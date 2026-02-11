@@ -5,10 +5,14 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "seed": "node seed.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "bcryptjs": "^2.4.3"
+    "@upstash/redis": "^1.36.2",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2"
   }
 }

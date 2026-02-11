@@ -33,6 +33,10 @@ async function api(method, path, body) {
     showLogin();
     throw new Error('Unauthorized');
   }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Server error' }));
+    throw new Error(err.error || 'Server error');
+  }
   return res.json();
 }
 
@@ -42,7 +46,7 @@ function toast(message, type = 'success') {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
   const icon = type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info';
-  el.innerHTML = `<span class="material-icons-round">${icon}</span>${message}`;
+  el.innerHTML = `<span class="material-icons-round">${icon}</span>${escHtml(message)}`;
   container.appendChild(el);
   setTimeout(() => {
     el.style.animation = 'toastOut .3s ease forwards';
@@ -75,7 +79,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     token = data.token;
     localStorage.setItem('agenda_token', token);
     showApp();
-    loadData();
+    await loadData();
   } catch {
     errEl.textContent = 'Contraseña incorrecta';
     errEl.classList.remove('hidden');
@@ -120,7 +124,6 @@ document.querySelectorAll('.nav-item').forEach(item => {
     e.preventDefault();
     const view = item.dataset.view;
     switchView(view);
-    // Close sidebar on mobile
     document.getElementById('sidebar').classList.remove('open');
   });
 });
@@ -134,7 +137,6 @@ function switchView(view) {
   const titles = { agenda: 'Agenda', team: 'Equipo', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
-  // Show/hide search and add button
   const searchBox = document.getElementById('search-box');
   const addBtn = document.getElementById('add-task-btn');
   if (view === 'agenda') {
@@ -161,6 +163,18 @@ async function loadData() {
       api('GET', '/tasks'),
       api('GET', '/settings')
     ]);
+
+    // If no tasks, try to seed (for fresh Redis deployments)
+    if (tasks.length === 0) {
+      try {
+        await fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        [tasks, settings] = await Promise.all([
+          api('GET', '/tasks'),
+          api('GET', '/settings')
+        ]);
+      } catch {}
+    }
+
     populateFilterDropdowns();
     renderTasks();
     renderTeam();
@@ -170,56 +184,63 @@ async function loadData() {
   }
 }
 
-// --- POPULATE DROPDOWNS ---
+// --- POPULATE DROPDOWNS (filters = <select>, form = <datalist>) ---
 function populateFilterDropdowns() {
-  const assignees = [...new Set(tasks.map(t => t.assignee).filter(Boolean))];
+  // Collect all unique values from tasks + settings
+  const assignees = [...new Set([
+    ...(settings.teamMembers || []).map(m => m.name),
+    ...tasks.map(t => t.assignee).filter(Boolean)
+  ])];
   const clients = [...new Set([
     ...(settings.clients || []).map(c => c.name),
     ...tasks.map(t => t.client).filter(Boolean)
   ])];
 
+  // Filter bar selects (these stay as <select> for filtering)
   const assigneeSelect = document.getElementById('filter-assignee');
   const clientSelect = document.getElementById('filter-client');
 
-  // Keep first option
   assigneeSelect.innerHTML = '<option value="">Todos los asignados</option>';
   clientSelect.innerHTML = '<option value="">Todos los clientes</option>';
 
   assignees.sort().forEach(a => {
-    assigneeSelect.innerHTML += `<option value="${esc(a)}">${esc(a)}</option>`;
+    assigneeSelect.innerHTML += `<option value="${escAttr(a)}">${escHtml(a)}</option>`;
   });
 
   clients.sort().forEach(c => {
-    clientSelect.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`;
+    clientSelect.innerHTML += `<option value="${escAttr(c)}">${escHtml(c)}</option>`;
   });
 
-  // Also populate task form dropdowns
-  populateFormDropdowns();
+  // Form datalists (these allow free text + suggestions)
+  populateFormDataLists(assignees, clients);
 }
 
-function populateFormDropdowns() {
-  const allMembers = (settings.teamMembers || []).map(m => m.name);
-  const allClients = (settings.clients || []).map(c => c.name);
+function populateFormDataLists(assignees, clients) {
+  // All people (from team members + unique names from tasks)
+  const allPeople = [...new Set([
+    ...(settings.teamMembers || []).map(m => m.name),
+    ...tasks.map(t => t.assignee).filter(Boolean),
+    ...tasks.map(t => t.supervisor).filter(Boolean),
+    ...tasks.map(t => t.owner).filter(Boolean)
+  ])].sort();
 
-  const taskAssignee = document.getElementById('task-assignee');
-  const taskSupervisor = document.getElementById('task-supervisor');
-  const taskOwner = document.getElementById('task-owner');
-  const taskClient = document.getElementById('task-client');
+  // All clients
+  const allClients = [...new Set([
+    ...(settings.clients || []).map(c => c.name),
+    ...tasks.map(t => t.client).filter(Boolean)
+  ])].sort();
 
-  taskAssignee.innerHTML = '<option value="">Seleccionar...</option>';
-  taskSupervisor.innerHTML = '<option value="">Seleccionar...</option>';
-  taskOwner.innerHTML = '<option value="">Seleccionar...</option>';
-  taskClient.innerHTML = '<option value="">Seleccionar...</option>';
+  // Populate datalists
+  setDatalistOptions('list-assignees', allPeople);
+  setDatalistOptions('list-supervisors', allPeople);
+  setDatalistOptions('list-owners', allPeople);
+  setDatalistOptions('list-clients', allClients);
+}
 
-  allMembers.sort().forEach(m => {
-    taskAssignee.innerHTML += `<option value="${esc(m)}">${esc(m)}</option>`;
-    taskSupervisor.innerHTML += `<option value="${esc(m)}">${esc(m)}</option>`;
-    taskOwner.innerHTML += `<option value="${esc(m)}">${esc(m)}</option>`;
-  });
-
-  allClients.sort().forEach(c => {
-    taskClient.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`;
-  });
+function setDatalistOptions(id, values) {
+  const dl = document.getElementById(id);
+  if (!dl) return;
+  dl.innerHTML = values.map(v => `<option value="${escAttr(v)}">`).join('');
 }
 
 // --- RENDER TASKS ---
@@ -249,7 +270,6 @@ function renderTasks() {
 }
 
 function renderGroupedTasks(container, filtered) {
-  // Group by assignee
   const groups = {};
   filtered.forEach(t => {
     const key = t.assignee || 'Sin asignar';
@@ -264,12 +284,11 @@ function renderGroupedTasks(container, filtered) {
     const color = member?.color || getColorForName(assignee);
     const initials = getInitials(assignee);
 
-    // Group header
     const header = document.createElement('div');
     header.className = 'group-header';
     header.innerHTML = `
       <div class="group-avatar" style="background:${color}">${initials}</div>
-      <span class="group-name">${esc(assignee)}</span>
+      <span class="group-name">${escHtml(assignee)}</span>
       <span class="group-count">${groupTasks.length} tarea${groupTasks.length !== 1 ? 's' : ''}</span>
       <span class="material-icons-round group-toggle">expand_more</span>
     `;
@@ -316,15 +335,15 @@ function buildTaskTable(taskList) {
 
     html += `
       <tr data-id="${t.id}">
-        <td><span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text}">${esc(t.client || '—')}</span></td>
+        <td><span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text}">${escHtml(t.client || '—')}</span></td>
         <td style="color:var(--text-muted);font-size:.8rem">${t.taskNumber || ''}</td>
-        <td class="task-project-cell">${esc(t.project || '—')}</td>
-        <td style="color:var(--text-secondary)">${esc(t.supervisor || '—')}</td>
-        <td>${t.priority ? `<span class="priority-badge ${priorityClass}">${esc(t.priority)}</span>` : '—'}</td>
+        <td class="task-project-cell">${escHtml(t.project || '—')}</td>
+        <td style="color:var(--text-secondary)">${escHtml(t.supervisor || '—')}</td>
+        <td>${t.priority ? `<span class="priority-badge ${priorityClass}">${escHtml(t.priority)}</span>` : '—'}</td>
         <td><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></td>
-        <td><span class="status-badge ${statusClass}">${esc(t.status || '—')}</span></td>
-        <td style="color:var(--text-secondary)">${esc(t.owner || '—')}</td>
-        <td><span class="material-icons-round comment-icon ${hasComment ? 'has-comment' : ''}" title="${esc(t.comments || '')}">${hasComment ? 'chat_bubble' : 'chat_bubble_outline'}</span></td>
+        <td><span class="status-badge ${statusClass}">${escHtml(t.status || '—')}</span></td>
+        <td style="color:var(--text-secondary)">${escHtml(t.owner || '—')}</td>
+        <td><span class="material-icons-round comment-icon ${hasComment ? 'has-comment' : ''}" title="${escAttr(t.comments || '')}">${hasComment ? 'chat_bubble' : 'chat_bubble_outline'}</span></td>
       </tr>`;
   });
 
@@ -355,21 +374,25 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
 document.getElementById('filter-assignee').addEventListener('change', (e) => {
   currentFilter.assignee = e.target.value;
   renderTasks();
+  updateStats();
 });
 
 document.getElementById('filter-status').addEventListener('change', (e) => {
   currentFilter.status = e.target.value;
   renderTasks();
+  updateStats();
 });
 
 document.getElementById('filter-client').addEventListener('change', (e) => {
   currentFilter.client = e.target.value;
   renderTasks();
+  updateStats();
 });
 
 document.getElementById('search-input').addEventListener('input', (e) => {
   currentFilter.search = e.target.value.toLowerCase();
   renderTasks();
+  updateStats();
 });
 
 document.getElementById('toggle-group').addEventListener('click', () => {
@@ -381,11 +404,18 @@ document.getElementById('toggle-group').addEventListener('click', () => {
 });
 
 function getFilteredTasks() {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
   return tasks.filter(t => {
     if (currentFilter.priority !== 'all' && (t.priority || '').toLowerCase() !== currentFilter.priority) return false;
     if (currentFilter.assignee && t.assignee !== currentFilter.assignee) return false;
     if (currentFilter.status && t.status !== currentFilter.status) return false;
     if (currentFilter.client && t.client !== currentFilter.client) return false;
+    if (currentFilter._overdue) {
+      if (!t.deadline || t.status === 'completado') return false;
+      if (!(new Date(t.deadline) < now)) return false;
+    }
     if (currentFilter.search) {
       const s = currentFilter.search;
       const hay = [t.client, t.project, t.assignee, t.supervisor, t.owner, t.comments]
@@ -396,7 +426,7 @@ function getFilteredTasks() {
   });
 }
 
-// --- STATS ---
+// --- STATS (clickable!) ---
 function updateStats() {
   const filtered = getFilteredTasks();
   const now = new Date();
@@ -415,6 +445,49 @@ function updateStats() {
   }).length;
 }
 
+// Clickable stat cards - act as quick filters
+document.querySelectorAll('.stat-card').forEach(card => {
+  card.style.cursor = 'pointer';
+  card.addEventListener('click', () => {
+    const label = card.querySelector('.stat-label')?.textContent?.trim();
+    // Reset all priority chips to "Todas"
+    document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
+    document.querySelector('.chip[data-filter="all"]').classList.add('active');
+    currentFilter.priority = 'all';
+
+    const statusSelect = document.getElementById('filter-status');
+
+    if (label === 'Total') {
+      // Clear all filters
+      statusSelect.value = '';
+      currentFilter.status = '';
+      currentFilter.assignee = '';
+      currentFilter.client = '';
+      document.getElementById('filter-assignee').value = '';
+      document.getElementById('filter-client').value = '';
+    } else if (label === 'En progreso') {
+      statusSelect.value = 'en progreso';
+      currentFilter.status = 'en progreso';
+    } else if (label === 'Sin empezar') {
+      statusSelect.value = 'sin empezar';
+      currentFilter.status = 'sin empezar';
+    } else if (label === 'Vencidas') {
+      // Special: clear status filter, we'll filter overdue in a custom way
+      statusSelect.value = '';
+      currentFilter.status = '';
+      // Use search to find overdue (we'll handle it in rendering)
+      currentFilter._overdue = true;
+    }
+
+    if (label !== 'Vencidas') {
+      currentFilter._overdue = false;
+    }
+
+    renderTasks();
+    updateStats();
+  });
+});
+
 // --- TASK MODAL ---
 const modal = document.getElementById('task-modal');
 const modalClose = document.getElementById('modal-close');
@@ -429,7 +502,6 @@ function openTaskModal(task = null) {
   document.getElementById('modal-title').textContent = task ? 'Editar tarea' : 'Nueva tarea';
   modalDelete.classList.toggle('hidden', !task);
 
-  // Populate form
   document.getElementById('task-client').value = task?.client || '';
   document.getElementById('task-project').value = task?.project || '';
   document.getElementById('task-assignee').value = task?.assignee || '';
@@ -456,15 +528,15 @@ taskForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const body = {
-    client: document.getElementById('task-client').value,
-    project: document.getElementById('task-project').value,
-    assignee: document.getElementById('task-assignee').value,
-    supervisor: document.getElementById('task-supervisor').value,
-    priority: document.getElementById('task-priority').value,
+    client: document.getElementById('task-client').value.trim(),
+    project: document.getElementById('task-project').value.trim(),
+    assignee: document.getElementById('task-assignee').value.trim(),
+    supervisor: document.getElementById('task-supervisor').value.trim(),
+    priority: document.getElementById('task-priority').value.trim(),
     deadline: document.getElementById('task-deadline').value,
-    status: document.getElementById('task-status').value,
-    owner: document.getElementById('task-owner').value,
-    comments: document.getElementById('task-comments').value
+    status: document.getElementById('task-status').value.trim() || 'sin empezar',
+    owner: document.getElementById('task-owner').value.trim(),
+    comments: document.getElementById('task-comments').value.trim()
   };
 
   try {
@@ -477,8 +549,8 @@ taskForm.addEventListener('submit', async (e) => {
     }
     closeTaskModal();
     await loadData();
-  } catch {
-    toast('Error al guardar', 'error');
+  } catch (err) {
+    toast('Error al guardar: ' + err.message, 'error');
   }
 });
 
@@ -490,8 +562,8 @@ modalDelete.addEventListener('click', async () => {
     toast('Tarea eliminada');
     closeTaskModal();
     await loadData();
-  } catch {
-    toast('Error al eliminar', 'error');
+  } catch (err) {
+    toast('Error al eliminar: ' + err.message, 'error');
   }
 });
 
@@ -500,7 +572,6 @@ function renderTeam() {
   const grid = document.getElementById('team-grid');
   const clientsList = document.getElementById('clients-list');
 
-  // Team members
   grid.innerHTML = '';
   (settings.teamMembers || []).forEach(member => {
     const taskCount = tasks.filter(t => t.assignee === member.name).length;
@@ -509,39 +580,41 @@ function renderTeam() {
     card.innerHTML = `
       <div class="member-avatar" style="background:${member.color || getColorForName(member.name)}">${getInitials(member.name)}</div>
       <div class="member-info">
-        <h3>${esc(member.name)}</h3>
-        <p>${esc(member.role || 'Equipo')}</p>
+        <h3>${escHtml(member.name)}</h3>
+        <p>${escHtml(member.role || 'Equipo')}</p>
       </div>
       <span class="member-tasks-count">${taskCount} tarea${taskCount !== 1 ? 's' : ''}</span>
-      <button class="member-delete" data-name="${esc(member.name)}" title="Eliminar">
+      <button class="member-delete" data-name="${escAttr(member.name)}" title="Eliminar">
         <span class="material-icons-round">close</span>
       </button>
     `;
     grid.appendChild(card);
   });
 
-  // Bind delete
   grid.querySelectorAll('.member-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const name = btn.dataset.name;
       if (!confirm(`¿Eliminar a ${name} del equipo?`)) return;
       settings.teamMembers = settings.teamMembers.filter(m => m.name !== name);
-      await api('PUT', '/settings', { teamMembers: settings.teamMembers });
-      renderTeam();
-      populateFilterDropdowns();
-      toast(`${name} eliminado del equipo`);
+      try {
+        await api('PUT', '/settings', { teamMembers: settings.teamMembers });
+        renderTeam();
+        populateFilterDropdowns();
+        toast(`${name} eliminado del equipo`);
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
     });
   });
 
-  // Clients
   clientsList.innerHTML = '';
   (settings.clients || []).forEach(client => {
     const tag = document.createElement('span');
     tag.className = 'tag';
     tag.innerHTML = `
-      <span class="client-badge" style="background:${client.color || '#f1f5f9'};color:${client.textColor || '#64748b'}">${esc(client.name)}</span>
-      <button class="tag-delete" data-name="${esc(client.name)}" title="Eliminar">
+      <span class="client-badge" style="background:${client.color || '#f1f5f9'};color:${client.textColor || '#64748b'}">${escHtml(client.name)}</span>
+      <button class="tag-delete" data-name="${escAttr(client.name)}" title="Eliminar">
         <span class="material-icons-round">close</span>
       </button>
     `;
@@ -553,10 +626,14 @@ function renderTeam() {
       const name = btn.dataset.name;
       if (!confirm(`¿Eliminar cliente ${name}?`)) return;
       settings.clients = settings.clients.filter(c => c.name !== name);
-      await api('PUT', '/settings', { clients: settings.clients });
-      renderTeam();
-      populateFilterDropdowns();
-      toast(`Cliente ${name} eliminado`);
+      try {
+        await api('PUT', '/settings', { clients: settings.clients });
+        renderTeam();
+        populateFilterDropdowns();
+        toast(`Cliente ${name} eliminado`);
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
     });
   });
 }
@@ -574,7 +651,6 @@ function openPromptModal(title, label, showColor, showRole, callback) {
   document.getElementById('prompt-modal-role-group').classList.toggle('hidden', !showRole);
   promptCallback = callback;
 
-  // Color swatches
   if (showColor) {
     const colorsDiv = document.getElementById('prompt-modal-colors');
     colorsDiv.innerHTML = '';
@@ -621,10 +697,14 @@ document.getElementById('add-member-btn').addEventListener('click', () => {
       return;
     }
     settings.teamMembers = [...(settings.teamMembers || []), { name, color, role }];
-    await api('PUT', '/settings', { teamMembers: settings.teamMembers });
-    renderTeam();
-    populateFilterDropdowns();
-    toast(`${name} agregado al equipo`);
+    try {
+      await api('PUT', '/settings', { teamMembers: settings.teamMembers });
+      renderTeam();
+      populateFilterDropdowns();
+      toast(`${name} agregado al equipo`);
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
   });
 });
 
@@ -634,22 +714,30 @@ document.getElementById('add-client-btn').addEventListener('click', () => {
       toast('Ya existe un cliente con ese nombre', 'error');
       return;
     }
-    // Generate light bg and dark text from color
     const bg = color + '18';
     settings.clients = [...(settings.clients || []), { name, color: bg, textColor: color }];
-    await api('PUT', '/settings', { clients: settings.clients });
-    renderTeam();
-    populateFilterDropdowns();
-    toast(`Cliente ${name} agregado`);
+    try {
+      await api('PUT', '/settings', { clients: settings.clients });
+      renderTeam();
+      populateFilterDropdowns();
+      toast(`Cliente ${name} agregado`);
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
   });
 });
 
 // --- HELPERS ---
-function esc(str) {
+function escHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function escAttr(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function getInitials(name) {
@@ -669,14 +757,12 @@ function getClientColor(client) {
   if (!client) return { bg: '#f1f5f9', text: '#64748b' };
   if (CLIENT_COLORS[client]) return CLIENT_COLORS[client];
 
-  // Check if there's a configured color
   const configured = (settings.clients || []).find(c => c.name === client);
   if (configured) {
     CLIENT_COLORS[client] = { bg: configured.color || '#f1f5f9', text: configured.textColor || '#64748b' };
     return CLIENT_COLORS[client];
   }
 
-  // Auto-generate
   const color = getColorForName(client);
   CLIENT_COLORS[client] = { bg: color + '18', text: color };
   return CLIENT_COLORS[client];

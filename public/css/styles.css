@@ -616,10 +616,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
-  position: sticky;
-  top: var(--topbar-height);
-  background: var(--bg);
-  z-index: 5;
+  background: var(--surface);
 }
 
 .task-table tbody tr {

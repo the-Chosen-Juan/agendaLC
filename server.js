@@ -6,33 +6,92 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'agenda.json');
-const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
+const DEFAULT_PASSWORD = process.env.AGENDA_PASSWORD || 'agenda2026';
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ensure data directory exists
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-  fs.mkdirSync(path.join(__dirname, 'data'));
+// ============================================================
+// STORAGE LAYER - Redis (Vercel) or File (local)
+// ============================================================
+const USE_REDIS = !!(process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL);
+let redis = null;
+
+if (USE_REDIS) {
+  const { Redis } = require('@upstash/redis');
+  redis = new Redis({
+    url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+  console.log('Storage: Upstash Redis');
+} else {
+  const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  console.log('Storage: Local files (' + DATA_DIR + ')');
 }
 
-// Initialize settings with default password "agenda2026"
-function getSettings() {
-  if (!fs.existsSync(SETTINGS_FILE)) {
-    const hash = bcrypt.hashSync('agenda2026', 10);
+// --- Storage functions ---
+async function getSettings() {
+  if (USE_REDIS) {
+    const data = await redis.get('agenda:settings');
+    if (data) return typeof data === 'string' ? JSON.parse(data) : data;
+    // Initialize with defaults
+    const hash = bcrypt.hashSync(DEFAULT_PASSWORD, 10);
     const settings = { passwordHash: hash, teamMembers: [], clients: [], supervisors: [], owners: [] };
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    await redis.set('agenda:settings', JSON.stringify(settings));
     return settings;
+  } else {
+    const filePath = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'settings.json');
+    if (!fs.existsSync(filePath)) {
+      const hash = bcrypt.hashSync(DEFAULT_PASSWORD, 10);
+      const settings = { passwordHash: hash, teamMembers: [], clients: [], supervisors: [], owners: [] };
+      fs.writeFileSync(filePath, JSON.stringify(settings, null, 2));
+      return settings;
+    }
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
   }
-  return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
 }
 
-function saveSettings(settings) {
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+async function saveSettings(settings) {
+  if (USE_REDIS) {
+    await redis.set('agenda:settings', JSON.stringify(settings));
+  } else {
+    const filePath = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'settings.json');
+    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2));
+  }
 }
 
-// Session tokens (in-memory for simplicity)
+async function getTasks() {
+  if (USE_REDIS) {
+    const data = await redis.get('agenda:tasks');
+    if (data) {
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      return Array.isArray(parsed) ? parsed : parsed.tasks || [];
+    }
+    return [];
+  } else {
+    const filePath = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'agenda.json');
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, JSON.stringify({ tasks: [] }, null, 2));
+      return [];
+    }
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return raw.tasks || [];
+  }
+}
+
+async function saveTasks(tasks) {
+  if (USE_REDIS) {
+    await redis.set('agenda:tasks', JSON.stringify(tasks));
+  } else {
+    const filePath = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'agenda.json');
+    fs.writeFileSync(filePath, JSON.stringify({ tasks }, null, 2));
+  }
+}
+
+// ============================================================
+// AUTH
+// ============================================================
 const sessions = new Map();
 
 function authMiddleware(req, res, next) {
@@ -43,27 +102,36 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-// --- AUTH ROUTES ---
-app.post('/api/login', (req, res) => {
-  const { password } = req.body;
-  const settings = getSettings();
-  if (bcrypt.compareSync(password, settings.passwordHash)) {
-    const token = crypto.randomBytes(32).toString('hex');
-    sessions.set(token, { loggedIn: true, createdAt: Date.now() });
-    return res.json({ token });
+app.post('/api/login', async (req, res) => {
+  try {
+    const { password } = req.body;
+    const settings = await getSettings();
+    if (bcrypt.compareSync(password, settings.passwordHash)) {
+      const token = crypto.randomBytes(32).toString('hex');
+      sessions.set(token, { loggedIn: true, createdAt: Date.now() });
+      return res.json({ token });
+    }
+    res.status(401).json({ error: 'Contraseña incorrecta' });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-  res.status(401).json({ error: 'Contraseña incorrecta' });
 });
 
-app.post('/api/change-password', authMiddleware, (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  const settings = getSettings();
-  if (!bcrypt.compareSync(currentPassword, settings.passwordHash)) {
-    return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+app.post('/api/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const settings = await getSettings();
+    if (!bcrypt.compareSync(currentPassword, settings.passwordHash)) {
+      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+    }
+    settings.passwordHash = bcrypt.hashSync(newPassword, 10);
+    await saveSettings(settings);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-  settings.passwordHash = bcrypt.hashSync(newPassword, 10);
-  saveSettings(settings);
-  res.json({ success: true });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -72,92 +140,146 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// --- DATA ROUTES ---
-function getData() {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ tasks: [] }, null, 2));
-    return { tasks: [] };
+// ============================================================
+// TASKS CRUD
+// ============================================================
+app.get('/api/tasks', authMiddleware, async (req, res) => {
+  try {
+    const tasks = await getTasks();
+    res.json(tasks);
+  } catch (err) {
+    console.error('Get tasks error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-  return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+});
+
+app.post('/api/tasks', authMiddleware, async (req, res) => {
+  try {
+    const tasks = await getTasks();
+    const task = {
+      id: crypto.randomUUID(),
+      client: req.body.client || '',
+      taskNumber: req.body.taskNumber || null,
+      project: req.body.project || '',
+      assignee: req.body.assignee || '',
+      supervisor: req.body.supervisor || '',
+      priority: req.body.priority || '',
+      deadline: req.body.deadline || '',
+      status: req.body.status || 'sin empezar',
+      owner: req.body.owner || '',
+      comments: req.body.comments || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    tasks.push(task);
+    await saveTasks(tasks);
+    res.json(task);
+  } catch (err) {
+    console.error('Create task error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
+  try {
+    const tasks = await getTasks();
+    const idx = tasks.findIndex(t => t.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Task not found' });
+    tasks[idx] = { ...tasks[idx], ...req.body, updatedAt: new Date().toISOString() };
+    await saveTasks(tasks);
+    res.json(tasks[idx]);
+  } catch (err) {
+    console.error('Update task error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
+  try {
+    let tasks = await getTasks();
+    tasks = tasks.filter(t => t.id !== req.params.id);
+    await saveTasks(tasks);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete task error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
+// SETTINGS (team members, clients)
+// ============================================================
+app.get('/api/settings', authMiddleware, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    res.json({
+      teamMembers: settings.teamMembers || [],
+      clients: settings.clients || [],
+      supervisors: settings.supervisors || [],
+      owners: settings.owners || []
+    });
+  } catch (err) {
+    console.error('Get settings error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/settings', authMiddleware, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    if (req.body.teamMembers) settings.teamMembers = req.body.teamMembers;
+    if (req.body.clients) settings.clients = req.body.clients;
+    if (req.body.supervisors) settings.supervisors = req.body.supervisors;
+    if (req.body.owners) settings.owners = req.body.owners;
+    await saveSettings(settings);
+    res.json({
+      teamMembers: settings.teamMembers,
+      clients: settings.clients,
+      supervisors: settings.supervisors,
+      owners: settings.owners
+    });
+  } catch (err) {
+    console.error('Update settings error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
+// SEED ENDPOINT - to populate Redis from initial data
+// ============================================================
+app.post('/api/seed', async (req, res) => {
+  try {
+    if (USE_REDIS) {
+      const existing = await getTasks();
+      if (existing.length > 0) {
+        return res.json({ message: 'Data already exists', tasks: existing.length });
+      }
+      // Read seed data from bundled files
+      const seedDataPath = path.join(__dirname, 'data', 'agenda.json');
+      const seedSettingsPath = path.join(__dirname, 'data', 'settings.json');
+      if (fs.existsSync(seedDataPath)) {
+        const data = JSON.parse(fs.readFileSync(seedDataPath, 'utf-8'));
+        await saveTasks(data.tasks || []);
+      }
+      if (fs.existsSync(seedSettingsPath)) {
+        const settingsData = JSON.parse(fs.readFileSync(seedSettingsPath, 'utf-8'));
+        await saveSettings(settingsData);
+      }
+      return res.json({ message: 'Seeded successfully' });
+    }
+    res.json({ message: 'File storage - no seed needed' });
+  } catch (err) {
+    console.error('Seed error:', err);
+    res.status(500).json({ error: 'Seed failed' });
+  }
+});
+
+// Start server (only when not imported by Vercel)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Agenda LC running on http://localhost:${PORT}`);
+  });
 }
 
-function saveData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-// Get all tasks
-app.get('/api/tasks', authMiddleware, (req, res) => {
-  const data = getData();
-  res.json(data.tasks);
-});
-
-// Create task
-app.post('/api/tasks', authMiddleware, (req, res) => {
-  const data = getData();
-  const task = {
-    id: crypto.randomUUID(),
-    client: req.body.client || '',
-    taskNumber: req.body.taskNumber || null,
-    project: req.body.project || '',
-    assignee: req.body.assignee || '',
-    supervisor: req.body.supervisor || '',
-    priority: req.body.priority || '',
-    deadline: req.body.deadline || '',
-    status: req.body.status || 'sin empezar',
-    owner: req.body.owner || '',
-    comments: req.body.comments || '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  data.tasks.push(task);
-  saveData(data);
-  res.json(task);
-});
-
-// Update task
-app.put('/api/tasks/:id', authMiddleware, (req, res) => {
-  const data = getData();
-  const idx = data.tasks.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Task not found' });
-  data.tasks[idx] = { ...data.tasks[idx], ...req.body, updatedAt: new Date().toISOString() };
-  saveData(data);
-  res.json(data.tasks[idx]);
-});
-
-// Delete task
-app.delete('/api/tasks/:id', authMiddleware, (req, res) => {
-  const data = getData();
-  data.tasks = data.tasks.filter(t => t.id !== req.params.id);
-  saveData(data);
-  res.json({ success: true });
-});
-
-// --- SETTINGS ROUTES (team members, clients, etc.) ---
-app.get('/api/settings', authMiddleware, (req, res) => {
-  const settings = getSettings();
-  res.json({
-    teamMembers: settings.teamMembers || [],
-    clients: settings.clients || [],
-    supervisors: settings.supervisors || [],
-    owners: settings.owners || []
-  });
-});
-
-app.put('/api/settings', authMiddleware, (req, res) => {
-  const settings = getSettings();
-  if (req.body.teamMembers) settings.teamMembers = req.body.teamMembers;
-  if (req.body.clients) settings.clients = req.body.clients;
-  if (req.body.supervisors) settings.supervisors = req.body.supervisors;
-  if (req.body.owners) settings.owners = req.body.owners;
-  saveSettings(settings);
-  res.json({
-    teamMembers: settings.teamMembers,
-    clients: settings.clients,
-    supervisors: settings.supervisors,
-    owners: settings.owners
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Agenda LC running on http://localhost:${PORT}`);
-});
+// Export for Vercel serverless
+module.exports = app;

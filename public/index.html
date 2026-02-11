@@ -223,19 +223,18 @@
         <div class="form-row">
           <div class="form-group">
             <label>Cliente / Marca</label>
-            <select id="task-client" required>
-              <option value="">Seleccionar...</option>
-            </select>
+            <input type="text" id="task-client" list="list-clients" placeholder="Escribí o elegí..." required>
+            <datalist id="list-clients"></datalist>
           </div>
           <div class="form-group">
             <label>Prioridad</label>
-            <select id="task-priority">
-              <option value="">Seleccionar...</option>
-              <option value="alta">Alta</option>
-              <option value="media">Media</option>
-              <option value="baja">Baja</option>
-              <option value="TBD">TBD</option>
-            </select>
+            <input type="text" id="task-priority" list="list-priorities" placeholder="Escribí o elegí...">
+            <datalist id="list-priorities">
+              <option value="alta">
+              <option value="media">
+              <option value="baja">
+              <option value="TBD">
+            </datalist>
           </div>
         </div>
         <div class="form-group">
@@ -245,15 +244,13 @@
         <div class="form-row">
           <div class="form-group">
             <label>Asignado a</label>
-            <select id="task-assignee" required>
-              <option value="">Seleccionar...</option>
-            </select>
+            <input type="text" id="task-assignee" list="list-assignees" placeholder="Escribí o elegí..." required>
+            <datalist id="list-assignees"></datalist>
           </div>
           <div class="form-group">
             <label>Supervisor</label>
-            <select id="task-supervisor">
-              <option value="">Seleccionar...</option>
-            </select>
+            <input type="text" id="task-supervisor" list="list-supervisors" placeholder="Escribí o elegí...">
+            <datalist id="list-supervisors"></datalist>
           </div>
         </div>
         <div class="form-row">
@@ -263,20 +260,20 @@
           </div>
           <div class="form-group">
             <label>Status</label>
-            <select id="task-status">
-              <option value="sin empezar">Sin empezar</option>
-              <option value="en progreso">En progreso</option>
-              <option value="on going">On going</option>
-              <option value="esperando respuesta">Esperando respuesta</option>
-              <option value="completado">Completado</option>
-            </select>
+            <input type="text" id="task-status" list="list-statuses" placeholder="Escribí o elegí...">
+            <datalist id="list-statuses">
+              <option value="sin empezar">
+              <option value="en progreso">
+              <option value="on going">
+              <option value="esperando respuesta">
+              <option value="completado">
+            </datalist>
           </div>
         </div>
         <div class="form-group">
           <label>Owner</label>
-          <select id="task-owner">
-            <option value="">Seleccionar...</option>
-          </select>
+          <input type="text" id="task-owner" list="list-owners" placeholder="Escribí o elegí...">
+          <datalist id="list-owners"></datalist>
         </div>
         <div class="form-group">
           <label>Comentarios</label>

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: agenda-lc
+    runtime: node
+    buildCommand: npm install && node seed.js
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AGENDA_PASSWORD
+        value: agenda2026
