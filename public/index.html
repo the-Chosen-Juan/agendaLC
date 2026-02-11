@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda LC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-backdrop"></div>
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="material-icons-round logo-icon">event_note</span>
+        <h1>Agenda <span class="accent">LC</span></h1>
+        <p class="login-subtitle">Team Task Management</p>
+      </div>
+      <form id="login-form" autocomplete="off">
+        <div class="input-group">
+          <span class="material-icons-round input-icon">lock</span>
+          <input type="password" id="login-password" placeholder="Ingresá la contraseña" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-login" id="login-btn">
+          <span>Entrar</span>
+          <span class="material-icons-round">arrow_forward</span>
+        </button>
+        <p id="login-error" class="login-error hidden"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app" class="app hidden">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <span class="material-icons-round logo-icon-sm">event_note</span>
+        <h2>Agenda <span class="accent">LC</span></h2>
+        <button class="btn-icon sidebar-close" id="sidebar-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="agenda">
+          <span class="material-icons-round">dashboard</span>
+          <span>Agenda</span>
+        </a>
+        <a href="#" class="nav-item" data-view="team">
+          <span class="material-icons-round">group</span>
+          <span>Equipo</span>
+        </a>
+        <a href="#" class="nav-item" data-view="settings">
+          <span class="material-icons-round">settings</span>
+          <span>Configuración</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="btn btn-ghost btn-logout" id="logout-btn">
+          <span class="material-icons-round">logout</span>
+          <span>Cerrar sesión</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- TOP BAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="btn-icon" id="sidebar-toggle">
+            <span class="material-icons-round">menu</span>
+          </button>
+          <h1 class="page-title" id="page-title">Agenda</h1>
+        </div>
+        <div class="topbar-right">
+          <div class="search-box" id="search-box">
+            <span class="material-icons-round">search</span>
+            <input type="text" id="search-input" placeholder="Buscar tareas...">
+          </div>
+          <button class="btn btn-primary" id="add-task-btn">
+            <span class="material-icons-round">add</span>
+            <span class="btn-label">Nueva tarea</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- AGENDA VIEW -->
+      <div id="view-agenda" class="view active">
+        <!-- FILTERS -->
+        <div class="filters-bar">
+          <div class="filter-chips">
+            <button class="chip active" data-filter="all">Todas</button>
+            <button class="chip" data-filter="alta">
+              <span class="priority-dot priority-alta"></span> Alta
+            </button>
+            <button class="chip" data-filter="media">
+              <span class="priority-dot priority-media"></span> Media
+            </button>
+            <button class="chip" data-filter="baja">
+              <span class="priority-dot priority-baja"></span> Baja
+            </button>
+          </div>
+          <div class="filter-selects">
+            <select id="filter-assignee" class="filter-select">
+              <option value="">Todos los asignados</option>
+            </select>
+            <select id="filter-status" class="filter-select">
+              <option value="">Todos los estados</option>
+              <option value="sin empezar">Sin empezar</option>
+              <option value="en progreso">En progreso</option>
+              <option value="on going">On going</option>
+              <option value="esperando respuesta">Esperando respuesta</option>
+              <option value="completado">Completado</option>
+            </select>
+            <select id="filter-client" class="filter-select">
+              <option value="">Todos los clientes</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" id="toggle-group">
+              <span class="material-icons-round">view_agenda</span>
+              <span>Agrupar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon stat-total"><span class="material-icons-round">assignment</span></div>
+            <div class="stat-info">
+              <span class="stat-number" id="stat-total">0</span>
+              <span class="stat-label">Total</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-progress"><span class="material-icons-round">pending</span></div>
+            <div class="stat-info">
+              <span class="stat-number" id="stat-progress">0</span>
+              <span class="stat-label">En progreso</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-notstarted"><span class="material-icons-round">schedule</span></div>
+            <div class="stat-info">
+              <span class="stat-number" id="stat-notstarted">0</span>
+              <span class="stat-label">Sin empezar</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-overdue"><span class="material-icons-round">warning</span></div>
+            <div class="stat-info">
+              <span class="stat-number" id="stat-overdue">0</span>
+              <span class="stat-label">Vencidas</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TASKS CONTAINER -->
+        <div id="tasks-container" class="tasks-container"></div>
+      </div>
+
+      <!-- TEAM VIEW -->
+      <div id="view-team" class="view hidden">
+        <div class="team-section">
+          <div class="section-header">
+            <h2>Miembros del equipo</h2>
+            <button class="btn btn-primary btn-sm" id="add-member-btn">
+              <span class="material-icons-round">person_add</span>
+              <span>Agregar miembro</span>
+            </button>
+          </div>
+          <div id="team-grid" class="team-grid"></div>
+        </div>
+        <div class="team-section">
+          <div class="section-header">
+            <h2>Clientes</h2>
+            <button class="btn btn-primary btn-sm" id="add-client-btn">
+              <span class="material-icons-round">add_business</span>
+              <span>Agregar cliente</span>
+            </button>
+          </div>
+          <div id="clients-list" class="tags-list"></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS VIEW -->
+      <div id="view-settings" class="view hidden">
+        <div class="settings-card">
+          <h2>Cambiar contraseña</h2>
+          <form id="change-password-form">
+            <div class="input-group">
+              <span class="material-icons-round input-icon">lock</span>
+              <input type="password" id="current-password" placeholder="Contraseña actual" required>
+            </div>
+            <div class="input-group">
+              <span class="material-icons-round input-icon">lock_reset</span>
+              <input type="password" id="new-password" placeholder="Nueva contraseña" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
+            <p id="password-msg" class="hidden"></p>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- TASK MODAL -->
+  <div id="task-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Nueva tarea</h2>
+        <button class="btn-icon modal-close" id="modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <form id="task-form" class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cliente / Marca</label>
+            <select id="task-client" required>
+              <option value="">Seleccionar...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Prioridad</label>
+            <select id="task-priority">
+              <option value="">Seleccionar...</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+              <option value="TBD">TBD</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Tema / Proyecto</label>
+          <input type="text" id="task-project" placeholder="Ej: Supervisión WC26" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Asignado a</label>
+            <select id="task-assignee" required>
+              <option value="">Seleccionar...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Supervisor</label>
+            <select id="task-supervisor">
+              <option value="">Seleccionar...</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Deadline</label>
+            <input type="date" id="task-deadline">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="task-status">
+              <option value="sin empezar">Sin empezar</option>
+              <option value="en progreso">En progreso</option>
+              <option value="on going">On going</option>
+              <option value="esperando respuesta">Esperando respuesta</option>
+              <option value="completado">Completado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Owner</label>
+          <select id="task-owner">
+            <option value="">Seleccionar...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Comentarios</label>
+          <textarea id="task-comments" rows="3" placeholder="Comentarios..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="modal-cancel">Cancelar</button>
+          <button type="button" class="btn btn-danger hidden" id="modal-delete">
+            <span class="material-icons-round">delete</span> Eliminar
+          </button>
+          <button type="submit" class="btn btn-primary" id="modal-save">
+            <span class="material-icons-round">check</span> Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SIMPLE PROMPT MODAL (for adding members/clients) -->
+  <div id="prompt-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h2 id="prompt-modal-title">Agregar</h2>
+        <button class="btn-icon modal-close" id="prompt-modal-close">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label id="prompt-modal-label">Nombre</label>
+          <input type="text" id="prompt-modal-input" placeholder="" required>
+        </div>
+        <div class="form-group hidden" id="prompt-modal-color-group">
+          <label>Color</label>
+          <div class="color-picker" id="prompt-modal-colors"></div>
+        </div>
+        <div class="form-group hidden" id="prompt-modal-role-group">
+          <label>Rol</label>
+          <input type="text" id="prompt-modal-role" placeholder="Ej: Diseñador, PM...">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="prompt-modal-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="prompt-modal-save">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

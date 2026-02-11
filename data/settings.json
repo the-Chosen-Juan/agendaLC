@@ -1,0 +1,134 @@
+{
+  "passwordHash": "$2a$10$mBqVhOMfSJNpYBd4QZuxy.jdxwKO2FBm3Q22KkV652Uw7rLieofzC",
+  "teamMembers": [
+    {
+      "name": "Whalys",
+      "color": "#6366f1",
+      "role": "Equipo"
+    },
+    {
+      "name": "Nacho",
+      "color": "#f59e0b",
+      "role": "Equipo"
+    },
+    {
+      "name": "Nia Freelo",
+      "color": "#ec4899",
+      "role": "Freelance"
+    },
+    {
+      "name": "Tomi",
+      "color": "#10b981",
+      "role": "Equipo"
+    },
+    {
+      "name": "Agus y Pau",
+      "color": "#3b82f6",
+      "role": "Equipo"
+    },
+    {
+      "name": "Chiari & Marti",
+      "color": "#a855f7",
+      "role": "Equipo"
+    },
+    {
+      "name": "Liso",
+      "color": "#06b6d4",
+      "role": "Supervisor"
+    },
+    {
+      "name": "Zeke",
+      "color": "#14b8a6",
+      "role": "Supervisor"
+    },
+    {
+      "name": "Agus",
+      "color": "#f97316",
+      "role": "Owner"
+    },
+    {
+      "name": "Jess",
+      "color": "#e11d48",
+      "role": "Owner"
+    },
+    {
+      "name": "LuMos",
+      "color": "#8b5cf6",
+      "role": "Owner"
+    },
+    {
+      "name": "Naki",
+      "color": "#84cc16",
+      "role": "Owner"
+    },
+    {
+      "name": "Barbi",
+      "color": "#d946ef",
+      "role": "Owner"
+    },
+    {
+      "name": "Del",
+      "color": "#0ea5e9",
+      "role": "Owner"
+    },
+    {
+      "name": "Juan",
+      "color": "#ef4444",
+      "role": "Owner"
+    },
+    {
+      "name": "Luli",
+      "color": "#ec4899",
+      "role": "Owner"
+    }
+  ],
+  "clients": [
+    {
+      "name": "Red",
+      "color": "#ef444418",
+      "textColor": "#ef4444"
+    },
+    {
+      "name": "Alma Mora",
+      "color": "#8b5cf618",
+      "textColor": "#8b5cf6"
+    },
+    {
+      "name": "LA COMU",
+      "color": "#3b82f618",
+      "textColor": "#3b82f6"
+    },
+    {
+      "name": "DIAGEO",
+      "color": "#f59e0b18",
+      "textColor": "#f59e0b"
+    },
+    {
+      "name": "Black",
+      "color": "#0f172a20",
+      "textColor": "#0f172a"
+    },
+    {
+      "name": "PORSCHE",
+      "color": "#0ea5e918",
+      "textColor": "#0ea5e9"
+    },
+    {
+      "name": "ClubNutri",
+      "color": "#10b98118",
+      "textColor": "#10b981"
+    },
+    {
+      "name": "TIME OFF",
+      "color": "#94a3b818",
+      "textColor": "#94a3b8"
+    },
+    {
+      "name": "Dadá",
+      "color": "#d946ef18",
+      "textColor": "#d946ef"
+    }
+  ],
+  "supervisors": [],
+  "owners": []
+}
