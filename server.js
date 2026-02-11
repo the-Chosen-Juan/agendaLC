@@ -90,13 +90,32 @@ async function saveTasks(tasks) {
 }
 
 // ============================================================
-// AUTH
+// AUTH - Stateless HMAC tokens (works on serverless)
 // ============================================================
-const sessions = new Map();
+const TOKEN_SECRET = process.env.TOKEN_SECRET || 'agenda-lc-secret-key-2026';
 
-function authMiddleware(req, res, next) {
+function createToken(passwordHash) {
+  // Token = timestamp.hmac - any instance can verify without shared state
+  const ts = Date.now().toString(36);
+  const hmac = crypto.createHmac('sha256', TOKEN_SECRET)
+    .update(passwordHash + ':' + ts)
+    .digest('hex').slice(0, 32);
+  return ts + '.' + hmac;
+}
+
+async function verifyToken(token) {
+  if (!token || !token.includes('.')) return false;
+  const [ts, hmac] = token.split('.');
+  const settings = await getSettings();
+  const expected = crypto.createHmac('sha256', TOKEN_SECRET)
+    .update(settings.passwordHash + ':' + ts)
+    .digest('hex').slice(0, 32);
+  return hmac === expected;
+}
+
+async function authMiddleware(req, res, next) {
   const token = req.headers['authorization']?.replace('Bearer ', '');
-  if (!token || !sessions.has(token)) {
+  if (!token || !(await verifyToken(token))) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();
@@ -107,8 +126,7 @@ app.post('/api/login', async (req, res) => {
     const { password } = req.body;
     const settings = await getSettings();
     if (bcrypt.compareSync(password, settings.passwordHash)) {
-      const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, { loggedIn: true, createdAt: Date.now() });
+      const token = createToken(settings.passwordHash);
       return res.json({ token });
     }
     res.status(401).json({ error: 'Contraseña incorrecta' });
@@ -127,7 +145,9 @@ app.post('/api/change-password', authMiddleware, async (req, res) => {
     }
     settings.passwordHash = bcrypt.hashSync(newPassword, 10);
     await saveSettings(settings);
-    res.json({ success: true });
+    // Return new token since password changed (old tokens auto-invalidate)
+    const token = createToken(settings.passwordHash);
+    res.json({ success: true, token });
   } catch (err) {
     console.error('Change password error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -135,8 +155,7 @@ app.post('/api/change-password', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-  const token = req.headers['authorization']?.replace('Bearer ', '');
-  sessions.delete(token);
+  // Stateless - client just deletes the token
   res.json({ success: true });
 });
 
