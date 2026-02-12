@@ -5,10 +5,15 @@
 // --- STATE ---
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
-let settings = { teamMembers: [], clients: [], supervisors: [], owners: [] };
+let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [] };
 let currentFilter = { priority: 'all', assignee: '', status: '', client: '', search: '' };
 let grouped = true;
 let editingTaskId = null;
+let editingTimeOffId = null;
+let calMonth = new Date().getMonth();
+let calYear = new Date().getFullYear();
+let calFilters = { deadlines: true, timeoff: true };
+let draggedGroup = null;
 
 // Preset colors for avatars
 const COLORS = [
@@ -16,6 +21,8 @@ const COLORS = [
   '#10b981', '#06b6d4', '#3b82f6', '#f97316', '#14b8a6',
   '#a855f7', '#e11d48', '#0ea5e9', '#84cc16', '#d946ef'
 ];
+
+const PRIORITY_CYCLE = ['alta', 'media', 'baja', 'TBD'];
 
 // --- API HELPER ---
 async function api(method, path, body) {
@@ -53,6 +60,26 @@ function toast(message, type = 'success') {
     setTimeout(() => el.remove(), 300);
   }, 3000);
 }
+
+// --- DARK MODE ---
+const darkModeToggle = document.getElementById('dark-mode-toggle');
+if (localStorage.getItem('darkMode') === 'true') {
+  document.documentElement.setAttribute('data-theme', 'dark');
+  darkModeToggle.querySelector('.material-icons-round').textContent = 'light_mode';
+}
+
+darkModeToggle.addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if (isDark) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('darkMode', 'false');
+    darkModeToggle.querySelector('.material-icons-round').textContent = 'dark_mode';
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('darkMode', 'true');
+    darkModeToggle.querySelector('.material-icons-round').textContent = 'light_mode';
+  }
+});
 
 // --- LOGIN / LOGOUT ---
 function showLogin() {
@@ -134,17 +161,21 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
 
-  const titles = { agenda: 'Agenda', team: 'Equipo', settings: 'Configuración' };
+  const titles = { agenda: 'Agenda', calendar: 'Calendario', team: 'Equipo', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
   const searchBox = document.getElementById('search-box');
-  const addBtn = document.getElementById('add-task-btn');
+  const addBtn = document.getElementById('add-task-dropdown');
   if (view === 'agenda') {
     searchBox.classList.remove('hidden');
     addBtn.classList.remove('hidden');
   } else {
     searchBox.classList.add('hidden');
     addBtn.classList.add('hidden');
+  }
+
+  if (view === 'calendar') {
+    renderCalendar();
   }
 }
 
@@ -154,6 +185,29 @@ document.getElementById('sidebar-toggle').addEventListener('click', () => {
 });
 document.getElementById('sidebar-close').addEventListener('click', () => {
   document.getElementById('sidebar').classList.remove('open');
+});
+
+// --- ADD TASK DROPDOWN ---
+const addTaskBtn = document.getElementById('add-task-btn');
+const addTaskMenu = document.getElementById('add-task-menu');
+
+addTaskBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  addTaskMenu.classList.toggle('hidden');
+});
+
+document.addEventListener('click', () => {
+  addTaskMenu.classList.add('hidden');
+});
+
+document.getElementById('add-task-regular').addEventListener('click', () => {
+  addTaskMenu.classList.add('hidden');
+  openTaskModal();
+});
+
+document.getElementById('add-timeoff-btn').addEventListener('click', () => {
+  addTaskMenu.classList.add('hidden');
+  openTimeOffModal();
 });
 
 // --- DATA LOADING ---
@@ -186,7 +240,6 @@ async function loadData() {
 
 // --- POPULATE DROPDOWNS (filters = <select>, form = <datalist>) ---
 function populateFilterDropdowns() {
-  // Collect all unique values from tasks + settings
   const assignees = [...new Set([
     ...(settings.teamMembers || []).map(m => m.name),
     ...tasks.map(t => t.assignee).filter(Boolean)
@@ -196,7 +249,6 @@ function populateFilterDropdowns() {
     ...tasks.map(t => t.client).filter(Boolean)
   ])];
 
-  // Filter bar selects (these stay as <select> for filtering)
   const assigneeSelect = document.getElementById('filter-assignee');
   const clientSelect = document.getElementById('filter-client');
 
@@ -211,12 +263,10 @@ function populateFilterDropdowns() {
     clientSelect.innerHTML += `<option value="${escAttr(c)}">${escHtml(c)}</option>`;
   });
 
-  // Form datalists (these allow free text + suggestions)
   populateFormDataLists(assignees, clients);
 }
 
 function populateFormDataLists(assignees, clients) {
-  // All people (from team members + unique names from tasks)
   const allPeople = [...new Set([
     ...(settings.teamMembers || []).map(m => m.name),
     ...tasks.map(t => t.assignee).filter(Boolean),
@@ -224,13 +274,11 @@ function populateFormDataLists(assignees, clients) {
     ...tasks.map(t => t.owner).filter(Boolean)
   ])].sort();
 
-  // All clients
   const allClients = [...new Set([
     ...(settings.clients || []).map(c => c.name),
     ...tasks.map(t => t.client).filter(Boolean)
   ])].sort();
 
-  // Populate datalists
   setDatalistOptions('list-assignees', allPeople);
   setDatalistOptions('list-supervisors', allPeople);
   setDatalistOptions('list-owners', allPeople);
@@ -244,6 +292,14 @@ function setDatalistOptions(id, values) {
 }
 
 // --- RENDER TASKS ---
+function getRegularTasks() {
+  return tasks.filter(t => !t.isTimeOff);
+}
+
+function getTimeOffEntries() {
+  return tasks.filter(t => t.isTimeOff);
+}
+
 function renderTasks() {
   const container = document.getElementById('tasks-container');
   const filtered = getFilteredTasks();
@@ -279,17 +335,54 @@ function renderGroupedTasks(container, filtered) {
 
   container.innerHTML = '';
 
-  Object.entries(groups).forEach(([assignee, groupTasks]) => {
+  // Sort groups by saved order
+  const order = settings.assigneeOrder || [];
+  const sortedKeys = Object.keys(groups).sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
+  const timeOffs = getTimeOffEntries();
+
+  sortedKeys.forEach((assignee) => {
+    const groupTasks = groups[assignee];
     const member = (settings.teamMembers || []).find(m => m.name === assignee);
     const color = member?.color || getColorForName(assignee);
     const initials = getInitials(assignee);
 
+    // Get time off entries for this member
+    const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
+
     const header = document.createElement('div');
     header.className = 'group-header';
+    header.setAttribute('draggable', 'true');
+    header.dataset.assignee = assignee;
+
+    let timeoffHtml = '';
+    if (memberTimeOffs.length > 0) {
+      timeoffHtml = '<div class="group-timeoff">';
+      memberTimeOffs.forEach(to => {
+        const start = formatDate(to.timeOffStart);
+        const end = formatDate(to.timeOffEnd);
+        const type = to.timeOffType || 'Tiempo libre';
+        timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(type)}">
+          <span class="material-icons-round">beach_access</span>
+          ${escHtml(type)}: ${start} - ${end}
+        </span>`;
+      });
+      timeoffHtml += '</div>';
+    }
+
     header.innerHTML = `
+      <span class="material-icons-round drag-handle">drag_indicator</span>
       <div class="group-avatar" style="background:${color}">${initials}</div>
       <span class="group-name">${escHtml(assignee)}</span>
       <span class="group-count">${groupTasks.length} tarea${groupTasks.length !== 1 ? 's' : ''}</span>
+      ${timeoffHtml}
       <span class="material-icons-round group-toggle">expand_more</span>
     `;
 
@@ -297,10 +390,66 @@ function renderGroupedTasks(container, filtered) {
     tableWrapper.className = 'table-wrapper';
     tableWrapper.innerHTML = buildTaskTable(groupTasks);
 
-    header.addEventListener('click', () => {
+    // Toggle collapse
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge')) return;
       const toggle = header.querySelector('.group-toggle');
       toggle.classList.toggle('collapsed');
       tableWrapper.classList.toggle('hidden');
+    });
+
+    // Time off badge click -> open time off modal for editing
+    header.querySelectorAll('.timeoff-badge').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const toTask = tasks.find(t => t.id === badge.dataset.id);
+        if (toTask) openTimeOffModal(toTask);
+      });
+    });
+
+    // Drag and drop for reordering
+    header.addEventListener('dragstart', (e) => {
+      draggedGroup = assignee;
+      header.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    header.addEventListener('dragend', () => {
+      header.classList.remove('dragging');
+      container.querySelectorAll('.group-header').forEach(h => h.classList.remove('drag-over'));
+      draggedGroup = null;
+    });
+
+    header.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (header.dataset.assignee !== draggedGroup) {
+        header.classList.add('drag-over');
+      }
+    });
+
+    header.addEventListener('dragleave', () => {
+      header.classList.remove('drag-over');
+    });
+
+    header.addEventListener('drop', (e) => {
+      e.preventDefault();
+      header.classList.remove('drag-over');
+      if (!draggedGroup || draggedGroup === assignee) return;
+
+      // Compute new order
+      const currentHeaders = [...container.querySelectorAll('.group-header')];
+      const names = currentHeaders.map(h => h.dataset.assignee);
+      const fromIdx = names.indexOf(draggedGroup);
+      const toIdx = names.indexOf(assignee);
+      if (fromIdx === -1 || toIdx === -1) return;
+
+      names.splice(fromIdx, 1);
+      names.splice(toIdx, 0, draggedGroup);
+
+      settings.assigneeOrder = names;
+      api('PUT', '/settings', { assigneeOrder: names }).catch(() => {});
+      renderTasks();
     });
 
     container.appendChild(header);
@@ -332,14 +481,17 @@ function buildTaskTable(taskList) {
     const statusClass = (t.status || '').toLowerCase().replace(/ /g, '-');
     const deadlineClass = getDeadlineClass(t.deadline);
     const hasComment = t.comments && t.comments.trim().length > 0;
+    const supervisionTag = t.isSupervision
+      ? '<span class="supervision-tag"><span class="material-icons-round">visibility</span>Supervisión</span>'
+      : '';
 
     html += `
       <tr data-id="${t.id}">
         <td><span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text}">${escHtml(t.client || '—')}</span></td>
         <td style="color:var(--text-muted);font-size:.8rem">${t.taskNumber || ''}</td>
-        <td class="task-project-cell">${escHtml(t.project || '—')}</td>
+        <td class="task-project-cell">${escHtml(t.project || '—')}${supervisionTag}</td>
         <td style="color:var(--text-secondary)">${escHtml(t.supervisor || '—')}</td>
-        <td>${t.priority ? `<span class="priority-badge ${priorityClass}">${escHtml(t.priority)}</span>` : '—'}</td>
+        <td><span class="priority-badge clickable ${priorityClass}" data-task-id="${t.id}" title="Click para cambiar prioridad">${escHtml(t.priority || '—')}</span></td>
         <td><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></td>
         <td><span class="status-badge ${statusClass}">${escHtml(t.status || '—')}</span></td>
         <td style="color:var(--text-secondary)">${escHtml(t.owner || '—')}</td>
@@ -352,10 +504,38 @@ function buildTaskTable(taskList) {
 }
 
 function bindTaskRows(wrapper) {
+  // Row click -> open modal
   wrapper.querySelectorAll('tr[data-id]').forEach(row => {
-    row.addEventListener('click', () => {
+    row.addEventListener('click', (e) => {
+      // Don't open modal if clicking priority badge
+      if (e.target.closest('.priority-badge.clickable')) return;
       const task = tasks.find(t => t.id === row.dataset.id);
       if (task) openTaskModal(task);
+    });
+  });
+
+  // Priority badge click -> cycle priority
+  wrapper.querySelectorAll('.priority-badge.clickable').forEach(badge => {
+    badge.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const taskId = badge.dataset.taskId;
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const currentPriority = (task.priority || '').toLowerCase();
+      const currentIdx = PRIORITY_CYCLE.indexOf(currentPriority);
+      const nextIdx = (currentIdx + 1) % PRIORITY_CYCLE.length;
+      const newPriority = PRIORITY_CYCLE[nextIdx];
+
+      try {
+        await api('PUT', `/tasks/${taskId}`, { priority: newPriority });
+        task.priority = newPriority;
+        renderTasks();
+        updateStats();
+        toast(`Prioridad: ${newPriority}`);
+      } catch (err) {
+        toast('Error al cambiar prioridad', 'error');
+      }
     });
   });
 }
@@ -407,7 +587,7 @@ function getFilteredTasks() {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  return tasks.filter(t => {
+  return getRegularTasks().filter(t => {
     if (currentFilter.priority !== 'all' && (t.priority || '').toLowerCase() !== currentFilter.priority) return false;
     if (currentFilter.assignee && t.assignee !== currentFilter.assignee) return false;
     if (currentFilter.status && t.status !== currentFilter.status) return false;
@@ -445,12 +625,10 @@ function updateStats() {
   }).length;
 }
 
-// Clickable stat cards - act as quick filters
 document.querySelectorAll('.stat-card').forEach(card => {
   card.style.cursor = 'pointer';
   card.addEventListener('click', () => {
     const label = card.querySelector('.stat-label')?.textContent?.trim();
-    // Reset all priority chips to "Todas"
     document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
     document.querySelector('.chip[data-filter="all"]').classList.add('active');
     currentFilter.priority = 'all';
@@ -458,7 +636,6 @@ document.querySelectorAll('.stat-card').forEach(card => {
     const statusSelect = document.getElementById('filter-status');
 
     if (label === 'Total') {
-      // Clear all filters
       statusSelect.value = '';
       currentFilter.status = '';
       currentFilter.assignee = '';
@@ -472,10 +649,8 @@ document.querySelectorAll('.stat-card').forEach(card => {
       statusSelect.value = 'sin empezar';
       currentFilter.status = 'sin empezar';
     } else if (label === 'Vencidas') {
-      // Special: clear status filter, we'll filter overdue in a custom way
       statusSelect.value = '';
       currentFilter.status = '';
-      // Use search to find overdue (we'll handle it in rendering)
       currentFilter._overdue = true;
     }
 
@@ -493,14 +668,14 @@ const modal = document.getElementById('task-modal');
 const modalClose = document.getElementById('modal-close');
 const modalCancel = document.getElementById('modal-cancel');
 const modalDelete = document.getElementById('modal-delete');
+const modalCopy = document.getElementById('modal-copy');
 const taskForm = document.getElementById('task-form');
-
-document.getElementById('add-task-btn').addEventListener('click', () => openTaskModal());
 
 function openTaskModal(task = null) {
   editingTaskId = task ? task.id : null;
   document.getElementById('modal-title').textContent = task ? 'Editar tarea' : 'Nueva tarea';
   modalDelete.classList.toggle('hidden', !task);
+  modalCopy.classList.toggle('hidden', !task);
 
   document.getElementById('task-client').value = task?.client || '';
   document.getElementById('task-project').value = task?.project || '';
@@ -511,6 +686,7 @@ function openTaskModal(task = null) {
   document.getElementById('task-status').value = task?.status || 'sin empezar';
   document.getElementById('task-owner').value = task?.owner || '';
   document.getElementById('task-comments').value = task?.comments || '';
+  document.getElementById('task-supervision').checked = task?.isSupervision || false;
 
   modal.classList.remove('hidden');
 }
@@ -536,7 +712,8 @@ taskForm.addEventListener('submit', async (e) => {
     deadline: document.getElementById('task-deadline').value,
     status: document.getElementById('task-status').value.trim() || 'sin empezar',
     owner: document.getElementById('task-owner').value.trim(),
-    comments: document.getElementById('task-comments').value.trim()
+    comments: document.getElementById('task-comments').value.trim(),
+    isSupervision: document.getElementById('task-supervision').checked
   };
 
   try {
@@ -567,14 +744,322 @@ modalDelete.addEventListener('click', async () => {
   }
 });
 
+// --- COPY TASK ---
+modalCopy.addEventListener('click', () => {
+  if (!editingTaskId) return;
+  closeTaskModal();
+  document.getElementById('copy-assignee').value = '';
+  document.getElementById('copy-modal').classList.remove('hidden');
+});
+
+document.getElementById('copy-modal-close').addEventListener('click', () => {
+  document.getElementById('copy-modal').classList.add('hidden');
+});
+document.getElementById('copy-modal-cancel').addEventListener('click', () => {
+  document.getElementById('copy-modal').classList.add('hidden');
+});
+document.getElementById('copy-modal').querySelector('.modal-backdrop').addEventListener('click', () => {
+  document.getElementById('copy-modal').classList.add('hidden');
+});
+
+document.getElementById('copy-modal-save').addEventListener('click', async () => {
+  const newAssignee = document.getElementById('copy-assignee').value.trim();
+  if (!newAssignee) {
+    toast('Seleccioná un asignado', 'error');
+    return;
+  }
+
+  const originalTask = tasks.find(t => t.id === editingTaskId);
+  if (!originalTask) return;
+
+  const body = {
+    client: originalTask.client,
+    project: originalTask.project,
+    assignee: newAssignee,
+    supervisor: originalTask.supervisor,
+    priority: originalTask.priority,
+    deadline: originalTask.deadline,
+    status: originalTask.status || 'sin empezar',
+    owner: originalTask.owner,
+    comments: originalTask.comments,
+    isSupervision: originalTask.isSupervision || false
+  };
+
+  try {
+    await api('POST', '/tasks', body);
+    toast(`Tarea copiada a ${newAssignee}`);
+    document.getElementById('copy-modal').classList.add('hidden');
+    editingTaskId = null;
+    await loadData();
+  } catch (err) {
+    toast('Error al copiar: ' + err.message, 'error');
+  }
+});
+
+// --- TIME OFF MODAL ---
+function openTimeOffModal(entry = null) {
+  editingTimeOffId = entry ? entry.id : null;
+  const titleEl = document.getElementById('timeoff-modal-title');
+  titleEl.textContent = entry ? 'Editar tiempo libre' : 'Tiempo libre';
+  document.getElementById('timeoff-delete').classList.toggle('hidden', !entry);
+
+  document.getElementById('timeoff-member').value = entry?.assignee || '';
+  document.getElementById('timeoff-start').value = entry?.timeOffStart || '';
+  document.getElementById('timeoff-end').value = entry?.timeOffEnd || '';
+  document.getElementById('timeoff-type').value = entry?.timeOffType || 'Vacaciones';
+
+  document.getElementById('timeoff-modal').classList.remove('hidden');
+}
+
+function closeTimeOffModal() {
+  document.getElementById('timeoff-modal').classList.add('hidden');
+  editingTimeOffId = null;
+}
+
+document.getElementById('timeoff-modal-close').addEventListener('click', closeTimeOffModal);
+document.getElementById('timeoff-cancel').addEventListener('click', closeTimeOffModal);
+document.getElementById('timeoff-modal').querySelector('.modal-backdrop').addEventListener('click', closeTimeOffModal);
+
+document.getElementById('timeoff-save').addEventListener('click', async () => {
+  const member = document.getElementById('timeoff-member').value.trim();
+  const start = document.getElementById('timeoff-start').value;
+  const end = document.getElementById('timeoff-end').value;
+  const type = document.getElementById('timeoff-type').value;
+
+  if (!member || !start || !end) {
+    toast('Completá todos los campos', 'error');
+    return;
+  }
+
+  const body = {
+    client: 'TIME OFF',
+    project: type,
+    assignee: member,
+    priority: '',
+    deadline: end,
+    status: 'on going',
+    supervisor: '',
+    owner: '',
+    comments: `${type}: ${start} - ${end}`,
+    isTimeOff: true,
+    timeOffStart: start,
+    timeOffEnd: end,
+    timeOffType: type
+  };
+
+  try {
+    if (editingTimeOffId) {
+      await api('PUT', `/tasks/${editingTimeOffId}`, body);
+      toast('Tiempo libre actualizado');
+    } else {
+      await api('POST', '/tasks', body);
+      toast('Tiempo libre registrado');
+    }
+    closeTimeOffModal();
+    await loadData();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
+document.getElementById('timeoff-delete').addEventListener('click', async () => {
+  if (!editingTimeOffId) return;
+  if (!confirm('¿Eliminar este tiempo libre?')) return;
+  try {
+    await api('DELETE', `/tasks/${editingTimeOffId}`);
+    toast('Tiempo libre eliminado');
+    closeTimeOffModal();
+    await loadData();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
+// --- CALENDAR VIEW ---
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+});
+
+document.getElementById('cal-next').addEventListener('click', () => {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+});
+
+document.getElementById('cal-today').addEventListener('click', () => {
+  const now = new Date();
+  calMonth = now.getMonth();
+  calYear = now.getFullYear();
+  renderCalendar();
+});
+
+document.getElementById('cal-filter-deadlines').addEventListener('click', (e) => {
+  calFilters.deadlines = !calFilters.deadlines;
+  e.currentTarget.classList.toggle('active', calFilters.deadlines);
+  renderCalendar();
+});
+
+document.getElementById('cal-filter-timeoff').addEventListener('click', (e) => {
+  calFilters.timeoff = !calFilters.timeoff;
+  e.currentTarget.classList.toggle('active', calFilters.timeoff);
+  renderCalendar();
+});
+
+function renderCalendar() {
+  const grid = document.getElementById('calendar-grid');
+  const titleEl = document.getElementById('cal-month-title');
+
+  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  titleEl.textContent = `${monthNames[calMonth]} ${calYear}`;
+
+  const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+  // First day of month
+  const firstDay = new Date(calYear, calMonth, 1);
+  let startDow = firstDay.getDay() - 1; // Monday = 0
+  if (startDow < 0) startDow = 6;
+
+  // Days in month
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  // Previous month days
+  const prevMonthDays = new Date(calYear, calMonth, 0).getDate();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build events map
+  const deadlineMap = {}; // dateStr -> [task, ...]
+  const timeoffMap = {};  // dateStr -> [entry, ...]
+
+  if (calFilters.deadlines) {
+    getRegularTasks().forEach(t => {
+      if (!t.deadline) return;
+      if (!deadlineMap[t.deadline]) deadlineMap[t.deadline] = [];
+      deadlineMap[t.deadline].push(t);
+    });
+  }
+
+  if (calFilters.timeoff) {
+    getTimeOffEntries().forEach(to => {
+      if (!to.timeOffStart || !to.timeOffEnd) return;
+      const start = new Date(to.timeOffStart + 'T00:00:00');
+      const end = new Date(to.timeOffEnd + 'T00:00:00');
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const ds = d.toISOString().slice(0, 10);
+        if (!timeoffMap[ds]) timeoffMap[ds] = [];
+        timeoffMap[ds].push(to);
+      }
+    });
+  }
+
+  let html = '';
+
+  // Day headers
+  dayNames.forEach(d => {
+    html += `<div class="calendar-day-header">${d}</div>`;
+  });
+
+  // Calendar days
+  const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
+
+  for (let i = 0; i < totalCells; i++) {
+    let dayNum, dateStr, isOtherMonth = false;
+
+    if (i < startDow) {
+      // Previous month
+      dayNum = prevMonthDays - startDow + i + 1;
+      const pm = calMonth === 0 ? 11 : calMonth - 1;
+      const py = calMonth === 0 ? calYear - 1 : calYear;
+      dateStr = `${py}-${String(pm + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      isOtherMonth = true;
+    } else if (i - startDow >= daysInMonth) {
+      // Next month
+      dayNum = i - startDow - daysInMonth + 1;
+      const nm = calMonth === 11 ? 0 : calMonth + 1;
+      const ny = calMonth === 11 ? calYear + 1 : calYear;
+      dateStr = `${ny}-${String(nm + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      isOtherMonth = true;
+    } else {
+      dayNum = i - startDow + 1;
+      dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    }
+
+    const isToday = dateStr === today.toISOString().slice(0, 10);
+    const classes = ['calendar-day'];
+    if (isToday) classes.push('today');
+    if (isOtherMonth) classes.push('other-month');
+
+    const deadlines = deadlineMap[dateStr] || [];
+    const timeoffs = timeoffMap[dateStr] || [];
+
+    let eventsHtml = '<div class="calendar-events">';
+    let eventCount = 0;
+    const maxEvents = 3;
+
+    // Time off events
+    timeoffs.forEach(to => {
+      if (eventCount >= maxEvents) return;
+      eventCount++;
+      const memberObj = (settings.teamMembers || []).find(m => m.name === to.assignee);
+      const color = memberObj?.color || getColorForName(to.assignee);
+      const label = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
+      eventsHtml += `<div class="calendar-event timeoff" style="background:${color}" title="${escAttr(to.assignee)} - ${escAttr(to.timeOffType)}">
+        <span class="material-icons-round">beach_access</span>${escHtml(to.assignee)} (${label})
+      </div>`;
+    });
+
+    // Deadline events
+    deadlines.forEach(t => {
+      if (eventCount >= maxEvents) return;
+      eventCount++;
+      const isOverdue = new Date(dateStr + 'T00:00:00') < today && t.status !== 'completado';
+      const cls = isOverdue ? 'deadline-overdue' : 'deadline';
+      eventsHtml += `<div class="calendar-event ${cls}" title="${escAttr(t.project)} - ${escAttr(t.assignee)}">
+        <span class="material-icons-round">flag</span>${escHtml(t.project || t.client)}
+      </div>`;
+    });
+
+    const remaining = (deadlines.length + timeoffs.length) - eventCount;
+    if (remaining > 0) {
+      eventsHtml += `<div class="calendar-more">+${remaining} más</div>`;
+    }
+
+    eventsHtml += '</div>';
+
+    html += `<div class="${classes.join(' ')}">
+      <div class="calendar-day-number">${dayNum}</div>
+      ${eventsHtml}
+    </div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
 // --- TEAM VIEW ---
 function renderTeam() {
   const grid = document.getElementById('team-grid');
   const clientsList = document.getElementById('clients-list');
+  const timeOffs = getTimeOffEntries();
 
   grid.innerHTML = '';
   (settings.teamMembers || []).forEach(member => {
-    const taskCount = tasks.filter(t => t.assignee === member.name).length;
+    const taskCount = getRegularTasks().filter(t => t.assignee === member.name).length;
+    const memberTimeOffs = timeOffs.filter(to => to.assignee === member.name);
+
+    let timeoffInfo = '';
+    if (memberTimeOffs.length > 0) {
+      const nextTo = memberTimeOffs[0];
+      const type = nextTo.timeOffType || 'Tiempo libre';
+      timeoffInfo = `<div class="member-timeoff-info">
+        <span class="material-icons-round">beach_access</span>
+        ${escHtml(type)}: ${formatDate(nextTo.timeOffStart)} - ${formatDate(nextTo.timeOffEnd)}
+      </div>`;
+    }
+
     const card = document.createElement('div');
     card.className = 'member-card';
     card.innerHTML = `
@@ -582,6 +1067,7 @@ function renderTeam() {
       <div class="member-info">
         <h3>${escHtml(member.name)}</h3>
         <p>${escHtml(member.role || 'Equipo')}</p>
+        ${timeoffInfo}
       </div>
       <span class="member-tasks-count">${taskCount} tarea${taskCount !== 1 ? 's' : ''}</span>
       <button class="member-delete" data-name="${escAttr(member.name)}" title="Eliminar">
@@ -783,7 +1269,8 @@ function getDeadlineClass(dateStr) {
   now.setHours(0, 0, 0, 0);
   const diff = (d - now) / (1000 * 60 * 60 * 24);
   if (diff < 0) return 'overdue';
-  if (diff <= 3) return 'soon';
+  if (diff <= 2) return 'urgent';
+  if (diff <= 7) return 'warning';
   return '';
 }
 
@@ -792,6 +1279,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeTaskModal();
     closePromptModal();
+    closeTimeOffModal();
+    document.getElementById('copy-modal').classList.add('hidden');
   }
 });
 

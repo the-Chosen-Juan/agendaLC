@@ -187,6 +187,11 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
       status: req.body.status || 'sin empezar',
       owner: req.body.owner || '',
       comments: req.body.comments || '',
+      isSupervision: req.body.isSupervision || false,
+      isTimeOff: req.body.isTimeOff || false,
+      timeOffStart: req.body.timeOffStart || '',
+      timeOffEnd: req.body.timeOffEnd || '',
+      timeOffType: req.body.timeOffType || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -235,7 +240,8 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       teamMembers: settings.teamMembers || [],
       clients: settings.clients || [],
       supervisors: settings.supervisors || [],
-      owners: settings.owners || []
+      owners: settings.owners || [],
+      assigneeOrder: settings.assigneeOrder || []
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -250,12 +256,14 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.clients) settings.clients = req.body.clients;
     if (req.body.supervisors) settings.supervisors = req.body.supervisors;
     if (req.body.owners) settings.owners = req.body.owners;
+    if (req.body.assigneeOrder !== undefined) settings.assigneeOrder = req.body.assigneeOrder;
     await saveSettings(settings);
     res.json({
       teamMembers: settings.teamMembers,
       clients: settings.clients,
       supervisors: settings.supervisors,
-      owners: settings.owners
+      owners: settings.owners,
+      assigneeOrder: settings.assigneeOrder || []
     });
   } catch (err) {
     console.error('Update settings error:', err);
