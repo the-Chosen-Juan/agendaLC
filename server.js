@@ -241,7 +241,8 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       clients: settings.clients || [],
       supervisors: settings.supervisors || [],
       owners: settings.owners || [],
-      assigneeOrder: settings.assigneeOrder || []
+      assigneeOrder: settings.assigneeOrder || [],
+      weeklyLeader: settings.weeklyLeader || null
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -257,13 +258,15 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.supervisors) settings.supervisors = req.body.supervisors;
     if (req.body.owners) settings.owners = req.body.owners;
     if (req.body.assigneeOrder !== undefined) settings.assigneeOrder = req.body.assigneeOrder;
+    if (req.body.weeklyLeader !== undefined) settings.weeklyLeader = req.body.weeklyLeader;
     await saveSettings(settings);
     res.json({
       teamMembers: settings.teamMembers,
       clients: settings.clients,
       supervisors: settings.supervisors,
       owners: settings.owners,
-      assigneeOrder: settings.assigneeOrder || []
+      assigneeOrder: settings.assigneeOrder || [],
+      weeklyLeader: settings.weeklyLeader || null
     });
   } catch (err) {
     console.error('Update settings error:', err);

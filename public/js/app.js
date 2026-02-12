@@ -5,7 +5,7 @@
 // --- STATE ---
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
-let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [] };
+let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], weeklyLeader: null };
 let currentFilter = { priority: 'all', assignee: '', status: '', client: '', search: '' };
 let grouped = true;
 let editingTaskId = null;
@@ -14,6 +14,8 @@ let calMonth = new Date().getMonth();
 let calYear = new Date().getFullYear();
 let calFilters = { deadlines: true, timeoff: true };
 let draggedGroup = null;
+let activeEditDropdown = null;
+let activeInlineInput = null;
 
 // Preset colors for avatars
 const COLORS = [
@@ -23,6 +25,8 @@ const COLORS = [
 ];
 
 const PRIORITY_CYCLE = ['alta', 'media', 'baja', 'TBD'];
+
+const STATUS_OPTIONS = ['sin empezar', 'en progreso', 'on going', 'esperando respuesta', 'completado'];
 
 // --- API HELPER ---
 async function api(method, path, body) {
@@ -174,9 +178,7 @@ function switchView(view) {
     addBtn.classList.add('hidden');
   }
 
-  if (view === 'calendar') {
-    renderCalendar();
-  }
+  if (view === 'calendar') renderCalendar();
 }
 
 // Sidebar toggle (mobile)
@@ -196,13 +198,44 @@ addTaskBtn.addEventListener('click', (e) => {
   addTaskMenu.classList.toggle('hidden');
 });
 
-document.addEventListener('click', () => {
+document.addEventListener('click', (e) => {
   addTaskMenu.classList.add('hidden');
+  // Close edit dropdown if clicking outside
+  if (activeEditDropdown && !e.target.closest('.edit-dropdown') && !e.target.closest('.editable-cell')) {
+    closeEditDropdown();
+  }
 });
 
-document.getElementById('add-task-regular').addEventListener('click', () => {
+document.getElementById('add-task-regular').addEventListener('click', async () => {
   addTaskMenu.classList.add('hidden');
-  openTaskModal();
+  try {
+    const body = {
+      client: '',
+      project: '',
+      assignee: '',
+      supervisor: '',
+      priority: 'TBD',
+      deadline: '',
+      status: 'sin empezar',
+      owner: '',
+      comments: '',
+      isSupervision: false
+    };
+    const newTask = await api('POST', '/tasks', body);
+    await loadData();
+    toast('Nueva tarea creada — editá los campos directamente');
+    // Auto-focus on the new task's client cell
+    setTimeout(() => {
+      const row = document.querySelector(`tr[data-id="${newTask.id}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const clientCell = row.querySelector('[data-field="client"]');
+        if (clientCell) clientCell.click();
+      }
+    }, 100);
+  } catch (err) {
+    toast('Error al crear tarea: ' + err.message, 'error');
+  }
 });
 
 document.getElementById('add-timeoff-btn').addEventListener('click', () => {
@@ -218,7 +251,6 @@ async function loadData() {
       api('GET', '/settings')
     ]);
 
-    // If no tasks, try to seed (for fresh Redis deployments)
     if (tasks.length === 0) {
       try {
         await fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
@@ -233,12 +265,13 @@ async function loadData() {
     renderTasks();
     renderTeam();
     updateStats();
+    renderLeader();
   } catch (err) {
     console.error('Failed to load data:', err);
   }
 }
 
-// --- POPULATE DROPDOWNS (filters = <select>, form = <datalist>) ---
+// --- POPULATE DROPDOWNS ---
 function populateFilterDropdowns() {
   const assignees = [...new Set([
     ...(settings.teamMembers || []).map(m => m.name),
@@ -274,21 +307,38 @@ function populateFormDataLists(assignees, clients) {
     ...tasks.map(t => t.owner).filter(Boolean)
   ])].sort();
 
-  const allClients = [...new Set([
-    ...(settings.clients || []).map(c => c.name),
-    ...tasks.map(t => t.client).filter(Boolean)
-  ])].sort();
-
-  setDatalistOptions('list-assignees', allPeople);
-  setDatalistOptions('list-supervisors', allPeople);
-  setDatalistOptions('list-owners', allPeople);
-  setDatalistOptions('list-clients', allClients);
+  setDatalistOptions('list-to-members', allPeople);
 }
 
 function setDatalistOptions(id, values) {
   const dl = document.getElementById(id);
   if (!dl) return;
   dl.innerHTML = values.map(v => `<option value="${escAttr(v)}">`).join('');
+}
+
+// --- GET OPTIONS FOR DROPDOWN FIELDS ---
+function getOptionsForField(field) {
+  const allPeople = [...new Set([
+    ...(settings.teamMembers || []).map(m => m.name),
+    ...tasks.map(t => t.assignee).filter(Boolean),
+    ...tasks.map(t => t.supervisor).filter(Boolean),
+    ...tasks.map(t => t.owner).filter(Boolean)
+  ])].sort();
+
+  const allClients = [...new Set([
+    ...(settings.clients || []).map(c => c.name),
+    ...tasks.map(t => t.client).filter(Boolean)
+  ])].sort();
+
+  switch (field) {
+    case 'client': return allClients;
+    case 'assignee': return allPeople;
+    case 'supervisor': return allPeople;
+    case 'owner': return allPeople;
+    case 'status': return STATUS_OPTIONS;
+    case 'priority': return PRIORITY_CYCLE;
+    default: return [];
+  }
 }
 
 // --- RENDER TASKS ---
@@ -300,11 +350,30 @@ function getTimeOffEntries() {
   return tasks.filter(t => t.isTimeOff);
 }
 
+function sortTasksByNumber(taskList) {
+  return [...taskList].sort((a, b) => {
+    const na = parseInt(a.taskNumber) || 9999;
+    const nb = parseInt(b.taskNumber) || 9999;
+    return na - nb;
+  });
+}
+
 function renderTasks() {
   const container = document.getElementById('tasks-container');
-  const filtered = getFilteredTasks();
+  const allFiltered = getFilteredTasks();
 
-  if (filtered.length === 0) {
+  // Separate esperando respuesta tasks
+  const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta');
+  const regularFiltered = allFiltered.filter(t => t.status !== 'esperando respuesta');
+
+  container.innerHTML = '';
+
+  // Render esperando respuesta section if any
+  if (esperandoTasks.length > 0) {
+    renderEsperandoSection(container, esperandoTasks);
+  }
+
+  if (regularFiltered.length === 0 && esperandoTasks.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <span class="material-icons-round">inbox</span>
@@ -314,15 +383,58 @@ function renderTasks() {
   }
 
   if (grouped) {
-    renderGroupedTasks(container, filtered);
+    renderGroupedTasks(container, regularFiltered);
   } else {
-    container.innerHTML = '';
+    const sorted = sortTasksByNumber(regularFiltered);
     const wrapper = document.createElement('div');
     wrapper.className = 'table-wrapper';
-    wrapper.innerHTML = buildTaskTable(filtered);
+    wrapper.innerHTML = buildTaskTable(sorted);
     container.appendChild(wrapper);
     bindTaskRows(wrapper);
   }
+}
+
+function renderEsperandoSection(container, esperandoTasks) {
+  const section = document.createElement('div');
+  section.className = 'esperando-section';
+
+  const header = document.createElement('div');
+  header.className = 'esperando-header';
+  header.innerHTML = `
+    <span class="material-icons-round">hourglass_top</span>
+    <span class="group-name">Esperando Respuesta</span>
+    <span class="group-count">${esperandoTasks.length} tarea${esperandoTasks.length !== 1 ? 's' : ''}</span>
+    <span class="material-icons-round group-toggle">expand_more</span>
+  `;
+
+  const tableWrapper = document.createElement('div');
+  tableWrapper.className = 'table-wrapper';
+  const sorted = sortTasksByNumber(esperandoTasks);
+  tableWrapper.innerHTML = buildTaskTable(sorted, true);
+
+  header.addEventListener('click', () => {
+    header.querySelector('.group-toggle').classList.toggle('collapsed');
+    tableWrapper.classList.toggle('hidden');
+  });
+
+  section.appendChild(header);
+  section.appendChild(tableWrapper);
+  container.appendChild(section);
+  bindTaskRows(tableWrapper);
+
+  // Drag from esperando: rows can be dragged to group headers to reassign
+  tableWrapper.querySelectorAll('tr[data-id]').forEach(row => {
+    row.setAttribute('draggable', 'true');
+    row.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', row.dataset.id);
+      e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging-task');
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging-task');
+      document.querySelectorAll('.group-header.drop-target').forEach(h => h.classList.remove('drop-target'));
+    });
+  });
 }
 
 function renderGroupedTasks(container, filtered) {
@@ -333,9 +445,6 @@ function renderGroupedTasks(container, filtered) {
     groups[key].push(t);
   });
 
-  container.innerHTML = '';
-
-  // Sort groups by saved order
   const order = settings.assigneeOrder || [];
   const sortedKeys = Object.keys(groups).sort((a, b) => {
     const ia = order.indexOf(a);
@@ -349,12 +458,11 @@ function renderGroupedTasks(container, filtered) {
   const timeOffs = getTimeOffEntries();
 
   sortedKeys.forEach((assignee) => {
-    const groupTasks = groups[assignee];
+    const groupTasks = sortTasksByNumber(groups[assignee]);
     const member = (settings.teamMembers || []).find(m => m.name === assignee);
     const color = member?.color || getColorForName(assignee);
-    const initials = getInitials(assignee);
+    const initials = member?.initials || getInitials(assignee);
 
-    // Get time off entries for this member
     const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
 
     const header = document.createElement('div');
@@ -398,7 +506,7 @@ function renderGroupedTasks(container, filtered) {
       tableWrapper.classList.toggle('hidden');
     });
 
-    // Time off badge click -> open time off modal for editing
+    // Time off badge click
     header.querySelectorAll('.timeoff-badge').forEach(badge => {
       badge.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -407,8 +515,9 @@ function renderGroupedTasks(container, filtered) {
       });
     });
 
-    // Drag and drop for reordering
+    // Group drag and drop for reordering
     header.addEventListener('dragstart', (e) => {
+      if (e.target.closest('tr[data-id]')) return; // Don't interfere with task row drags
       draggedGroup = assignee;
       header.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -416,28 +525,57 @@ function renderGroupedTasks(container, filtered) {
 
     header.addEventListener('dragend', () => {
       header.classList.remove('dragging');
-      container.querySelectorAll('.group-header').forEach(h => h.classList.remove('drag-over'));
+      container.querySelectorAll('.group-header').forEach(h => {
+        h.classList.remove('drag-over');
+        h.classList.remove('drop-target');
+      });
       draggedGroup = null;
     });
 
     header.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      if (header.dataset.assignee !== draggedGroup) {
+      // Could be a group reorder or a task drop from esperando
+      if (draggedGroup && header.dataset.assignee !== draggedGroup) {
         header.classList.add('drag-over');
+      } else if (!draggedGroup) {
+        header.classList.add('drop-target');
       }
     });
 
     header.addEventListener('dragleave', () => {
       header.classList.remove('drag-over');
+      header.classList.remove('drop-target');
     });
 
-    header.addEventListener('drop', (e) => {
+    header.addEventListener('drop', async (e) => {
       e.preventDefault();
       header.classList.remove('drag-over');
+      header.classList.remove('drop-target');
+
+      const taskId = e.dataTransfer.getData('text/plain');
+
+      if (taskId && !draggedGroup) {
+        // Task dropped from esperando section onto a group header
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+          try {
+            await api('PUT', `/tasks/${taskId}`, { assignee: assignee, status: 'en progreso' });
+            task.assignee = assignee;
+            task.status = 'en progreso';
+            renderTasks();
+            updateStats();
+            toast(`Tarea movida a ${assignee}`);
+          } catch (err) {
+            toast('Error al mover tarea', 'error');
+          }
+        }
+        return;
+      }
+
       if (!draggedGroup || draggedGroup === assignee) return;
 
-      // Compute new order
+      // Group reorder
       const currentHeaders = [...container.querySelectorAll('.group-header')];
       const names = currentHeaders.map(h => h.dataset.assignee);
       const fromIdx = names.indexOf(draggedGroup);
@@ -458,18 +596,20 @@ function renderGroupedTasks(container, filtered) {
   });
 }
 
-function buildTaskTable(taskList) {
+function buildTaskTable(taskList, showAssignee = false) {
   let html = `<table class="task-table">
     <thead>
       <tr>
         <th>Cliente</th>
         <th>#</th>
         <th>Tema / Proyecto</th>
+        ${showAssignee ? '<th>Asignado</th>' : ''}
         <th>Supervisor</th>
         <th>Prioridad</th>
         <th>Deadline</th>
         <th>Status</th>
         <th>Owner</th>
+        <th></th>
         <th></th>
       </tr>
     </thead>
@@ -487,15 +627,22 @@ function buildTaskTable(taskList) {
 
     html += `
       <tr data-id="${t.id}">
-        <td><span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text}">${escHtml(t.client || '—')}</span></td>
+        <td class="editable-cell" data-field="client"><span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text}">${escHtml(t.client || '—')}</span></td>
         <td style="color:var(--text-muted);font-size:.8rem">${t.taskNumber || ''}</td>
-        <td class="task-project-cell">${escHtml(t.project || '—')}${supervisionTag}</td>
-        <td style="color:var(--text-secondary)">${escHtml(t.supervisor || '—')}</td>
-        <td><span class="priority-badge clickable ${priorityClass}" data-task-id="${t.id}" title="Click para cambiar prioridad">${escHtml(t.priority || '—')}</span></td>
-        <td><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></td>
-        <td><span class="status-badge ${statusClass}">${escHtml(t.status || '—')}</span></td>
-        <td style="color:var(--text-secondary)">${escHtml(t.owner || '—')}</td>
-        <td><span class="material-icons-round comment-icon ${hasComment ? 'has-comment' : ''}" title="${escAttr(t.comments || '')}">${hasComment ? 'chat_bubble' : 'chat_bubble_outline'}</span></td>
+        <td class="editable-cell task-project-cell" data-field="project">${escHtml(t.project || '—')}${supervisionTag}</td>
+        ${showAssignee ? `<td class="editable-cell" data-field="assignee" style="color:var(--text-secondary)">${escHtml(t.assignee || '—')}</td>` : ''}
+        <td class="editable-cell" data-field="supervisor" style="color:var(--text-secondary)">${escHtml(t.supervisor || '—')}</td>
+        <td class="editable-cell" data-field="priority"><span class="priority-badge ${priorityClass}">${escHtml(t.priority || '—')}</span></td>
+        <td class="editable-cell" data-field="deadline"><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></td>
+        <td class="editable-cell" data-field="status"><span class="status-badge ${statusClass}">${escHtml(t.status || '—')}</span></td>
+        <td class="editable-cell" data-field="owner" style="color:var(--text-secondary)">${escHtml(t.owner || '—')}</td>
+        <td class="editable-cell comment-cell" data-field="comments"><span class="material-icons-round comment-icon ${hasComment ? 'has-comment' : ''}">${hasComment ? 'chat_bubble' : 'chat_bubble_outline'}</span></td>
+        <td>
+          <div class="task-actions">
+            <button class="task-action-btn copy" title="Copiar tarea" data-task-id="${t.id}"><span class="material-icons-round">content_copy</span></button>
+            <button class="task-action-btn delete" title="Eliminar tarea" data-task-id="${t.id}"><span class="material-icons-round">delete</span></button>
+          </div>
+        </td>
       </tr>`;
   });
 
@@ -504,40 +651,301 @@ function buildTaskTable(taskList) {
 }
 
 function bindTaskRows(wrapper) {
-  // Row click -> open modal
-  wrapper.querySelectorAll('tr[data-id]').forEach(row => {
-    row.addEventListener('click', (e) => {
-      // Don't open modal if clicking priority badge
-      if (e.target.closest('.priority-badge.clickable')) return;
-      const task = tasks.find(t => t.id === row.dataset.id);
-      if (task) openTaskModal(task);
+  // Editable cells click -> inline edit
+  wrapper.querySelectorAll('.editable-cell').forEach(cell => {
+    cell.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const row = cell.closest('tr[data-id]');
+      if (!row) return;
+      const taskId = row.dataset.id;
+      const field = cell.dataset.field;
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+      startInlineEdit(cell, task, field);
     });
   });
 
-  // Priority badge click -> cycle priority
-  wrapper.querySelectorAll('.priority-badge.clickable').forEach(badge => {
-    badge.addEventListener('click', async (e) => {
+  // Comment tooltip on hover
+  wrapper.querySelectorAll('.comment-cell').forEach(cell => {
+    cell.addEventListener('mouseenter', (e) => {
+      const row = cell.closest('tr[data-id]');
+      if (!row) return;
+      const task = tasks.find(t => t.id === row.dataset.id);
+      if (task && task.comments && task.comments.trim()) {
+        showCommentTooltip(cell, task.comments);
+      }
+    });
+    cell.addEventListener('mouseleave', () => {
+      hideCommentTooltip();
+    });
+  });
+
+  // Task action buttons
+  wrapper.querySelectorAll('.task-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const taskId = badge.dataset.taskId;
-      const task = tasks.find(t => t.id === taskId);
-      if (!task) return;
-
-      const currentPriority = (task.priority || '').toLowerCase();
-      const currentIdx = PRIORITY_CYCLE.indexOf(currentPriority);
-      const nextIdx = (currentIdx + 1) % PRIORITY_CYCLE.length;
-      const newPriority = PRIORITY_CYCLE[nextIdx];
-
+      const taskId = btn.dataset.taskId;
+      if (!confirm('¿Eliminar esta tarea?')) return;
       try {
-        await api('PUT', `/tasks/${taskId}`, { priority: newPriority });
-        task.priority = newPriority;
-        renderTasks();
-        updateStats();
-        toast(`Prioridad: ${newPriority}`);
+        await api('DELETE', `/tasks/${taskId}`);
+        toast('Tarea eliminada');
+        await loadData();
       } catch (err) {
-        toast('Error al cambiar prioridad', 'error');
+        toast('Error al eliminar: ' + err.message, 'error');
       }
     });
   });
+
+  wrapper.querySelectorAll('.task-action-btn.copy').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editingTaskId = btn.dataset.taskId;
+      document.getElementById('copy-assignee').value = '';
+      document.getElementById('copy-modal').classList.remove('hidden');
+    });
+  });
+}
+
+// --- INLINE EDITING ---
+function startInlineEdit(cell, task, field) {
+  closeEditDropdown();
+  closeInlineInput();
+
+  const dropdownFields = ['client', 'assignee', 'supervisor', 'owner', 'status', 'priority'];
+  const textFields = ['project', 'comments'];
+
+  if (dropdownFields.includes(field)) {
+    openEditDropdown(cell, task, field);
+  } else if (field === 'deadline') {
+    openDateInput(cell, task);
+  } else if (textFields.includes(field)) {
+    openTextInput(cell, task, field);
+  }
+}
+
+function openTextInput(cell, task, field) {
+  const currentValue = task[field] || '';
+  const rect = cell.getBoundingClientRect();
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'cell-edit-input';
+  input.value = currentValue;
+  input.placeholder = field === 'comments' ? 'Agregar comentario...' : 'Escribir...';
+
+  const originalHtml = cell.innerHTML;
+  cell.innerHTML = '';
+  cell.appendChild(input);
+  input.focus();
+  input.select();
+
+  activeInlineInput = { cell, originalHtml, input };
+
+  const save = async () => {
+    const newValue = input.value.trim();
+    if (newValue !== currentValue) {
+      try {
+        const update = {};
+        update[field] = newValue;
+        await api('PUT', `/tasks/${task.id}`, update);
+        task[field] = newValue;
+        toast('Actualizado');
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
+    }
+    closeInlineInput();
+    renderTasks();
+    updateStats();
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { closeInlineInput(); cell.innerHTML = originalHtml; }
+  });
+  input.addEventListener('blur', () => {
+    // Small delay to allow click events to fire first
+    setTimeout(() => {
+      if (activeInlineInput && activeInlineInput.input === input) save();
+    }, 150);
+  });
+}
+
+function openDateInput(cell, task) {
+  const currentValue = task.deadline || '';
+  const originalHtml = cell.innerHTML;
+
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.className = 'cell-edit-input';
+  input.value = currentValue;
+
+  cell.innerHTML = '';
+  cell.appendChild(input);
+  input.focus();
+
+  activeInlineInput = { cell, originalHtml, input };
+
+  const save = async () => {
+    const newValue = input.value;
+    if (newValue !== currentValue) {
+      try {
+        await api('PUT', `/tasks/${task.id}`, { deadline: newValue });
+        task.deadline = newValue;
+        toast('Deadline actualizado');
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
+    }
+    closeInlineInput();
+    renderTasks();
+    updateStats();
+  };
+
+  input.addEventListener('change', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeInlineInput(); cell.innerHTML = originalHtml; }
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (activeInlineInput && activeInlineInput.input === input) save();
+    }, 150);
+  });
+}
+
+// --- EDIT DROPDOWN ---
+function openEditDropdown(cell, task, field) {
+  const dropdown = document.getElementById('edit-dropdown');
+  const searchInput = document.getElementById('edit-dropdown-search');
+  const optionsContainer = document.getElementById('edit-dropdown-options');
+  const addBtn = document.getElementById('edit-dropdown-add');
+
+  const options = getOptionsForField(field);
+  const currentValue = task[field] || '';
+  const canAdd = ['client', 'assignee', 'supervisor', 'owner'].includes(field);
+
+  // Position dropdown
+  const rect = cell.getBoundingClientRect();
+  dropdown.style.top = (rect.bottom + 4) + 'px';
+  dropdown.style.left = rect.left + 'px';
+  dropdown.style.minWidth = Math.max(rect.width, 200) + 'px';
+
+  // Adjust if off-screen
+  const maxLeft = window.innerWidth - 320;
+  if (rect.left > maxLeft) {
+    dropdown.style.left = maxLeft + 'px';
+  }
+
+  searchInput.value = '';
+  searchInput.placeholder = 'Buscar...';
+  addBtn.classList.toggle('hidden', !canAdd);
+
+  function renderOptions(filter = '') {
+    const filtered = filter
+      ? options.filter(o => o.toLowerCase().includes(filter.toLowerCase()))
+      : options;
+
+    optionsContainer.innerHTML = '';
+    filtered.forEach(opt => {
+      const div = document.createElement('div');
+      div.className = `edit-dropdown-option ${opt === currentValue ? 'active' : ''}`;
+      div.innerHTML = `<span class="option-label">${escHtml(opt)}</span>`;
+      div.addEventListener('click', () => {
+        selectDropdownOption(task, field, opt);
+      });
+      optionsContainer.appendChild(div);
+    });
+
+    if (filtered.length === 0) {
+      optionsContainer.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem;text-align:center">Sin resultados</div>';
+    }
+  }
+
+  renderOptions();
+
+  searchInput.oninput = () => renderOptions(searchInput.value);
+
+  addBtn.onclick = () => {
+    const newName = searchInput.value.trim();
+    if (!newName) {
+      toast('Escribí un nombre en el buscador', 'error');
+      return;
+    }
+    selectDropdownOption(task, field, newName);
+    // Also add to settings if appropriate
+    if (field === 'client') {
+      const color = getColorForName(newName);
+      const bg = color + '18';
+      if (!(settings.clients || []).some(c => c.name === newName)) {
+        settings.clients = [...(settings.clients || []), { name: newName, color: bg, textColor: color }];
+        api('PUT', '/settings', { clients: settings.clients }).catch(() => {});
+      }
+    } else if (field === 'assignee' || field === 'supervisor' || field === 'owner') {
+      if (!(settings.teamMembers || []).some(m => m.name === newName)) {
+        const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+        settings.teamMembers = [...(settings.teamMembers || []), { name: newName, color, role: '' }];
+        api('PUT', '/settings', { teamMembers: settings.teamMembers }).catch(() => {});
+      }
+    }
+  };
+
+  dropdown.classList.remove('hidden');
+  searchInput.focus();
+
+  activeEditDropdown = { dropdown, cell, task, field };
+}
+
+async function selectDropdownOption(task, field, value) {
+  closeEditDropdown();
+  try {
+    const update = {};
+    update[field] = value;
+    await api('PUT', `/tasks/${task.id}`, update);
+    task[field] = value;
+    toast('Actualizado');
+    renderTasks();
+    updateStats();
+    populateFilterDropdowns();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+}
+
+function closeEditDropdown() {
+  const dropdown = document.getElementById('edit-dropdown');
+  dropdown.classList.add('hidden');
+  activeEditDropdown = null;
+}
+
+function closeInlineInput() {
+  if (activeInlineInput) {
+    activeInlineInput = null;
+  }
+}
+
+// --- COMMENT TOOLTIP ---
+function showCommentTooltip(cell, text) {
+  const tooltip = document.getElementById('comment-tooltip');
+  const rect = cell.getBoundingClientRect();
+
+  tooltip.textContent = text;
+  tooltip.classList.remove('hidden');
+
+  // Position above the cell
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let top = rect.top - tooltipRect.height - 8;
+  let left = rect.left - (tooltipRect.width / 2) + (rect.width / 2);
+
+  if (top < 8) top = rect.bottom + 8;
+  if (left < 8) left = 8;
+  if (left + tooltipRect.width > window.innerWidth - 8) left = window.innerWidth - tooltipRect.width - 8;
+
+  tooltip.style.top = top + 'px';
+  tooltip.style.left = left + 'px';
+}
+
+function hideCommentTooltip() {
+  document.getElementById('comment-tooltip').classList.add('hidden');
 }
 
 // --- FILTERS ---
@@ -663,95 +1071,38 @@ document.querySelectorAll('.stat-card').forEach(card => {
   });
 });
 
-// --- TASK MODAL ---
-const modal = document.getElementById('task-modal');
-const modalClose = document.getElementById('modal-close');
-const modalCancel = document.getElementById('modal-cancel');
-const modalDelete = document.getElementById('modal-delete');
-const modalCopy = document.getElementById('modal-copy');
-const taskForm = document.getElementById('task-form');
-
-function openTaskModal(task = null) {
-  editingTaskId = task ? task.id : null;
-  document.getElementById('modal-title').textContent = task ? 'Editar tarea' : 'Nueva tarea';
-  modalDelete.classList.toggle('hidden', !task);
-  modalCopy.classList.toggle('hidden', !task);
-
-  document.getElementById('task-client').value = task?.client || '';
-  document.getElementById('task-project').value = task?.project || '';
-  document.getElementById('task-assignee').value = task?.assignee || '';
-  document.getElementById('task-supervisor').value = task?.supervisor || '';
-  document.getElementById('task-priority').value = task?.priority || '';
-  document.getElementById('task-deadline').value = task?.deadline || '';
-  document.getElementById('task-status').value = task?.status || 'sin empezar';
-  document.getElementById('task-owner').value = task?.owner || '';
-  document.getElementById('task-comments').value = task?.comments || '';
-  document.getElementById('task-supervision').checked = task?.isSupervision || false;
-
-  modal.classList.remove('hidden');
+// --- LEADER OF THE WEEK ---
+function renderLeader() {
+  const nameEl = document.getElementById('leader-name');
+  const leader = settings.weeklyLeader;
+  nameEl.textContent = leader || '—';
 }
 
-function closeTaskModal() {
-  modal.classList.add('hidden');
-  editingTaskId = null;
-}
+document.getElementById('leader-randomize').addEventListener('click', async () => {
+  const members = (settings.teamMembers || []).map(m => m.name);
+  if (members.length === 0) {
+    toast('Agregá miembros al equipo primero', 'error');
+    return;
+  }
 
-modalClose.addEventListener('click', closeTaskModal);
-modalCancel.addEventListener('click', closeTaskModal);
-modal.querySelector('.modal-backdrop').addEventListener('click', closeTaskModal);
-
-taskForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const body = {
-    client: document.getElementById('task-client').value.trim(),
-    project: document.getElementById('task-project').value.trim(),
-    assignee: document.getElementById('task-assignee').value.trim(),
-    supervisor: document.getElementById('task-supervisor').value.trim(),
-    priority: document.getElementById('task-priority').value.trim(),
-    deadline: document.getElementById('task-deadline').value,
-    status: document.getElementById('task-status').value.trim() || 'sin empezar',
-    owner: document.getElementById('task-owner').value.trim(),
-    comments: document.getElementById('task-comments').value.trim(),
-    isSupervision: document.getElementById('task-supervision').checked
-  };
-
-  try {
-    if (editingTaskId) {
-      await api('PUT', `/tasks/${editingTaskId}`, body);
-      toast('Tarea actualizada');
-    } else {
-      await api('POST', '/tasks', body);
-      toast('Tarea creada');
+  // Animate the randomizer
+  const nameEl = document.getElementById('leader-name');
+  let count = 0;
+  const interval = setInterval(() => {
+    nameEl.textContent = members[Math.floor(Math.random() * members.length)];
+    count++;
+    if (count >= 15) {
+      clearInterval(interval);
+      const winner = members[Math.floor(Math.random() * members.length)];
+      nameEl.textContent = winner;
+      settings.weeklyLeader = winner;
+      api('PUT', '/settings', { weeklyLeader: winner }).catch(() => {});
+      toast(`${winner} es el lider de la semana!`);
     }
-    closeTaskModal();
-    await loadData();
-  } catch (err) {
-    toast('Error al guardar: ' + err.message, 'error');
-  }
+  }, 100);
 });
 
-modalDelete.addEventListener('click', async () => {
-  if (!editingTaskId) return;
-  if (!confirm('¿Eliminar esta tarea?')) return;
-  try {
-    await api('DELETE', `/tasks/${editingTaskId}`);
-    toast('Tarea eliminada');
-    closeTaskModal();
-    await loadData();
-  } catch (err) {
-    toast('Error al eliminar: ' + err.message, 'error');
-  }
-});
-
-// --- COPY TASK ---
-modalCopy.addEventListener('click', () => {
-  if (!editingTaskId) return;
-  closeTaskModal();
-  document.getElementById('copy-assignee').value = '';
-  document.getElementById('copy-modal').classList.remove('hidden');
-});
-
+// --- COPY TASK MODAL ---
 document.getElementById('copy-modal-close').addEventListener('click', () => {
   document.getElementById('copy-modal').classList.add('hidden');
 });
@@ -917,23 +1268,18 @@ function renderCalendar() {
 
   const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
-  // First day of month
   const firstDay = new Date(calYear, calMonth, 1);
-  let startDow = firstDay.getDay() - 1; // Monday = 0
+  let startDow = firstDay.getDay() - 1;
   if (startDow < 0) startDow = 6;
 
-  // Days in month
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-
-  // Previous month days
   const prevMonthDays = new Date(calYear, calMonth, 0).getDate();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Build events map
-  const deadlineMap = {}; // dateStr -> [task, ...]
-  const timeoffMap = {};  // dateStr -> [entry, ...]
+  const deadlineMap = {};
+  const timeoffMap = {};
 
   if (calFilters.deadlines) {
     getRegularTasks().forEach(t => {
@@ -958,26 +1304,22 @@ function renderCalendar() {
 
   let html = '';
 
-  // Day headers
   dayNames.forEach(d => {
     html += `<div class="calendar-day-header">${d}</div>`;
   });
 
-  // Calendar days
   const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
 
   for (let i = 0; i < totalCells; i++) {
     let dayNum, dateStr, isOtherMonth = false;
 
     if (i < startDow) {
-      // Previous month
       dayNum = prevMonthDays - startDow + i + 1;
       const pm = calMonth === 0 ? 11 : calMonth - 1;
       const py = calMonth === 0 ? calYear - 1 : calYear;
       dateStr = `${py}-${String(pm + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
       isOtherMonth = true;
     } else if (i - startDow >= daysInMonth) {
-      // Next month
       dayNum = i - startDow - daysInMonth + 1;
       const nm = calMonth === 11 ? 0 : calMonth + 1;
       const ny = calMonth === 11 ? calYear + 1 : calYear;
@@ -1000,7 +1342,6 @@ function renderCalendar() {
     let eventCount = 0;
     const maxEvents = 3;
 
-    // Time off events
     timeoffs.forEach(to => {
       if (eventCount >= maxEvents) return;
       eventCount++;
@@ -1012,7 +1353,6 @@ function renderCalendar() {
       </div>`;
     });
 
-    // Deadline events
     deadlines.forEach(t => {
       if (eventCount >= maxEvents) return;
       eventCount++;
@@ -1060,16 +1400,21 @@ function renderTeam() {
       </div>`;
     }
 
+    const initials = member.initials || getInitials(member.name);
+
     const card = document.createElement('div');
     card.className = 'member-card';
     card.innerHTML = `
-      <div class="member-avatar" style="background:${member.color || getColorForName(member.name)}">${getInitials(member.name)}</div>
+      <div class="member-avatar" style="background:${member.color || getColorForName(member.name)}">${initials}</div>
       <div class="member-info">
         <h3>${escHtml(member.name)}</h3>
         <p>${escHtml(member.role || 'Equipo')}</p>
         ${timeoffInfo}
       </div>
       <span class="member-tasks-count">${taskCount} tarea${taskCount !== 1 ? 's' : ''}</span>
+      <button class="member-edit" data-name="${escAttr(member.name)}" title="Editar">
+        <span class="material-icons-round">edit</span>
+      </button>
       <button class="member-delete" data-name="${escAttr(member.name)}" title="Eliminar">
         <span class="material-icons-round">close</span>
       </button>
@@ -1077,6 +1422,18 @@ function renderTeam() {
     grid.appendChild(card);
   });
 
+  // Edit member
+  grid.querySelectorAll('.member-edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.name;
+      const member = (settings.teamMembers || []).find(m => m.name === name);
+      if (!member) return;
+      openEditMemberModal(member);
+    });
+  });
+
+  // Delete member
   grid.querySelectorAll('.member-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -1124,6 +1481,73 @@ function renderTeam() {
   });
 }
 
+function openEditMemberModal(member) {
+  document.getElementById('prompt-modal-title').textContent = 'Editar miembro';
+  document.getElementById('prompt-modal-label').textContent = 'Nombre';
+  document.getElementById('prompt-modal-input').value = member.name;
+
+  document.getElementById('prompt-modal-color-group').classList.remove('hidden');
+  document.getElementById('prompt-modal-role-group').classList.remove('hidden');
+  document.getElementById('prompt-modal-initials-group').classList.remove('hidden');
+
+  document.getElementById('prompt-modal-role').value = member.role || '';
+
+  const initialsInput = document.getElementById('prompt-modal-initials');
+  if (initialsInput) initialsInput.value = member.initials || getInitials(member.name);
+
+  const colorsDiv = document.getElementById('prompt-modal-colors');
+  colorsDiv.innerHTML = '';
+  COLORS.forEach(c => {
+    const swatch = document.createElement('div');
+    swatch.className = `color-swatch ${c === member.color ? 'selected' : ''}`;
+    swatch.style.background = c;
+    swatch.dataset.color = c;
+    swatch.addEventListener('click', () => {
+      colorsDiv.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      swatch.classList.add('selected');
+    });
+    colorsDiv.appendChild(swatch);
+  });
+
+  promptCallback = async ({ name, color, role }) => {
+    const idx = settings.teamMembers.findIndex(m => m.name === member.name);
+    if (idx === -1) return;
+
+    const initialsVal = document.getElementById('prompt-modal-initials')?.value?.trim() || '';
+
+    // Update member in settings
+    const oldName = member.name;
+    settings.teamMembers[idx] = { name, color, role, initials: initialsVal || getInitials(name) };
+
+    try {
+      await api('PUT', '/settings', { teamMembers: settings.teamMembers });
+
+      // If name changed, update all tasks referencing this member
+      if (oldName !== name) {
+        const updatePromises = [];
+        tasks.forEach(t => {
+          const updates = {};
+          if (t.assignee === oldName) updates.assignee = name;
+          if (t.supervisor === oldName) updates.supervisor = name;
+          if (t.owner === oldName) updates.owner = name;
+          if (Object.keys(updates).length > 0) {
+            updatePromises.push(api('PUT', `/tasks/${t.id}`, updates));
+          }
+        });
+        await Promise.all(updatePromises);
+      }
+
+      await loadData();
+      toast(`Miembro actualizado`);
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  };
+
+  document.getElementById('prompt-modal').classList.remove('hidden');
+  document.getElementById('prompt-modal-input').focus();
+}
+
 // --- ADD MEMBER / CLIENT MODALS ---
 const promptModal = document.getElementById('prompt-modal');
 let promptCallback = null;
@@ -1135,6 +1559,11 @@ function openPromptModal(title, label, showColor, showRole, callback) {
   document.getElementById('prompt-modal-role').value = '';
   document.getElementById('prompt-modal-color-group').classList.toggle('hidden', !showColor);
   document.getElementById('prompt-modal-role-group').classList.toggle('hidden', !showRole);
+  document.getElementById('prompt-modal-initials-group').classList.toggle('hidden', !showRole);
+
+  const initialsInput = document.getElementById('prompt-modal-initials');
+  if (initialsInput) initialsInput.value = '';
+
   promptCallback = callback;
 
   if (showColor) {
@@ -1182,7 +1611,8 @@ document.getElementById('add-member-btn').addEventListener('click', () => {
       toast('Ya existe un miembro con ese nombre', 'error');
       return;
     }
-    settings.teamMembers = [...(settings.teamMembers || []), { name, color, role }];
+    const initialsVal = document.getElementById('prompt-modal-initials')?.value?.trim() || '';
+    settings.teamMembers = [...(settings.teamMembers || []), { name, color, role, initials: initialsVal || getInitials(name) }];
     try {
       await api('PUT', '/settings', { teamMembers: settings.teamMembers });
       renderTeam();
@@ -1277,7 +1707,8 @@ function getDeadlineClass(dateStr) {
 // --- KEYBOARD SHORTCUTS ---
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    closeTaskModal();
+    closeEditDropdown();
+    closeInlineInput();
     closePromptModal();
     closeTimeOffModal();
     document.getElementById('copy-modal').classList.add('hidden');

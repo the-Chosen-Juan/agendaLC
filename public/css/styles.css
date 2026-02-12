@@ -538,6 +538,43 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .search-box input::placeholder { color: var(--text-muted); }
 
 /* ===========================
+   LEADER BAR
+   =========================== */
+.leader-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1.75rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 1px solid #fcd34d;
+}
+[data-theme="dark"] .leader-bar {
+  background: linear-gradient(135deg, rgba(245,158,11,.15) 0%, rgba(245,158,11,.08) 100%);
+  border-bottom-color: rgba(245,158,11,.2);
+}
+.leader-content {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.leader-icon { color: #f59e0b; font-size: 1.3rem; }
+.leader-title { font-size: .85rem; font-weight: 600; color: #92400e; }
+[data-theme="dark"] .leader-title { color: #f59e0b; }
+.leader-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #78350f;
+  background: #fff;
+  padding: .15rem .75rem;
+  border-radius: 100px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.1);
+}
+[data-theme="dark"] .leader-name {
+  background: rgba(245,158,11,.2);
+  color: #fbbf24;
+}
+
+/* ===========================
    FILTERS
    =========================== */
 .filters-bar {
@@ -729,6 +766,13 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   border-radius: var(--radius-sm);
 }
 
+/* Drop target highlight for group headers when receiving task drops */
+.group-header.drop-target {
+  background: var(--primary-bg);
+  border-bottom-color: var(--primary);
+  border-radius: var(--radius-sm);
+}
+
 /* Time off badge in group header */
 .group-timeoff {
   display: flex;
@@ -914,6 +958,195 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   accent-color: var(--primary);
   cursor: pointer;
 }
+
+/* ===========================
+   INLINE EDIT CELL
+   =========================== */
+.editable-cell { cursor: pointer; position: relative; }
+.editable-cell:hover { background: var(--primary-bg); border-radius: 4px; }
+.cell-edit-input {
+  width: 100%;
+  min-width: 80px;
+  padding: .3rem .5rem;
+  border: 1.5px solid var(--primary);
+  border-radius: 4px;
+  font-size: inherit;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+}
+
+/* ===========================
+   EDIT DROPDOWN
+   =========================== */
+.edit-dropdown {
+  position: fixed;
+  z-index: 500;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  max-width: 300px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalIn .15s ease;
+}
+.edit-dropdown-search {
+  padding: .6rem .75rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  font-size: .85rem;
+  color: var(--text);
+  outline: none;
+  width: 100%;
+}
+.edit-dropdown-search::placeholder { color: var(--text-muted); }
+.edit-dropdown-options {
+  overflow-y: auto;
+  flex: 1;
+  max-height: 220px;
+}
+.edit-dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .5rem .75rem;
+  font-size: .85rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 100ms;
+  gap: .5rem;
+}
+.edit-dropdown-option:hover { background: var(--surface-hover); }
+.edit-dropdown-option.active { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+.edit-dropdown-option .option-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edit-dropdown-option .option-edit,
+.edit-dropdown-option .option-delete {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all 100ms;
+}
+.edit-dropdown-option:hover .option-edit,
+.edit-dropdown-option:hover .option-delete { opacity: 1; }
+.edit-dropdown-option .option-edit:hover { color: var(--primary); background: var(--primary-bg); }
+.edit-dropdown-option .option-delete:hover { color: #ef4444; background: #fef2f2; }
+.edit-dropdown-option .option-edit .material-icons-round,
+.edit-dropdown-option .option-delete .material-icons-round { font-size: .85rem; }
+.edit-dropdown-add {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .6rem .75rem;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  font-size: .85rem;
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 100ms;
+  width: 100%;
+}
+.edit-dropdown-add:hover { background: var(--primary-bg); }
+.edit-dropdown-add .material-icons-round { font-size: 1rem; }
+
+/* ===========================
+   COMMENT TOOLTIP
+   =========================== */
+.comment-tooltip {
+  position: fixed;
+  z-index: 400;
+  background: var(--text);
+  color: #fff;
+  padding: .5rem .85rem;
+  border-radius: var(--radius-sm);
+  font-size: .8rem;
+  max-width: 300px;
+  line-height: 1.5;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  animation: fadeIn .15s ease;
+}
+[data-theme="dark"] .comment-tooltip {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* ===========================
+   ESPERANDO RESPUESTA SECTION
+   =========================== */
+.esperando-section {
+  margin-bottom: 1.5rem;
+  border: 2px dashed var(--status-esperando);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.esperando-header {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem 1rem;
+  background: var(--status-esperando-bg);
+  cursor: pointer;
+  user-select: none;
+}
+.esperando-header .material-icons-round { color: var(--status-esperando); }
+.esperando-header .group-name { color: var(--status-esperando); }
+.esperando-section .task-table tbody tr {
+  cursor: grab;
+}
+.esperando-section .task-table tbody tr:active {
+  cursor: grabbing;
+}
+.esperando-section .task-table tbody tr.dragging-task {
+  opacity: .4;
+}
+
+/* ===========================
+   TASK ACTION BUTTONS
+   =========================== */
+.task-actions {
+  display: flex;
+  gap: .2rem;
+  opacity: 0;
+  transition: opacity 100ms;
+}
+.task-table tbody tr:hover .task-actions { opacity: 1; }
+.task-action-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 100ms;
+}
+.task-action-btn:hover { background: var(--surface-hover); }
+.task-action-btn.delete:hover { color: #ef4444; background: #fef2f2; }
+.task-action-btn.copy:hover { color: var(--primary); background: var(--primary-bg); }
+.task-action-btn .material-icons-round { font-size: .9rem; }
 
 /* ===========================
    CALENDAR VIEW
@@ -1261,6 +1494,28 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .member-delete:hover { background: #fef2f2; color: #ef4444; }
 .member-delete .material-icons-round { font-size: 1rem; }
 
+/* Team member edit button */
+.member-edit {
+  position: absolute;
+  top: .5rem;
+  right: 2rem;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: var(--transition);
+}
+.member-card:hover .member-edit { opacity: 1; }
+.member-edit:hover { background: var(--primary-bg); color: var(--primary); }
+.member-edit .material-icons-round { font-size: 1rem; }
+
 /* Tags list (clients) */
 .tags-list {
   display: flex;
@@ -1487,7 +1742,13 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   .login-card {
     padding: 2rem 1.5rem;
     margin: 0 1rem;
+    border-radius: 16px;
   }
+
+  .login-logo h1 { font-size: 1.6rem; }
+  .logo-icon { font-size: 2.5rem; }
+  .btn-login { padding: .85rem; font-size: .95rem; }
+  .input-group input { padding: .8rem 1rem .8rem 2.8rem; font-size: 1rem; }
 
   .calendar-day { min-height: 50px; }
 }

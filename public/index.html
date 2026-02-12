@@ -2,7 +2,9 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Agenda LC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,10 +23,10 @@
         <h1>Agenda <span class="accent">LC</span></h1>
         <p class="login-subtitle">Team Task Management</p>
       </div>
-      <form id="login-form" autocomplete="off">
+      <form id="login-form" autocomplete="on">
         <div class="input-group">
           <span class="material-icons-round input-icon">lock</span>
-          <input type="password" id="login-password" placeholder="Ingresá la contraseña" required>
+          <input type="password" id="login-password" placeholder="Ingresá la contraseña" required autocomplete="current-password" inputmode="text">
         </div>
         <button type="submit" class="btn btn-primary btn-login" id="login-btn">
           <span>Entrar</span>
@@ -37,74 +39,37 @@
 
   <!-- MAIN APP -->
   <div id="app" class="app hidden">
-    <!-- SIDEBAR -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <span class="material-icons-round logo-icon-sm">event_note</span>
         <h2>Agenda <span class="accent">LC</span></h2>
-        <button class="btn-icon sidebar-close" id="sidebar-close">
-          <span class="material-icons-round">close</span>
-        </button>
+        <button class="btn-icon sidebar-close" id="sidebar-close"><span class="material-icons-round">close</span></button>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" data-view="agenda">
-          <span class="material-icons-round">dashboard</span>
-          <span>Agenda</span>
-        </a>
-        <a href="#" class="nav-item" data-view="calendar">
-          <span class="material-icons-round">calendar_month</span>
-          <span>Calendario</span>
-        </a>
-        <a href="#" class="nav-item" data-view="team">
-          <span class="material-icons-round">group</span>
-          <span>Equipo</span>
-        </a>
-        <a href="#" class="nav-item" data-view="settings">
-          <span class="material-icons-round">settings</span>
-          <span>Configuración</span>
-        </a>
+        <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span></a>
+        <a href="#" class="nav-item" data-view="calendar"><span class="material-icons-round">calendar_month</span><span>Calendario</span></a>
+        <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
+        <a href="#" class="nav-item" data-view="settings"><span class="material-icons-round">settings</span><span>Configuración</span></a>
       </nav>
       <div class="sidebar-footer">
-        <button class="btn btn-ghost btn-logout" id="logout-btn">
-          <span class="material-icons-round">logout</span>
-          <span>Cerrar sesión</span>
-        </button>
+        <button class="btn btn-ghost btn-logout" id="logout-btn"><span class="material-icons-round">logout</span><span>Cerrar sesión</span></button>
       </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
     <main class="main-content">
-      <!-- TOP BAR -->
       <header class="topbar">
         <div class="topbar-left">
-          <button class="btn-icon" id="sidebar-toggle">
-            <span class="material-icons-round">menu</span>
-          </button>
+          <button class="btn-icon" id="sidebar-toggle"><span class="material-icons-round">menu</span></button>
           <h1 class="page-title" id="page-title">Agenda</h1>
         </div>
         <div class="topbar-right">
-          <button class="btn-icon" id="dark-mode-toggle" title="Modo oscuro">
-            <span class="material-icons-round">dark_mode</span>
-          </button>
-          <div class="search-box" id="search-box">
-            <span class="material-icons-round">search</span>
-            <input type="text" id="search-input" placeholder="Buscar tareas...">
-          </div>
+          <button class="btn-icon" id="dark-mode-toggle" title="Modo oscuro"><span class="material-icons-round">dark_mode</span></button>
+          <div class="search-box" id="search-box"><span class="material-icons-round">search</span><input type="text" id="search-input" placeholder="Buscar tareas..."></div>
           <div class="dropdown" id="add-task-dropdown">
-            <button class="btn btn-primary" id="add-task-btn">
-              <span class="material-icons-round">add</span>
-              <span class="btn-label">Nueva tarea</span>
-              <span class="material-icons-round btn-label dropdown-arrow">arrow_drop_down</span>
-            </button>
+            <button class="btn btn-primary" id="add-task-btn"><span class="material-icons-round">add</span><span class="btn-label">Nueva tarea</span><span class="material-icons-round btn-label dropdown-arrow">arrow_drop_down</span></button>
             <div class="dropdown-menu hidden" id="add-task-menu">
-              <button class="dropdown-item" id="add-task-regular">
-                <span class="material-icons-round">assignment</span>
-                Nueva tarea
-              </button>
-              <button class="dropdown-item" id="add-timeoff-btn">
-                <span class="material-icons-round">beach_access</span>
-                Tiempo libre
-              </button>
+              <button class="dropdown-item" id="add-task-regular"><span class="material-icons-round">assignment</span>Nueva tarea</button>
+              <button class="dropdown-item" id="add-timeoff-btn"><span class="material-icons-round">beach_access</span>Tiempo libre</button>
             </div>
           </div>
         </div>
@@ -112,75 +77,34 @@
 
       <!-- AGENDA VIEW -->
       <div id="view-agenda" class="view active">
-        <!-- FILTERS -->
+        <div class="leader-bar" id="leader-bar">
+          <div class="leader-content">
+            <span class="material-icons-round leader-icon">emoji_events</span>
+            <span class="leader-title">Lider de la semana:</span>
+            <span class="leader-name" id="leader-name">—</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="leader-randomize"><span class="material-icons-round">casino</span><span>Sortear</span></button>
+        </div>
         <div class="filters-bar">
           <div class="filter-chips">
             <button class="chip active" data-filter="all">Todas</button>
-            <button class="chip" data-filter="alta">
-              <span class="priority-dot priority-alta"></span> Alta
-            </button>
-            <button class="chip" data-filter="media">
-              <span class="priority-dot priority-media"></span> Media
-            </button>
-            <button class="chip" data-filter="baja">
-              <span class="priority-dot priority-baja"></span> Baja
-            </button>
+            <button class="chip" data-filter="alta"><span class="priority-dot priority-alta"></span> Alta</button>
+            <button class="chip" data-filter="media"><span class="priority-dot priority-media"></span> Media</button>
+            <button class="chip" data-filter="baja"><span class="priority-dot priority-baja"></span> Baja</button>
           </div>
           <div class="filter-selects">
-            <select id="filter-assignee" class="filter-select">
-              <option value="">Todos los asignados</option>
-            </select>
-            <select id="filter-status" class="filter-select">
-              <option value="">Todos los estados</option>
-              <option value="sin empezar">Sin empezar</option>
-              <option value="en progreso">En progreso</option>
-              <option value="on going">On going</option>
-              <option value="esperando respuesta">Esperando respuesta</option>
-              <option value="completado">Completado</option>
-            </select>
-            <select id="filter-client" class="filter-select">
-              <option value="">Todos los clientes</option>
-            </select>
-            <button class="btn btn-ghost btn-sm" id="toggle-group">
-              <span class="material-icons-round">view_agenda</span>
-              <span>Agrupar</span>
-            </button>
+            <select id="filter-assignee" class="filter-select"><option value="">Todos los asignados</option></select>
+            <select id="filter-status" class="filter-select"><option value="">Todos los estados</option><option value="sin empezar">Sin empezar</option><option value="en progreso">En progreso</option><option value="on going">On going</option><option value="esperando respuesta">Esperando respuesta</option><option value="completado">Completado</option></select>
+            <select id="filter-client" class="filter-select"><option value="">Todos los clientes</option></select>
+            <button class="btn btn-ghost btn-sm" id="toggle-group"><span class="material-icons-round">view_agenda</span><span>Agrupar</span></button>
           </div>
         </div>
-
-        <!-- STATS -->
         <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-icon stat-total"><span class="material-icons-round">assignment</span></div>
-            <div class="stat-info">
-              <span class="stat-number" id="stat-total">0</span>
-              <span class="stat-label">Total</span>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon stat-progress"><span class="material-icons-round">pending</span></div>
-            <div class="stat-info">
-              <span class="stat-number" id="stat-progress">0</span>
-              <span class="stat-label">En progreso</span>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon stat-notstarted"><span class="material-icons-round">schedule</span></div>
-            <div class="stat-info">
-              <span class="stat-number" id="stat-notstarted">0</span>
-              <span class="stat-label">Sin empezar</span>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon stat-overdue"><span class="material-icons-round">warning</span></div>
-            <div class="stat-info">
-              <span class="stat-number" id="stat-overdue">0</span>
-              <span class="stat-label">Vencidas</span>
-            </div>
-          </div>
+          <div class="stat-card"><div class="stat-icon stat-total"><span class="material-icons-round">assignment</span></div><div class="stat-info"><span class="stat-number" id="stat-total">0</span><span class="stat-label">Total</span></div></div>
+          <div class="stat-card"><div class="stat-icon stat-progress"><span class="material-icons-round">pending</span></div><div class="stat-info"><span class="stat-number" id="stat-progress">0</span><span class="stat-label">En progreso</span></div></div>
+          <div class="stat-card"><div class="stat-icon stat-notstarted"><span class="material-icons-round">schedule</span></div><div class="stat-info"><span class="stat-number" id="stat-notstarted">0</span><span class="stat-label">Sin empezar</span></div></div>
+          <div class="stat-card"><div class="stat-icon stat-overdue"><span class="material-icons-round">warning</span></div><div class="stat-info"><span class="stat-number" id="stat-overdue">0</span><span class="stat-label">Vencidas</span></div></div>
         </div>
-
-        <!-- TASKS CONTAINER -->
         <div id="tasks-container" class="tasks-container"></div>
       </div>
 
@@ -188,22 +112,14 @@
       <div id="view-calendar" class="view hidden">
         <div class="calendar-toolbar">
           <div class="calendar-nav">
-            <button class="btn-icon" id="cal-prev">
-              <span class="material-icons-round">chevron_left</span>
-            </button>
+            <button class="btn-icon" id="cal-prev"><span class="material-icons-round">chevron_left</span></button>
             <h2 id="cal-month-title"></h2>
-            <button class="btn-icon" id="cal-next">
-              <span class="material-icons-round">chevron_right</span>
-            </button>
+            <button class="btn-icon" id="cal-next"><span class="material-icons-round">chevron_right</span></button>
             <button class="btn btn-ghost btn-sm" id="cal-today">Hoy</button>
           </div>
           <div class="calendar-filters">
-            <button class="chip active" id="cal-filter-deadlines">
-              <span class="material-icons-round" style="font-size:.9rem">flag</span> Deadlines
-            </button>
-            <button class="chip active" id="cal-filter-timeoff">
-              <span class="material-icons-round" style="font-size:.9rem">beach_access</span> Tiempo libre
-            </button>
+            <button class="chip active" id="cal-filter-deadlines"><span class="material-icons-round" style="font-size:.9rem">flag</span> Deadlines</button>
+            <button class="chip active" id="cal-filter-timeoff"><span class="material-icons-round" style="font-size:.9rem">beach_access</span> Tiempo libre</button>
           </div>
         </div>
         <div id="calendar-grid" class="calendar-grid"></div>
@@ -212,23 +128,11 @@
       <!-- TEAM VIEW -->
       <div id="view-team" class="view hidden">
         <div class="team-section">
-          <div class="section-header">
-            <h2>Miembros del equipo</h2>
-            <button class="btn btn-primary btn-sm" id="add-member-btn">
-              <span class="material-icons-round">person_add</span>
-              <span>Agregar miembro</span>
-            </button>
-          </div>
+          <div class="section-header"><h2>Miembros del equipo</h2><button class="btn btn-primary btn-sm" id="add-member-btn"><span class="material-icons-round">person_add</span><span>Agregar miembro</span></button></div>
           <div id="team-grid" class="team-grid"></div>
         </div>
         <div class="team-section">
-          <div class="section-header">
-            <h2>Clientes</h2>
-            <button class="btn btn-primary btn-sm" id="add-client-btn">
-              <span class="material-icons-round">add_business</span>
-              <span>Agregar cliente</span>
-            </button>
-          </div>
+          <div class="section-header"><h2>Clientes</h2><button class="btn btn-primary btn-sm" id="add-client-btn"><span class="material-icons-round">add_business</span><span>Agregar cliente</span></button></div>
           <div id="clients-list" class="tags-list"></div>
         </div>
       </div>
@@ -238,14 +142,8 @@
         <div class="settings-card">
           <h2>Cambiar contraseña</h2>
           <form id="change-password-form">
-            <div class="input-group">
-              <span class="material-icons-round input-icon">lock</span>
-              <input type="password" id="current-password" placeholder="Contraseña actual" required>
-            </div>
-            <div class="input-group">
-              <span class="material-icons-round input-icon">lock_reset</span>
-              <input type="password" id="new-password" placeholder="Nueva contraseña" required>
-            </div>
+            <div class="input-group"><span class="material-icons-round input-icon">lock</span><input type="password" id="current-password" placeholder="Contraseña actual" required></div>
+            <div class="input-group"><span class="material-icons-round input-icon">lock_reset</span><input type="password" id="new-password" placeholder="Nueva contraseña" required></div>
             <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
             <p id="password-msg" class="hidden"></p>
           </form>
@@ -254,140 +152,19 @@
     </main>
   </div>
 
-  <!-- TASK MODAL -->
-  <div id="task-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="modal-title">Nueva tarea</h2>
-        <button class="btn-icon modal-close" id="modal-close">
-          <span class="material-icons-round">close</span>
-        </button>
-      </div>
-      <form id="task-form" class="modal-body">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Cliente / Marca</label>
-            <input type="text" id="task-client" list="list-clients" placeholder="Escribí o elegí..." required>
-            <datalist id="list-clients"></datalist>
-          </div>
-          <div class="form-group">
-            <label>Prioridad</label>
-            <input type="text" id="task-priority" list="list-priorities" placeholder="Escribí o elegí...">
-            <datalist id="list-priorities">
-              <option value="alta">
-              <option value="media">
-              <option value="baja">
-              <option value="TBD">
-            </datalist>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Tema / Proyecto</label>
-          <input type="text" id="task-project" placeholder="Ej: Supervisión WC26" required>
-        </div>
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="task-supervision">
-            <span>Solo supervisión</span>
-            <span class="material-icons-round" style="font-size:1rem;color:var(--primary)">visibility</span>
-          </label>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Asignado a</label>
-            <input type="text" id="task-assignee" list="list-assignees" placeholder="Escribí o elegí..." required>
-            <datalist id="list-assignees"></datalist>
-          </div>
-          <div class="form-group">
-            <label>Supervisor</label>
-            <input type="text" id="task-supervisor" list="list-supervisors" placeholder="Escribí o elegí...">
-            <datalist id="list-supervisors"></datalist>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Deadline</label>
-            <input type="date" id="task-deadline">
-          </div>
-          <div class="form-group">
-            <label>Status</label>
-            <input type="text" id="task-status" list="list-statuses" placeholder="Escribí o elegí...">
-            <datalist id="list-statuses">
-              <option value="sin empezar">
-              <option value="en progreso">
-              <option value="on going">
-              <option value="esperando respuesta">
-              <option value="completado">
-            </datalist>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Owner</label>
-          <input type="text" id="task-owner" list="list-owners" placeholder="Escribí o elegí...">
-          <datalist id="list-owners"></datalist>
-        </div>
-        <div class="form-group">
-          <label>Comentarios</label>
-          <textarea id="task-comments" rows="3" placeholder="Comentarios..."></textarea>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-ghost btn-copy hidden" id="modal-copy">
-            <span class="material-icons-round">content_copy</span> Copiar a otro
-          </button>
-          <button type="button" class="btn btn-ghost" id="modal-cancel">Cancelar</button>
-          <button type="button" class="btn btn-danger hidden" id="modal-delete">
-            <span class="material-icons-round">delete</span> Eliminar
-          </button>
-          <button type="submit" class="btn btn-primary" id="modal-save">
-            <span class="material-icons-round">check</span> Guardar
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- TIME OFF MODAL -->
   <div id="timeoff-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h2 id="timeoff-modal-title">Tiempo libre</h2>
-        <button class="btn-icon modal-close" id="timeoff-modal-close">
-          <span class="material-icons-round">close</span>
-        </button>
-      </div>
+      <div class="modal-header"><h2 id="timeoff-modal-title">Tiempo libre</h2><button class="btn-icon modal-close" id="timeoff-modal-close"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Miembro</label>
-          <input type="text" id="timeoff-member" list="list-assignees" placeholder="Seleccioná..." required>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Desde</label>
-            <input type="date" id="timeoff-start" required>
-          </div>
-          <div class="form-group">
-            <label>Hasta</label>
-            <input type="date" id="timeoff-end" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Tipo</label>
-          <select id="timeoff-type" class="filter-select" style="width:100%;padding:.65rem .85rem;font-size:.9rem">
-            <option value="Vacaciones">Vacaciones</option>
-            <option value="Day Off">Day Off</option>
-            <option value="OOO">OOO (Out of Office)</option>
-          </select>
-        </div>
+        <div class="form-group"><label>Miembro</label><input type="text" id="timeoff-member" list="list-to-members" placeholder="Seleccioná..." required><datalist id="list-to-members"></datalist></div>
+        <div class="form-row"><div class="form-group"><label>Desde</label><input type="date" id="timeoff-start" required></div><div class="form-group"><label>Hasta</label><input type="date" id="timeoff-end" required></div></div>
+        <div class="form-group"><label>Tipo</label><select id="timeoff-type" class="filter-select" style="width:100%;padding:.65rem .85rem;font-size:.9rem"><option value="Vacaciones">Vacaciones</option><option value="Day Off">Day Off</option><option value="OOO">OOO (Out of Office)</option></select></div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-danger hidden" id="timeoff-delete">
-            <span class="material-icons-round">delete</span> Eliminar
-          </button>
+          <button type="button" class="btn btn-danger hidden" id="timeoff-delete"><span class="material-icons-round">delete</span> Eliminar</button>
           <button type="button" class="btn btn-ghost" id="timeoff-cancel">Cancelar</button>
-          <button type="button" class="btn btn-primary" id="timeoff-save">
-            <span class="material-icons-round">check</span> Guardar
-          </button>
+          <button type="button" class="btn btn-primary" id="timeoff-save"><span class="material-icons-round">check</span> Guardar</button>
         </div>
       </div>
     </div>
@@ -397,50 +174,27 @@
   <div id="copy-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h2>Copiar tarea a otro asignado</h2>
-        <button class="btn-icon modal-close" id="copy-modal-close">
-          <span class="material-icons-round">close</span>
-        </button>
-      </div>
+      <div class="modal-header"><h2>Copiar tarea a otro asignado</h2><button class="btn-icon modal-close" id="copy-modal-close"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Nuevo asignado</label>
-          <input type="text" id="copy-assignee" list="list-assignees" placeholder="Seleccioná..." required>
-        </div>
+        <div class="form-group"><label>Nuevo asignado</label><input type="text" id="copy-assignee" list="list-to-members" placeholder="Seleccioná..." required></div>
         <div class="modal-footer">
           <button type="button" class="btn btn-ghost" id="copy-modal-cancel">Cancelar</button>
-          <button type="button" class="btn btn-primary" id="copy-modal-save">
-            <span class="material-icons-round">content_copy</span> Copiar tarea
-          </button>
+          <button type="button" class="btn btn-primary" id="copy-modal-save"><span class="material-icons-round">content_copy</span> Copiar tarea</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- SIMPLE PROMPT MODAL (for adding members/clients) -->
+  <!-- PROMPT MODAL -->
   <div id="prompt-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h2 id="prompt-modal-title">Agregar</h2>
-        <button class="btn-icon modal-close" id="prompt-modal-close">
-          <span class="material-icons-round">close</span>
-        </button>
-      </div>
+      <div class="modal-header"><h2 id="prompt-modal-title">Agregar</h2><button class="btn-icon modal-close" id="prompt-modal-close"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
-        <div class="form-group">
-          <label id="prompt-modal-label">Nombre</label>
-          <input type="text" id="prompt-modal-input" placeholder="" required>
-        </div>
-        <div class="form-group hidden" id="prompt-modal-color-group">
-          <label>Color</label>
-          <div class="color-picker" id="prompt-modal-colors"></div>
-        </div>
-        <div class="form-group hidden" id="prompt-modal-role-group">
-          <label>Rol</label>
-          <input type="text" id="prompt-modal-role" placeholder="Ej: Diseñador, PM...">
-        </div>
+        <div class="form-group"><label id="prompt-modal-label">Nombre</label><input type="text" id="prompt-modal-input" required></div>
+        <div class="form-group hidden" id="prompt-modal-color-group"><label>Color</label><div class="color-picker" id="prompt-modal-colors"></div></div>
+        <div class="form-group hidden" id="prompt-modal-initials-group"><label>Iniciales (2 caracteres)</label><input type="text" id="prompt-modal-initials" maxlength="2" placeholder="Ej: JP"></div>
+        <div class="form-group hidden" id="prompt-modal-role-group"><label>Rol</label><input type="text" id="prompt-modal-role" placeholder="Ej: Diseñador, PM..."></div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="prompt-modal-cancel">Cancelar</button>
           <button class="btn btn-primary" id="prompt-modal-save">Guardar</button>
@@ -448,6 +202,16 @@
       </div>
     </div>
   </div>
+
+  <!-- GLOBAL EDIT DROPDOWN -->
+  <div id="edit-dropdown" class="edit-dropdown hidden">
+    <input type="text" class="edit-dropdown-search" id="edit-dropdown-search" placeholder="Buscar..." autocomplete="off">
+    <div class="edit-dropdown-options" id="edit-dropdown-options"></div>
+    <button class="edit-dropdown-add hidden" id="edit-dropdown-add"><span class="material-icons-round">add</span> Agregar nuevo...</button>
+  </div>
+
+  <!-- COMMENT TOOLTIP -->
+  <div id="comment-tooltip" class="comment-tooltip hidden"></div>
 
   <!-- TOAST -->
   <div id="toast-container" class="toast-container"></div>
