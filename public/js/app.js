@@ -16,6 +16,7 @@ let calFilters = { deadlines: true, timeoff: true };
 let draggedGroup = null;
 let activeEditDropdown = null;
 let activeInlineInput = null;
+let copyingTaskId = null;
 
 // Preset colors for avatars
 const COLORS = [
@@ -476,7 +477,7 @@ function renderGroupedTasks(container, filtered) {
       memberTimeOffs.forEach(to => {
         const start = formatDate(to.timeOffStart);
         const end = formatDate(to.timeOffEnd);
-        const type = to.timeOffType || 'Tiempo libre';
+        const type = to.timeOffType || 'Time Off';
         timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(type)}">
           <span class="material-icons-round">beach_access</span>
           ${escHtml(type)}: ${start} - ${end}
@@ -699,9 +700,13 @@ function bindTaskRows(wrapper) {
   wrapper.querySelectorAll('.task-action-btn.copy').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      editingTaskId = btn.dataset.taskId;
+      const taskId = btn.dataset.taskId;
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) { toast('No se encontró la tarea', 'error'); return; }
+      copyingTaskId = taskId;
       document.getElementById('copy-assignee').value = '';
       document.getElementById('copy-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('copy-assignee').focus(), 100);
     });
   });
 }
@@ -1120,8 +1125,12 @@ document.getElementById('copy-modal-save').addEventListener('click', async () =>
     return;
   }
 
-  const originalTask = tasks.find(t => t.id === editingTaskId);
-  if (!originalTask) return;
+  const originalTask = tasks.find(t => t.id === copyingTaskId);
+  if (!originalTask) {
+    toast('No se encontró la tarea original', 'error');
+    document.getElementById('copy-modal').classList.add('hidden');
+    return;
+  }
 
   const body = {
     client: originalTask.client,
@@ -1140,7 +1149,7 @@ document.getElementById('copy-modal-save').addEventListener('click', async () =>
     await api('POST', '/tasks', body);
     toast(`Tarea copiada a ${newAssignee}`);
     document.getElementById('copy-modal').classList.add('hidden');
-    editingTaskId = null;
+    copyingTaskId = null;
     await loadData();
   } catch (err) {
     toast('Error al copiar: ' + err.message, 'error');
@@ -1151,7 +1160,7 @@ document.getElementById('copy-modal-save').addEventListener('click', async () =>
 function openTimeOffModal(entry = null) {
   editingTimeOffId = entry ? entry.id : null;
   const titleEl = document.getElementById('timeoff-modal-title');
-  titleEl.textContent = entry ? 'Editar tiempo libre' : 'Tiempo libre';
+  titleEl.textContent = entry ? 'Editar Time Off' : 'Time Off';
   document.getElementById('timeoff-delete').classList.toggle('hidden', !entry);
 
   document.getElementById('timeoff-member').value = entry?.assignee || '';
@@ -1201,10 +1210,10 @@ document.getElementById('timeoff-save').addEventListener('click', async () => {
   try {
     if (editingTimeOffId) {
       await api('PUT', `/tasks/${editingTimeOffId}`, body);
-      toast('Tiempo libre actualizado');
+      toast('Time off actualizado');
     } else {
       await api('POST', '/tasks', body);
-      toast('Tiempo libre registrado');
+      toast('Time off registrado');
     }
     closeTimeOffModal();
     await loadData();
@@ -1215,10 +1224,10 @@ document.getElementById('timeoff-save').addEventListener('click', async () => {
 
 document.getElementById('timeoff-delete').addEventListener('click', async () => {
   if (!editingTimeOffId) return;
-  if (!confirm('¿Eliminar este tiempo libre?')) return;
+  if (!confirm('¿Eliminar este time off?')) return;
   try {
     await api('DELETE', `/tasks/${editingTimeOffId}`);
-    toast('Tiempo libre eliminado');
+    toast('Time off eliminado');
     closeTimeOffModal();
     await loadData();
   } catch (err) {
@@ -1297,7 +1306,10 @@ function renderCalendar() {
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const ds = d.toISOString().slice(0, 10);
         if (!timeoffMap[ds]) timeoffMap[ds] = [];
-        timeoffMap[ds].push(to);
+        const isStart = ds === to.timeOffStart;
+        const isEnd = ds === to.timeOffEnd;
+        const isSingle = to.timeOffStart === to.timeOffEnd;
+        timeoffMap[ds].push({ ...to, _pos: isSingle ? 'single' : isStart ? 'start' : isEnd ? 'end' : 'middle' });
       }
     });
   }
@@ -1348,8 +1360,10 @@ function renderCalendar() {
       const memberObj = (settings.teamMembers || []).find(m => m.name === to.assignee);
       const color = memberObj?.color || getColorForName(to.assignee);
       const label = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
-      eventsHtml += `<div class="calendar-event timeoff" style="background:${color}" title="${escAttr(to.assignee)} - ${escAttr(to.timeOffType)}">
-        <span class="material-icons-round">beach_access</span>${escHtml(to.assignee)} (${label})
+      const pos = to._pos || 'single';
+      const showLabel = pos === 'start' || pos === 'single';
+      eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="background:${color}" title="${escAttr(to.assignee)} - ${escAttr(to.timeOffType)}">
+        ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(to.assignee)} (${label})` : '&nbsp;'}
       </div>`;
     });
 

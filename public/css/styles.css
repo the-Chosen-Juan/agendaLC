@@ -118,6 +118,39 @@
   color: var(--text);
 }
 
+/* Dark mode badge fixes - ensure visibility */
+[data-theme="dark"] .client-badge {
+  background: rgba(255,255,255,.1) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+[data-theme="dark"] .status-badge {
+  border: 1px solid rgba(255,255,255,.06);
+}
+
+[data-theme="dark"] .priority-badge {
+  border: 1px solid rgba(255,255,255,.06);
+}
+
+[data-theme="dark"] .priority-badge.tbd {
+  background: rgba(148,163,184,.2);
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .status-badge.sin-empezar {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .deadline-text.overdue,
+[data-theme="dark"] .deadline-text.urgent {
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .deadline-text.warning {
+  color: #fcd34d;
+}
+
 /* ===========================
    RESET & BASE
    =========================== */
@@ -1260,6 +1293,30 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .calendar-event.timeoff {
   color: #fff;
   opacity: .9;
+  border-radius: 4px;
+}
+
+/* Multi-day time off connected bars */
+.calendar-event.timeoff.timeoff-start {
+  border-radius: 4px 0 0 4px;
+  margin-right: -6px;
+  padding-right: 8px;
+}
+.calendar-event.timeoff.timeoff-middle {
+  border-radius: 0;
+  margin-left: -6px;
+  margin-right: -6px;
+  padding-left: 4px;
+  min-height: 18px;
+}
+.calendar-event.timeoff.timeoff-end {
+  border-radius: 0 4px 4px 0;
+  margin-left: -6px;
+  padding-left: 4px;
+  min-height: 18px;
+}
+.calendar-event.timeoff.timeoff-single {
+  border-radius: 4px;
 }
 
 .calendar-event .material-icons-round {
