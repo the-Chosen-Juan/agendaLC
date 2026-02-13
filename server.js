@@ -80,6 +80,15 @@ async function getTasks() {
   }
 }
 
+function pruneExpiredCompletedTasks(taskList) {
+  const now = Date.now();
+  const ttlMs = 2 * 24 * 60 * 60 * 1000;
+  return taskList.filter(task => {
+    if (task.status !== 'completado' || !task.completedAt) return true;
+    return (now - new Date(task.completedAt).getTime()) < ttlMs;
+  });
+}
+
 async function saveTasks(tasks) {
   if (USE_REDIS) {
     await redis.set('agenda:tasks', JSON.stringify(tasks));
@@ -164,7 +173,8 @@ app.post('/api/logout', (req, res) => {
 // ============================================================
 app.get('/api/tasks', authMiddleware, async (req, res) => {
   try {
-    const tasks = await getTasks();
+    const tasks = pruneExpiredCompletedTasks(await getTasks());
+    await saveTasks(tasks);
     res.json(tasks);
   } catch (err) {
     console.error('Get tasks error:', err);
@@ -192,6 +202,8 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
       timeOffStart: req.body.timeOffStart || '',
       timeOffEnd: req.body.timeOffEnd || '',
       timeOffType: req.body.timeOffType || '',
+      timeOffTitle: req.body.timeOffTitle || '',
+      completedAt: req.body.status === 'completado' ? new Date().toISOString() : '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -209,7 +221,14 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
     const tasks = await getTasks();
     const idx = tasks.findIndex(t => t.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'Task not found' });
-    tasks[idx] = { ...tasks[idx], ...req.body, updatedAt: new Date().toISOString() };
+    const nextTask = { ...tasks[idx], ...req.body, updatedAt: new Date().toISOString() };
+    if (nextTask.status === 'completado' && !tasks[idx].completedAt) {
+      nextTask.completedAt = new Date().toISOString();
+    }
+    if (nextTask.status !== 'completado') {
+      nextTask.completedAt = '';
+    }
+    tasks[idx] = nextTask;
     await saveTasks(tasks);
     res.json(tasks[idx]);
   } catch (err) {

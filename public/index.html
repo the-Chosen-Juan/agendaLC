@@ -121,6 +121,7 @@
             <button class="chip active" id="cal-filter-deadlines"><span class="material-icons-round" style="font-size:.9rem">flag</span> Deadlines</button>
             <button class="chip active" id="cal-filter-timeoff"><span class="material-icons-round" style="font-size:.9rem">beach_access</span> Time Off</button>
           </div>
+          <div id="cal-assignee-filters" class="calendar-assignee-filters"></div>
         </div>
         <div id="calendar-grid" class="calendar-grid"></div>
       </div>
@@ -148,6 +149,15 @@
             <p id="password-msg" class="hidden"></p>
           </form>
         </div>
+        <div class="settings-card">
+          <h2>Gestión rápida</h2>
+          <p class="settings-help">Personalizá miembros, roles del randomizer, owners y exportá tareas sin tocar código.</p>
+          <div class="settings-actions">
+            <button class="btn btn-ghost" id="settings-manage-team"><span class="material-icons-round">groups</span>Gestionar equipo</button>
+            <button class="btn btn-ghost" id="settings-manage-clients"><span class="material-icons-round">apartment</span>Gestionar clientes</button>
+            <button class="btn btn-primary" id="settings-export-csv"><span class="material-icons-round">download</span>Exportar a CSV</button>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -160,6 +170,7 @@
       <div class="modal-body">
         <div class="form-group"><label>Miembro</label><input type="text" id="timeoff-member" list="list-to-members" placeholder="Seleccioná..." required><datalist id="list-to-members"></datalist></div>
         <div class="form-row"><div class="form-group"><label>Desde</label><input type="date" id="timeoff-start" required></div><div class="form-group"><label>Hasta</label><input type="date" id="timeoff-end" required></div></div>
+        <div class="form-group"><label>Título visible</label><input type="text" id="timeoff-title" placeholder="Ej: Vacaciones Juan" /></div>
         <div class="form-group"><label>Tipo</label><select id="timeoff-type" class="filter-select" style="width:100%;padding:.65rem .85rem;font-size:.9rem"><option value="Vacaciones">Vacaciones</option><option value="Day Off">Day Off</option><option value="OOO">OOO (Out of Office)</option></select></div>
         <div class="modal-footer">
           <button type="button" class="btn btn-danger hidden" id="timeoff-delete"><span class="material-icons-round">delete</span> Eliminar</button>
@@ -193,8 +204,8 @@
       <div class="modal-body">
         <div class="form-group"><label id="prompt-modal-label">Nombre</label><input type="text" id="prompt-modal-input" required></div>
         <div class="form-group hidden" id="prompt-modal-color-group"><label>Color</label><div class="color-picker" id="prompt-modal-colors"></div></div>
-        <div class="form-group hidden" id="prompt-modal-initials-group"><label>Iniciales (2 caracteres)</label><input type="text" id="prompt-modal-initials" maxlength="2" placeholder="Ej: JP"></div>
-        <div class="form-group hidden" id="prompt-modal-role-group"><label>Rol</label><input type="text" id="prompt-modal-role" placeholder="Ej: Diseñador, PM..."></div>
+        <div class="form-group hidden" id="prompt-modal-initials-group"><label>Iniciales (3 caracteres)</label><input type="text" id="prompt-modal-initials" maxlength="3" placeholder="Ej: JPR"></div>
+        <div class="form-group hidden" id="prompt-modal-role-group"><label>Rol</label><select id="prompt-modal-role" class="filter-select" style="width:100%"><option value="Equipo">Equipo</option><option value="Supervisor">Supervisor</option><option value="Owner">Owner</option></select></div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="prompt-modal-cancel">Cancelar</button>
           <button class="btn btn-primary" id="prompt-modal-save">Guardar</button>

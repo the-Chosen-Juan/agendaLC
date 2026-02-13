@@ -12,7 +12,9 @@ let editingTaskId = null;
 let editingTimeOffId = null;
 let calMonth = new Date().getMonth();
 let calYear = new Date().getFullYear();
-let calFilters = { deadlines: true, timeoff: true };
+let calFilters = { deadlines: true, timeoff: true, assignees: new Set() };
+let undoStack = [];
+let redoGuard = false;
 let draggedGroup = null;
 let activeEditDropdown = null;
 let activeInlineInput = null;
@@ -179,7 +181,10 @@ function switchView(view) {
     addBtn.classList.add('hidden');
   }
 
-  if (view === 'calendar') renderCalendar();
+  if (view === 'calendar') {
+    renderCalendarAssigneeFilters();
+    renderCalendar();
+  }
 }
 
 // Sidebar toggle (mobile)
@@ -209,31 +214,27 @@ document.addEventListener('click', (e) => {
 
 document.getElementById('add-task-regular').addEventListener('click', async () => {
   addTaskMenu.classList.add('hidden');
+  const project = prompt('Tema / Proyecto');
+  if (project === null) return;
+  const assignee = prompt('Asignado (rol Equipo)') || '';
+  const client = prompt('Cliente') || '';
   try {
     const body = {
-      client: '',
-      project: '',
-      assignee: '',
+      client,
+      project,
+      assignee,
       supervisor: '',
       priority: 'TBD',
+      taskNumber: '',
       deadline: '',
       status: 'sin empezar',
       owner: '',
       comments: '',
       isSupervision: false
     };
-    const newTask = await api('POST', '/tasks', body);
+    await api('POST', '/tasks', body);
     await loadData();
-    toast('Nueva tarea creada — editá los campos directamente');
-    // Auto-focus on the new task's client cell
-    setTimeout(() => {
-      const row = document.querySelector(`tr[data-id="${newTask.id}"]`);
-      if (row) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const clientCell = row.querySelector('[data-field="client"]');
-        if (clientCell) clientCell.click();
-      }
-    }, 100);
+    toast('Nueva tarea creada');
   } catch (err) {
     toast('Error al crear tarea: ' + err.message, 'error');
   }
@@ -278,6 +279,7 @@ function populateFilterDropdowns() {
     ...(settings.teamMembers || []).map(m => m.name),
     ...tasks.map(t => t.assignee).filter(Boolean)
   ])];
+  assignees.forEach(a => calFilters.assignees.add(a));
   const clients = [...new Set([
     ...(settings.clients || []).map(c => c.name),
     ...tasks.map(t => t.client).filter(Boolean)
@@ -298,6 +300,7 @@ function populateFilterDropdowns() {
   });
 
   populateFormDataLists(assignees, clients);
+  renderCalendarAssigneeFilters();
 }
 
 function populateFormDataLists(assignees, clients) {
@@ -333,9 +336,13 @@ function getOptionsForField(field) {
 
   switch (field) {
     case 'client': return allClients;
-    case 'assignee': return allPeople;
+    case 'assignee': {
+      const teams = (settings.teamMembers || []).filter(m => (m.role || 'Equipo') === 'Equipo').map(m => m.name);
+      return teams.sort();
+    }
     case 'supervisor': return allPeople;
-    case 'owner': return allPeople;
+    case 'owner':
+      return (settings.teamMembers || []).filter(m => (m.role || '') === 'Owner').map(m => m.name).sort();
     case 'status': return STATUS_OPTIONS;
     case 'priority': return PRIORITY_CYCLE;
     default: return [];
@@ -369,11 +376,6 @@ function renderTasks() {
 
   container.innerHTML = '';
 
-  // Render esperando respuesta section if any
-  if (esperandoTasks.length > 0) {
-    renderEsperandoSection(container, esperandoTasks);
-  }
-
   if (regularFiltered.length === 0 && esperandoTasks.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
@@ -392,6 +394,11 @@ function renderTasks() {
     wrapper.innerHTML = buildTaskTable(sorted);
     container.appendChild(wrapper);
     bindTaskRows(wrapper);
+  }
+
+  // Render esperando respuesta section at the bottom
+  if (esperandoTasks.length > 0) {
+    renderEsperandoSection(container, esperandoTasks);
   }
 }
 
@@ -440,7 +447,14 @@ function renderEsperandoSection(container, esperandoTasks) {
 
 function renderGroupedTasks(container, filtered) {
   const groups = {};
+  const completedByAssignee = {};
   filtered.forEach(t => {
+    if (t.status === 'completado') {
+      const ck = t.assignee || 'Sin asignar';
+      if (!completedByAssignee[ck]) completedByAssignee[ck] = [];
+      completedByAssignee[ck].push(t);
+      return;
+    }
     const key = t.assignee || 'Sin asignar';
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
@@ -465,6 +479,7 @@ function renderGroupedTasks(container, filtered) {
     const initials = member?.initials || getInitials(assignee);
 
     const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
+    const completedTasks = sortTasksByNumber(completedByAssignee[assignee] || []);
 
     const header = document.createElement('div');
     header.className = 'group-header';
@@ -505,7 +520,17 @@ function renderGroupedTasks(container, filtered) {
       const toggle = header.querySelector('.group-toggle');
       toggle.classList.toggle('collapsed');
       tableWrapper.classList.toggle('hidden');
+      const collapsed = new Set(JSON.parse(localStorage.getItem('collapsedGroups') || '[]'));
+      if (tableWrapper.classList.contains('hidden')) collapsed.add(assignee);
+      else collapsed.delete(assignee);
+      localStorage.setItem('collapsedGroups', JSON.stringify([...collapsed]));
     });
+
+    const collapsed = new Set(JSON.parse(localStorage.getItem('collapsedGroups') || '[]'));
+    if (collapsed.has(assignee)) {
+      header.querySelector('.group-toggle').classList.add('collapsed');
+      tableWrapper.classList.add('hidden');
+    }
 
     // Time off badge click
     header.querySelectorAll('.timeoff-badge').forEach(badge => {
@@ -594,6 +619,14 @@ function renderGroupedTasks(container, filtered) {
     container.appendChild(header);
     container.appendChild(tableWrapper);
     bindTaskRows(tableWrapper);
+
+    if (completedTasks.length > 0) {
+      const completedWrap = document.createElement('div');
+      completedWrap.className = 'table-wrapper completed-wrapper';
+      completedWrap.innerHTML = `<div class="completed-title">Completadas</div>${buildTaskTable(completedTasks)}`;
+      container.appendChild(completedWrap);
+      bindTaskRows(completedWrap);
+    }
   });
 }
 
@@ -629,7 +662,7 @@ function buildTaskTable(taskList, showAssignee = false) {
     html += `
       <tr data-id="${t.id}">
         <td class="editable-cell" data-field="client"><span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text}">${escHtml(t.client || '—')}</span></td>
-        <td style="color:var(--text-muted);font-size:.8rem">${t.taskNumber || ''}</td>
+        <td class="editable-cell" data-field="taskNumber" style="color:var(--text-muted);font-size:.8rem">${t.taskNumber || ''}</td>
         <td class="editable-cell task-project-cell" data-field="project">${escHtml(t.project || '—')}${supervisionTag}</td>
         ${showAssignee ? `<td class="editable-cell" data-field="assignee" style="color:var(--text-secondary)">${escHtml(t.assignee || '—')}</td>` : ''}
         <td class="editable-cell" data-field="supervisor" style="color:var(--text-secondary)">${escHtml(t.supervisor || '—')}</td>
@@ -713,11 +746,15 @@ function bindTaskRows(wrapper) {
 
 // --- INLINE EDITING ---
 function startInlineEdit(cell, task, field) {
+  if (activeEditDropdown && activeEditDropdown.task.id === task.id && activeEditDropdown.field === field) {
+    closeEditDropdown();
+    return;
+  }
   closeEditDropdown();
   closeInlineInput();
 
   const dropdownFields = ['client', 'assignee', 'supervisor', 'owner', 'status', 'priority'];
-  const textFields = ['project', 'comments'];
+  const textFields = ['project', 'comments', 'taskNumber'];
 
   if (dropdownFields.includes(field)) {
     openEditDropdown(cell, task, field);
@@ -740,7 +777,21 @@ function openTextInput(cell, task, field) {
 
   const originalHtml = cell.innerHTML;
   cell.innerHTML = '';
-  cell.appendChild(input);
+  let supervisionCheckbox = null;
+  if (field === 'project') {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '.5rem';
+    supervisionCheckbox = document.createElement('input');
+    supervisionCheckbox.type = 'checkbox';
+    supervisionCheckbox.checked = !!task.isSupervision;
+    wrap.appendChild(input);
+    wrap.appendChild(supervisionCheckbox);
+    cell.appendChild(wrap);
+  } else {
+    cell.appendChild(input);
+  }
   input.focus();
   input.select();
 
@@ -752,8 +803,10 @@ function openTextInput(cell, task, field) {
       try {
         const update = {};
         update[field] = newValue;
-        await api('PUT', `/tasks/${task.id}`, update);
+        if (field === 'project' && supervisionCheckbox) update.isSupervision = supervisionCheckbox.checked;
+        await updateTask(task.id, update, `Deshecho: ${field} → ${currentValue || 'vacío'}`);
         task[field] = newValue;
+        if (field === 'project' && supervisionCheckbox) task.isSupervision = supervisionCheckbox.checked;
         toast('Actualizado');
       } catch (err) {
         toast('Error: ' + err.message, 'error');
@@ -776,6 +829,16 @@ function openTextInput(cell, task, field) {
   });
 }
 
+async function updateTask(taskId, patch, undoLabel = 'Deshecho') {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return null;
+  const before = {};
+  Object.keys(patch).forEach(k => { before[k] = task[k]; });
+  const updated = await api('PUT', `/tasks/${taskId}`, patch);
+  if (!redoGuard) undoStack.push({ taskId, before, label: undoLabel });
+  return updated;
+}
+
 function openDateInput(cell, task) {
   const currentValue = task.deadline || '';
   const originalHtml = cell.innerHTML;
@@ -795,7 +858,7 @@ function openDateInput(cell, task) {
     const newValue = input.value;
     if (newValue !== currentValue) {
       try {
-        await api('PUT', `/tasks/${task.id}`, { deadline: newValue });
+        await updateTask(task.id, { deadline: newValue }, `Deshecho: deadline → ${currentValue || 'vacío'}`);
         task.deadline = newValue;
         toast('Deadline actualizado');
       } catch (err) {
@@ -888,7 +951,7 @@ function openEditDropdown(cell, task, field) {
     } else if (field === 'assignee' || field === 'supervisor' || field === 'owner') {
       if (!(settings.teamMembers || []).some(m => m.name === newName)) {
         const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-        settings.teamMembers = [...(settings.teamMembers || []), { name: newName, color, role: '' }];
+        settings.teamMembers = [...(settings.teamMembers || []), { name: newName, color, role: 'Equipo' }];
         api('PUT', '/settings', { teamMembers: settings.teamMembers }).catch(() => {});
       }
     }
@@ -905,7 +968,7 @@ async function selectDropdownOption(task, field, value) {
   try {
     const update = {};
     update[field] = value;
-    await api('PUT', `/tasks/${task.id}`, update);
+    await updateTask(task.id, update, `Deshecho: ${field} → ${task[field] || 'vacío'}`);
     task[field] = value;
     toast('Actualizado');
     renderTasks();
@@ -1167,6 +1230,7 @@ function openTimeOffModal(entry = null) {
   document.getElementById('timeoff-start').value = entry?.timeOffStart || '';
   document.getElementById('timeoff-end').value = entry?.timeOffEnd || '';
   document.getElementById('timeoff-type').value = entry?.timeOffType || 'Vacaciones';
+  document.getElementById('timeoff-title').value = entry?.timeOffTitle || '';
 
   document.getElementById('timeoff-modal').classList.remove('hidden');
 }
@@ -1185,6 +1249,7 @@ document.getElementById('timeoff-save').addEventListener('click', async () => {
   const start = document.getElementById('timeoff-start').value;
   const end = document.getElementById('timeoff-end').value;
   const type = document.getElementById('timeoff-type').value;
+  const title = document.getElementById('timeoff-title').value.trim();
 
   if (!member || !start || !end) {
     toast('Completá todos los campos', 'error');
@@ -1193,7 +1258,7 @@ document.getElementById('timeoff-save').addEventListener('click', async () => {
 
   const body = {
     client: 'TIME OFF',
-    project: type,
+    project: title || type,
     assignee: member,
     priority: '',
     deadline: end,
@@ -1204,7 +1269,8 @@ document.getElementById('timeoff-save').addEventListener('click', async () => {
     isTimeOff: true,
     timeOffStart: start,
     timeOffEnd: end,
-    timeOffType: type
+    timeOffType: type,
+    timeOffTitle: title
   };
 
   try {
@@ -1292,6 +1358,7 @@ function renderCalendar() {
 
   if (calFilters.deadlines) {
     getRegularTasks().forEach(t => {
+      if (t.assignee && calFilters.assignees.size && !calFilters.assignees.has(t.assignee)) return;
       if (!t.deadline) return;
       if (!deadlineMap[t.deadline]) deadlineMap[t.deadline] = [];
       deadlineMap[t.deadline].push(t);
@@ -1300,6 +1367,7 @@ function renderCalendar() {
 
   if (calFilters.timeoff) {
     getTimeOffEntries().forEach(to => {
+      if (to.assignee && calFilters.assignees.size && !calFilters.assignees.has(to.assignee)) return;
       if (!to.timeOffStart || !to.timeOffEnd) return;
       const start = new Date(to.timeOffStart + 'T00:00:00');
       const end = new Date(to.timeOffEnd + 'T00:00:00');
@@ -1359,11 +1427,11 @@ function renderCalendar() {
       eventCount++;
       const memberObj = (settings.teamMembers || []).find(m => m.name === to.assignee);
       const color = memberObj?.color || getColorForName(to.assignee);
-      const label = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
+      const label = to.timeOffTitle || (to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac');
       const pos = to._pos || 'single';
       const showLabel = pos === 'start' || pos === 'single';
-      eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="background:${color}" title="${escAttr(to.assignee)} - ${escAttr(to.timeOffType)}">
-        ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(to.assignee)} (${label})` : '&nbsp;'}
+      eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" data-task-id="${to.id}" data-event-type="timeoff" style="background:${color}" title="${escAttr(to.assignee)} - ${escAttr(to.timeOffType)}">
+        ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(label)}` : '&nbsp;'}
       </div>`;
     });
 
@@ -1372,7 +1440,7 @@ function renderCalendar() {
       eventCount++;
       const isOverdue = new Date(dateStr + 'T00:00:00') < today && t.status !== 'completado';
       const cls = isOverdue ? 'deadline-overdue' : 'deadline';
-      eventsHtml += `<div class="calendar-event ${cls}" title="${escAttr(t.project)} - ${escAttr(t.assignee)}">
+      eventsHtml += `<div class="calendar-event ${cls}" data-task-id="${t.id}" data-event-type="deadline" title="${escAttr(t.project)} - ${escAttr(t.assignee)}">
         <span class="material-icons-round">flag</span>${escHtml(t.project || t.client)}
       </div>`;
     });
@@ -1391,6 +1459,71 @@ function renderCalendar() {
   }
 
   grid.innerHTML = html;
+
+  grid.querySelectorAll('.calendar-event[data-task-id]').forEach(ev => {
+    ev.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const taskId = ev.dataset.taskId;
+      const type = ev.dataset.eventType;
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      if (type === 'timeoff') {
+        const action = prompt('Editar Time Off: fecha inicio (YYYY-MM-DD), fecha fin (YYYY-MM-DD) o "delete"');
+        if (!action) return;
+        if (action.toLowerCase() === 'delete') {
+          await api('DELETE', `/tasks/${taskId}`);
+          toast('Time off eliminado');
+          return loadData();
+        }
+        const [start, end] = action.split(',').map(v => (v || '').trim());
+        if (start && end) {
+          await updateTask(taskId, { timeOffStart: start, timeOffEnd: end, deadline: end }, 'Deshecho: editar time off');
+          await loadData();
+        }
+      } else {
+        const action = prompt('Editar deadline (YYYY-MM-DD) o "delete" para eliminar tarea', task.deadline || '');
+        if (!action) return;
+        if (action.toLowerCase() === 'delete') {
+          await api('DELETE', `/tasks/${taskId}`);
+          toast('Tarea eliminada');
+          return loadData();
+        }
+        await updateTask(taskId, { deadline: action.trim() }, 'Deshecho: editar deadline');
+        await loadData();
+      }
+    });
+  });
+}
+
+function renderCalendarAssigneeFilters() {
+  const wrap = document.getElementById('cal-assignee-filters');
+  if (!wrap) return;
+  const assignees = [...new Set([
+    ...(settings.teamMembers || []).map(m => m.name),
+    ...tasks.map(t => t.assignee).filter(Boolean)
+  ])].sort();
+  if (!assignees.length) {
+    wrap.innerHTML = '';
+    return;
+  }
+  assignees.forEach(a => calFilters.assignees.add(a));
+  wrap.innerHTML = assignees
+    .map(a => `<button class="chip ${calFilters.assignees.has(a) ? 'active' : ''}" data-assignee="${escAttr(a)}">${escHtml(a)}</button>`)
+    .join('');
+
+  wrap.querySelectorAll('button[data-assignee]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const assignee = btn.dataset.assignee;
+      if (calFilters.assignees.has(assignee)) {
+        calFilters.assignees.delete(assignee);
+      } else {
+        calFilters.assignees.add(assignee);
+      }
+      btn.classList.toggle('active', calFilters.assignees.has(assignee));
+      renderCalendar();
+    });
+  });
 }
 
 // --- TEAM VIEW ---
@@ -1570,7 +1703,7 @@ function openPromptModal(title, label, showColor, showRole, callback) {
   document.getElementById('prompt-modal-title').textContent = title;
   document.getElementById('prompt-modal-label').textContent = label;
   document.getElementById('prompt-modal-input').value = '';
-  document.getElementById('prompt-modal-role').value = '';
+  document.getElementById('prompt-modal-role').value = 'Equipo';
   document.getElementById('prompt-modal-color-group').classList.toggle('hidden', !showColor);
   document.getElementById('prompt-modal-role-group').classList.toggle('hidden', !showRole);
   document.getElementById('prompt-modal-initials-group').classList.toggle('hidden', !showRole);
@@ -1657,6 +1790,27 @@ document.getElementById('add-client-btn').addEventListener('click', () => {
   });
 });
 
+document.getElementById('settings-manage-team')?.addEventListener('click', () => switchView('team'));
+document.getElementById('settings-manage-clients')?.addEventListener('click', () => switchView('team'));
+document.getElementById('settings-export-csv')?.addEventListener('click', () => exportTasksCsv());
+
+function exportTasksCsv() {
+  const headers = ['id', 'cliente', 'numero', 'proyecto', 'asignado', 'supervisor', 'prioridad', 'deadline', 'status', 'owner', 'comentarios'];
+  const rows = getRegularTasks().map(t => [
+    t.id, t.client, t.taskNumber || '', t.project, t.assignee, t.supervisor,
+    t.priority, t.deadline, t.status, t.owner, t.comments
+  ].map(v => `"${String(v || '').replaceAll('"', '""')}"`).join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `agenda-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- HELPERS ---
 function escHtml(str) {
   if (!str) return '';
@@ -1672,7 +1826,7 @@ function escAttr(str) {
 
 function getInitials(name) {
   if (!name) return '?';
-  return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 3);
 }
 
 function getColorForName(name) {
@@ -1720,6 +1874,28 @@ function getDeadlineClass(dateStr) {
 
 // --- KEYBOARD SHORTCUTS ---
 document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    const action = undoStack.pop();
+    if (action) {
+      redoGuard = true;
+      updateTask(action.taskId, action.before).finally(async () => {
+        redoGuard = false;
+        await loadData();
+        toast(action.label || 'Deshecho', 'info');
+      });
+    }
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    const input = document.getElementById('search-input');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+    return;
+  }
   if (e.key === 'Escape') {
     closeEditDropdown();
     closeInlineInput();
