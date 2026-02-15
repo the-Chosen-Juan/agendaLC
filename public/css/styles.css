@@ -1832,3 +1832,355 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .table-wrapper .task-table tbody tr:last-child td {
   border-bottom: none;
 }
+
+/* ===========================
+   STICKY TABLE HEADERS
+   =========================== */
+.task-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+}
+
+/* ===========================
+   CELL SAVE HIGHLIGHT
+   =========================== */
+@keyframes cellSaved {
+  0% { background: rgba(16,185,129,.25); }
+  100% { background: transparent; }
+}
+.cell-saved {
+  animation: cellSaved .8s ease-out;
+}
+
+/* ===========================
+   COMPLETION CELEBRATION
+   =========================== */
+@keyframes rowComplete {
+  0% { background: rgba(6,182,212,.3); }
+  50% { background: rgba(6,182,212,.15); }
+  100% { background: transparent; }
+}
+.row-completed {
+  animation: rowComplete 1.2s ease-out;
+}
+
+@keyframes confettiBurst {
+  0% { transform: scale(0) rotate(0deg); opacity: 1; }
+  50% { opacity: 1; }
+  100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+}
+.confetti-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 600;
+  pointer-events: none;
+}
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confettiFall 1.2s cubic-bezier(.25,.46,.45,.94) forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; }
+}
+
+/* ===========================
+   OVERDUE NAV BADGE
+   =========================== */
+.nav-badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: .65rem;
+  font-weight: 700;
+  padding: .1rem .4rem;
+  border-radius: 100px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.3;
+  margin-left: auto;
+}
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+.nav-badge.pulse { animation: badgePulse 2s ease-in-out infinite; }
+
+.group-overdue-icon {
+  color: #ef4444;
+  font-size: 1rem;
+  margin-left: .25rem;
+}
+
+/* ===========================
+   SEARCH OVERLAY (Ctrl+K)
+   =========================== */
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+}
+.search-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15,23,42,.5);
+  backdrop-filter: blur(4px);
+  animation: fadeIn .15s ease;
+}
+.search-overlay-panel {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 560px;
+  box-shadow: var(--shadow-xl), 0 0 60px rgba(99,102,241,.1);
+  overflow: hidden;
+  animation: modalIn .2s cubic-bezier(.16,1,.3,1);
+}
+.search-overlay-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.search-overlay-input-wrap .material-icons-round {
+  color: var(--text-muted);
+  font-size: 1.4rem;
+}
+.search-overlay-input-wrap input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.search-overlay-input-wrap input::placeholder { color: var(--text-muted); }
+.search-overlay-input-wrap kbd {
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .15rem .4rem;
+  font-size: .65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+.search-overlay-results {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: .5rem 0;
+}
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .6rem 1.25rem;
+  cursor: pointer;
+  transition: background 100ms;
+}
+.search-result-item:hover,
+.search-result-item.active {
+  background: var(--primary-bg);
+}
+.search-result-item .result-icon {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+.search-result-info {
+  flex: 1;
+  min-width: 0;
+}
+.search-result-title {
+  font-size: .9rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-result-meta {
+  font-size: .75rem;
+  color: var(--text-muted);
+}
+.search-no-results {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: .9rem;
+}
+
+/* ===========================
+   QUICK-ADD ROW
+   =========================== */
+.quick-add-row {
+  cursor: pointer;
+  opacity: .4;
+  transition: opacity 200ms, background 200ms;
+}
+.quick-add-row:hover {
+  opacity: 1;
+  background: var(--primary-bg);
+}
+.quick-add-row td {
+  padding: .5rem .75rem !important;
+  border-bottom: none !important;
+  color: var(--text-muted);
+  font-size: .8rem;
+}
+.quick-add-row .material-icons-round {
+  font-size: .9rem;
+  vertical-align: middle;
+  margin-right: .25rem;
+}
+
+/* ===========================
+   UNDO TOAST
+   =========================== */
+.toast .undo-btn {
+  background: rgba(255,255,255,.2);
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  padding: .2rem .6rem;
+  border-radius: 4px;
+  font-size: .75rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: .5rem;
+  transition: background 100ms;
+}
+.toast .undo-btn:hover {
+  background: rgba(255,255,255,.35);
+}
+
+/* ===========================
+   PRESENCE INDICATORS
+   =========================== */
+@keyframes presenceGlow {
+  0%, 100% { box-shadow: 0 0 0 2px var(--presence-color); }
+  50% { box-shadow: 0 0 0 3px var(--presence-color), 0 0 8px var(--presence-color); }
+}
+.cell-presence {
+  animation: presenceGlow 2s ease-in-out infinite;
+  border-radius: 4px;
+  position: relative;
+}
+.presence-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--surface);
+  z-index: 5;
+}
+
+/* ===========================
+   SKELETON LOADING
+   =========================== */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--border-light) 25%, var(--surface-hover) 50%, var(--border-light) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+.skeleton-row {
+  display: flex;
+  gap: .75rem;
+  padding: .75rem 1.75rem;
+  align-items: center;
+}
+.skeleton-cell {
+  height: 16px;
+  border-radius: 4px;
+}
+.skeleton-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ===========================
+   MOBILE CARD VIEW
+   =========================== */
+.mobile-cards { display: none; }
+
+@media (max-width: 768px) {
+  .table-wrapper { display: none; }
+  .mobile-cards { display: flex; flex-direction: column; gap: .5rem; margin-top: .5rem; }
+
+  .mobile-task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: .85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    transition: var(--transition);
+    cursor: pointer;
+  }
+  .mobile-task-card:hover {
+    box-shadow: var(--shadow-md);
+  }
+  .mobile-task-card.row-completed {
+    animation: rowComplete 1.2s ease-out;
+  }
+  .mobile-card-top {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    justify-content: space-between;
+  }
+  .mobile-card-project {
+    font-weight: 600;
+    font-size: .9rem;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-card-bottom {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+  }
+  .mobile-card-meta {
+    font-size: .75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: .2rem;
+  }
+  .mobile-card-meta .material-icons-round { font-size: .85rem; }
+  .mobile-card-actions {
+    display: flex;
+    gap: .25rem;
+    margin-left: auto;
+  }
+
+  /* Sidebar overlay */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 99;
+    animation: fadeIn .2s ease;
+  }
+}

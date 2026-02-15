@@ -18,6 +18,15 @@ let activeEditDropdown = null;
 let activeInlineInput = null;
 let copyingTaskId = null;
 
+// --- NEW FEATURE STATE ---
+const undoStack = [];
+const MAX_UNDO = 20;
+const sessionId = 'sess_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+let collapsedGroups = JSON.parse(localStorage.getItem('agenda_collapsed') || '{}');
+let presenceData = [];
+let presenceInterval = null;
+let searchSelectedIdx = -1;
+
 // Preset colors for avatars
 const COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',
@@ -52,18 +61,31 @@ async function api(method, path, body) {
   return res.json();
 }
 
-// --- TOAST ---
-function toast(message, type = 'success') {
+// --- TOAST (supports undo action) ---
+function toast(message, type = 'success', action = null) {
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
   const icon = type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info';
-  el.innerHTML = `<span class="material-icons-round">${icon}</span>${escHtml(message)}`;
+  let html = `<span class="material-icons-round">${icon}</span>${escHtml(message)}`;
+  if (action) {
+    html += `<button class="undo-btn">${escHtml(action.label)}</button>`;
+  }
+  el.innerHTML = html;
+
+  if (action) {
+    el.querySelector('.undo-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      action.callback();
+      el.remove();
+    });
+  }
+
   container.appendChild(el);
   setTimeout(() => {
     el.style.animation = 'toastOut .3s ease forwards';
     setTimeout(() => el.remove(), 300);
-  }, 3000);
+  }, action ? 5000 : 3000);
 }
 
 // --- DARK MODE ---
@@ -124,6 +146,7 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   try { await api('POST', '/logout'); } catch {}
   token = null;
   localStorage.removeItem('agenda_token');
+  stopPresencePolling();
   showLogin();
   document.getElementById('login-password').value = '';
 });
@@ -244,9 +267,27 @@ document.getElementById('add-timeoff-btn').addEventListener('click', () => {
   openTimeOffModal();
 });
 
-// --- DATA LOADING ---
+// --- DATA LOADING (with skeleton) ---
+function showSkeleton() {
+  const container = document.getElementById('tasks-container');
+  let html = '';
+  for (let i = 0; i < 5; i++) {
+    html += `<div class="skeleton-row">
+      <div class="skeleton skeleton-avatar"></div>
+      <div class="skeleton skeleton-cell" style="width:80px"></div>
+      <div class="skeleton skeleton-cell" style="flex:1"></div>
+      <div class="skeleton skeleton-cell" style="width:100px"></div>
+      <div class="skeleton skeleton-cell" style="width:60px"></div>
+      <div class="skeleton skeleton-cell" style="width:80px"></div>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
 async function loadData() {
   try {
+    showSkeleton();
+
     [tasks, settings] = await Promise.all([
       api('GET', '/tasks'),
       api('GET', '/settings')
@@ -267,6 +308,8 @@ async function loadData() {
     renderTeam();
     updateStats();
     renderLeader();
+    updateOverdueBadge();
+    startPresencePolling();
   } catch (err) {
     console.error('Failed to load data:', err);
   }
@@ -392,6 +435,10 @@ function renderTasks() {
     wrapper.innerHTML = buildTaskTable(sorted);
     container.appendChild(wrapper);
     bindTaskRows(wrapper);
+
+    // Mobile cards
+    const cards = buildMobileCards(sorted);
+    container.appendChild(cards);
   }
 }
 
@@ -399,27 +446,39 @@ function renderEsperandoSection(container, esperandoTasks) {
   const section = document.createElement('div');
   section.className = 'esperando-section';
 
+  const isCollapsed = collapsedGroups['__esperando__'] === true;
+
   const header = document.createElement('div');
   header.className = 'esperando-header';
   header.innerHTML = `
     <span class="material-icons-round">hourglass_top</span>
     <span class="group-name">Esperando Respuesta</span>
     <span class="group-count">${esperandoTasks.length} tarea${esperandoTasks.length !== 1 ? 's' : ''}</span>
-    <span class="material-icons-round group-toggle">expand_more</span>
+    <span class="material-icons-round group-toggle ${isCollapsed ? 'collapsed' : ''}">expand_more</span>
   `;
 
   const tableWrapper = document.createElement('div');
   tableWrapper.className = 'table-wrapper';
+  if (isCollapsed) tableWrapper.classList.add('hidden');
   const sorted = sortTasksByNumber(esperandoTasks);
   tableWrapper.innerHTML = buildTaskTable(sorted, true);
 
+  // Mobile cards for esperando
+  const cards = buildMobileCards(sorted);
+  if (isCollapsed) cards.classList.add('hidden');
+
   header.addEventListener('click', () => {
-    header.querySelector('.group-toggle').classList.toggle('collapsed');
+    const toggle = header.querySelector('.group-toggle');
+    toggle.classList.toggle('collapsed');
     tableWrapper.classList.toggle('hidden');
+    cards.classList.toggle('hidden');
+    collapsedGroups['__esperando__'] = tableWrapper.classList.contains('hidden');
+    localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
   });
 
   section.appendChild(header);
   section.appendChild(tableWrapper);
+  section.appendChild(cards);
   container.appendChild(section);
   bindTaskRows(tableWrapper);
 
@@ -457,6 +516,8 @@ function renderGroupedTasks(container, filtered) {
   });
 
   const timeOffs = getTimeOffEntries();
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
   sortedKeys.forEach((assignee) => {
     const groupTasks = sortTasksByNumber(groups[assignee]);
@@ -465,6 +526,14 @@ function renderGroupedTasks(container, filtered) {
     const initials = member?.initials || getInitials(assignee);
 
     const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
+
+    // Count overdue tasks in this group
+    const overdueCount = groupTasks.filter(t => {
+      if (!t.deadline || t.status === 'completado') return false;
+      return new Date(t.deadline + 'T00:00:00') < now;
+    }).length;
+
+    const isCollapsed = collapsedGroups[assignee] === true;
 
     const header = document.createElement('div');
     header.className = 'group-header';
@@ -486,25 +555,41 @@ function renderGroupedTasks(container, filtered) {
       timeoffHtml += '</div>';
     }
 
+    let overdueHtml = '';
+    if (overdueCount > 0) {
+      overdueHtml = `<span class="group-overdue-icon" title="${overdueCount} vencida${overdueCount > 1 ? 's' : ''}">
+        <span class="material-icons-round">warning</span>
+      </span>`;
+    }
+
     header.innerHTML = `
       <span class="material-icons-round drag-handle">drag_indicator</span>
       <div class="group-avatar" style="background:${color}">${initials}</div>
       <span class="group-name">${escHtml(assignee)}</span>
       <span class="group-count">${groupTasks.length} tarea${groupTasks.length !== 1 ? 's' : ''}</span>
+      ${overdueHtml}
       ${timeoffHtml}
-      <span class="material-icons-round group-toggle">expand_more</span>
+      <span class="material-icons-round group-toggle ${isCollapsed ? 'collapsed' : ''}">expand_more</span>
     `;
 
     const tableWrapper = document.createElement('div');
     tableWrapper.className = 'table-wrapper';
-    tableWrapper.innerHTML = buildTaskTable(groupTasks);
+    if (isCollapsed) tableWrapper.classList.add('hidden');
+    tableWrapper.innerHTML = buildTaskTable(groupTasks, false, assignee);
 
-    // Toggle collapse
+    // Mobile cards
+    const cards = buildMobileCards(groupTasks, assignee);
+    if (isCollapsed) cards.classList.add('hidden');
+
+    // Toggle collapse (with localStorage persistence)
     header.addEventListener('click', (e) => {
       if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge')) return;
       const toggle = header.querySelector('.group-toggle');
       toggle.classList.toggle('collapsed');
       tableWrapper.classList.toggle('hidden');
+      cards.classList.toggle('hidden');
+      collapsedGroups[assignee] = tableWrapper.classList.contains('hidden');
+      localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
     });
 
     // Time off badge click
@@ -518,7 +603,7 @@ function renderGroupedTasks(container, filtered) {
 
     // Group drag and drop for reordering
     header.addEventListener('dragstart', (e) => {
-      if (e.target.closest('tr[data-id]')) return; // Don't interfere with task row drags
+      if (e.target.closest('tr[data-id]')) return;
       draggedGroup = assignee;
       header.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -536,7 +621,6 @@ function renderGroupedTasks(container, filtered) {
     header.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      // Could be a group reorder or a task drop from esperando
       if (draggedGroup && header.dataset.assignee !== draggedGroup) {
         header.classList.add('drag-over');
       } else if (!draggedGroup) {
@@ -557,7 +641,6 @@ function renderGroupedTasks(container, filtered) {
       const taskId = e.dataTransfer.getData('text/plain');
 
       if (taskId && !draggedGroup) {
-        // Task dropped from esperando section onto a group header
         const task = tasks.find(t => t.id === taskId);
         if (task) {
           try {
@@ -576,7 +659,6 @@ function renderGroupedTasks(container, filtered) {
 
       if (!draggedGroup || draggedGroup === assignee) return;
 
-      // Group reorder
       const currentHeaders = [...container.querySelectorAll('.group-header')];
       const names = currentHeaders.map(h => h.dataset.assignee);
       const fromIdx = names.indexOf(draggedGroup);
@@ -593,11 +675,12 @@ function renderGroupedTasks(container, filtered) {
 
     container.appendChild(header);
     container.appendChild(tableWrapper);
+    container.appendChild(cards);
     bindTaskRows(tableWrapper);
   });
 }
 
-function buildTaskTable(taskList, showAssignee = false) {
+function buildTaskTable(taskList, showAssignee = false, groupAssignee = '') {
   let html = `<table class="task-table">
     <thead>
       <tr>
@@ -647,8 +730,101 @@ function buildTaskTable(taskList, showAssignee = false) {
       </tr>`;
   });
 
+  // Quick-add row
+  const colSpan = showAssignee ? 11 : 10;
+  html += `<tr class="quick-add-row" data-group-assignee="${escAttr(groupAssignee)}">
+    <td colspan="${colSpan}"><span class="material-icons-round">add</span> Agregar tarea...</td>
+  </tr>`;
+
   html += '</tbody></table>';
   return html;
+}
+
+// --- MOBILE CARD VIEW ---
+function buildMobileCards(taskList, groupAssignee = '') {
+  const container = document.createElement('div');
+  container.className = 'mobile-cards';
+
+  taskList.forEach(t => {
+    const clientColor = getClientColor(t.client);
+    const priorityClass = (t.priority || '').toLowerCase().replace(' ', '');
+    const statusClass = (t.status || '').toLowerCase().replace(/ /g, '-');
+    const deadlineClass = getDeadlineClass(t.deadline);
+
+    const card = document.createElement('div');
+    card.className = 'mobile-task-card';
+    card.dataset.id = t.id;
+
+    card.innerHTML = `
+      <div class="mobile-card-top">
+        <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.7rem">${escHtml(t.client || '—')}</span>
+        <span class="mobile-card-project">${escHtml(t.project || 'Sin proyecto')}</span>
+        <span class="priority-badge ${priorityClass}" style="font-size:.65rem">${escHtml(t.priority || '—')}</span>
+      </div>
+      <div class="mobile-card-bottom">
+        <span class="status-badge ${statusClass}" style="font-size:.65rem">${escHtml(t.status || '—')}</span>
+        ${t.deadline ? `<span class="mobile-card-meta"><span class="material-icons-round">event</span><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></span>` : ''}
+        ${t.supervisor ? `<span class="mobile-card-meta"><span class="material-icons-round">person</span>${escHtml(t.supervisor)}</span>` : ''}
+        <div class="mobile-card-actions">
+          <button class="task-action-btn copy" title="Copiar" data-task-id="${t.id}"><span class="material-icons-round">content_copy</span></button>
+          <button class="task-action-btn delete" title="Eliminar" data-task-id="${t.id}"><span class="material-icons-round">delete</span></button>
+        </div>
+      </div>
+    `;
+
+    // Mobile card tap -> open inline editing for project
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.task-action-btn')) return;
+      switchView('agenda');
+      setTimeout(() => {
+        const row = document.querySelector(`tr[data-id="${t.id}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const cell = row.querySelector('[data-field="project"]');
+          if (cell) cell.click();
+        }
+      }, 100);
+    });
+
+    // Mobile card action buttons
+    card.querySelector('.task-action-btn.delete').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('¿Eliminar esta tarea?')) return;
+      try {
+        await api('DELETE', `/tasks/${t.id}`);
+        toast('Tarea eliminada');
+        await loadData();
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
+    });
+
+    card.querySelector('.task-action-btn.copy').addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyingTaskId = t.id;
+      document.getElementById('copy-assignee').value = '';
+      document.getElementById('copy-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('copy-assignee').focus(), 100);
+    });
+
+    container.appendChild(card);
+  });
+
+  // Quick-add for mobile
+  const addCard = document.createElement('div');
+  addCard.className = 'mobile-task-card';
+  addCard.style.opacity = '.4';
+  addCard.style.justifyContent = 'center';
+  addCard.style.alignItems = 'center';
+  addCard.style.flexDirection = 'row';
+  addCard.style.gap = '.5rem';
+  addCard.style.color = 'var(--text-muted)';
+  addCard.style.fontSize = '.85rem';
+  addCard.innerHTML = '<span class="material-icons-round" style="font-size:1rem">add</span> Agregar tarea...';
+  addCard.addEventListener('click', () => quickAddTask(groupAssignee));
+  container.appendChild(addCard);
+
+  return container;
 }
 
 function bindTaskRows(wrapper) {
@@ -709,12 +885,54 @@ function bindTaskRows(wrapper) {
       setTimeout(() => document.getElementById('copy-assignee').focus(), 100);
     });
   });
+
+  // Quick-add row
+  wrapper.querySelectorAll('.quick-add-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const assignee = row.dataset.groupAssignee || '';
+      quickAddTask(assignee);
+    });
+  });
+}
+
+// --- QUICK ADD TASK ---
+async function quickAddTask(assignee) {
+  try {
+    const body = {
+      client: '',
+      project: '',
+      assignee: assignee,
+      supervisor: '',
+      priority: 'TBD',
+      deadline: '',
+      status: 'sin empezar',
+      owner: '',
+      comments: '',
+      isSupervision: false
+    };
+    const newTask = await api('POST', '/tasks', body);
+    await loadData();
+    toast('Tarea creada');
+    setTimeout(() => {
+      const row = document.querySelector(`tr[data-id="${newTask.id}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const cell = row.querySelector('[data-field="client"]');
+        if (cell) cell.click();
+      }
+    }, 100);
+  } catch (err) {
+    toast('Error al crear tarea: ' + err.message, 'error');
+  }
 }
 
 // --- INLINE EDITING ---
 function startInlineEdit(cell, task, field) {
   closeEditDropdown();
   closeInlineInput();
+
+  // Report presence
+  reportPresence(task.id, field);
 
   const dropdownFields = ['client', 'assignee', 'supervisor', 'owner', 'status', 'priority'];
   const textFields = ['project', 'comments'];
@@ -753,23 +971,26 @@ function openTextInput(cell, task, field) {
         const update = {};
         update[field] = newValue;
         await api('PUT', `/tasks/${task.id}`, update);
+        // Push undo
+        pushUndo(task.id, field, currentValue, newValue);
         task[field] = newValue;
-        toast('Actualizado');
       } catch (err) {
         toast('Error: ' + err.message, 'error');
       }
     }
     closeInlineInput();
+    clearPresence();
     renderTasks();
     updateStats();
+    // Highlight saved cell
+    highlightCell(task.id, field);
   };
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); save(); }
-    if (e.key === 'Escape') { closeInlineInput(); cell.innerHTML = originalHtml; }
+    if (e.key === 'Escape') { closeInlineInput(); clearPresence(); cell.innerHTML = originalHtml; }
   });
   input.addEventListener('blur', () => {
-    // Small delay to allow click events to fire first
     setTimeout(() => {
       if (activeInlineInput && activeInlineInput.input === input) save();
     }, 150);
@@ -796,20 +1017,23 @@ function openDateInput(cell, task) {
     if (newValue !== currentValue) {
       try {
         await api('PUT', `/tasks/${task.id}`, { deadline: newValue });
+        pushUndo(task.id, 'deadline', currentValue, newValue);
         task.deadline = newValue;
-        toast('Deadline actualizado');
       } catch (err) {
         toast('Error: ' + err.message, 'error');
       }
     }
     closeInlineInput();
+    clearPresence();
     renderTasks();
     updateStats();
+    updateOverdueBadge();
+    highlightCell(task.id, 'deadline');
   };
 
   input.addEventListener('change', save);
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeInlineInput(); cell.innerHTML = originalHtml; }
+    if (e.key === 'Escape') { closeInlineInput(); clearPresence(); cell.innerHTML = originalHtml; }
   });
   input.addEventListener('blur', () => {
     setTimeout(() => {
@@ -856,7 +1080,7 @@ function openEditDropdown(cell, task, field) {
       div.className = `edit-dropdown-option ${opt === currentValue ? 'active' : ''}`;
       div.innerHTML = `<span class="option-label">${escHtml(opt)}</span>`;
       div.addEventListener('click', () => {
-        selectDropdownOption(task, field, opt);
+        selectDropdownOption(task, field, opt, currentValue);
       });
       optionsContainer.appendChild(div);
     });
@@ -876,7 +1100,7 @@ function openEditDropdown(cell, task, field) {
       toast('Escribí un nombre en el buscador', 'error');
       return;
     }
-    selectDropdownOption(task, field, newName);
+    selectDropdownOption(task, field, newName, currentValue);
     // Also add to settings if appropriate
     if (field === 'client') {
       const color = getColorForName(newName);
@@ -900,17 +1124,26 @@ function openEditDropdown(cell, task, field) {
   activeEditDropdown = { dropdown, cell, task, field };
 }
 
-async function selectDropdownOption(task, field, value) {
+async function selectDropdownOption(task, field, value, oldValue) {
   closeEditDropdown();
+  clearPresence();
+  const previousValue = oldValue !== undefined ? oldValue : (task[field] || '');
   try {
     const update = {};
     update[field] = value;
     await api('PUT', `/tasks/${task.id}`, update);
+    pushUndo(task.id, field, previousValue, value);
     task[field] = value;
-    toast('Actualizado');
     renderTasks();
     updateStats();
+    updateOverdueBadge();
     populateFilterDropdowns();
+    highlightCell(task.id, field);
+
+    // Check for completion celebration
+    if (field === 'status' && value === 'completado') {
+      checkCelebration(task);
+    }
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
@@ -936,7 +1169,6 @@ function showCommentTooltip(cell, text) {
   tooltip.textContent = text;
   tooltip.classList.remove('hidden');
 
-  // Position above the cell
   const tooltipRect = tooltip.getBoundingClientRect();
   let top = rect.top - tooltipRect.height - 8;
   let left = rect.left - (tooltipRect.width / 2) + (rect.width / 2);
@@ -1019,7 +1251,7 @@ function getFilteredTasks() {
   });
 }
 
-// --- STATS (clickable!) ---
+// --- STATS (with overdue badge) ---
 function updateStats() {
   const filtered = getFilteredTasks();
   const now = new Date();
@@ -1032,10 +1264,31 @@ function updateStats() {
   document.getElementById('stat-notstarted').textContent = filtered.filter(t =>
     t.status === 'sin empezar'
   ).length;
-  document.getElementById('stat-overdue').textContent = filtered.filter(t => {
+
+  const overdueCount = filtered.filter(t => {
     if (!t.deadline || t.status === 'completado') return false;
     return new Date(t.deadline) < now;
   }).length;
+  document.getElementById('stat-overdue').textContent = overdueCount;
+}
+
+function updateOverdueBadge() {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const overdueCount = getRegularTasks().filter(t => {
+    if (!t.deadline || t.status === 'completado') return false;
+    return new Date(t.deadline + 'T00:00:00') < now;
+  }).length;
+
+  const badge = document.getElementById('nav-overdue-badge');
+  if (overdueCount > 0) {
+    badge.textContent = overdueCount;
+    badge.classList.remove('hidden');
+    badge.classList.add('pulse');
+  } else {
+    badge.classList.add('hidden');
+    badge.classList.remove('pulse');
+  }
 }
 
 document.querySelectorAll('.stat-card').forEach(card => {
@@ -1090,7 +1343,6 @@ document.getElementById('leader-randomize').addEventListener('click', async () =
     return;
   }
 
-  // Animate the randomizer
   const nameEl = document.getElementById('leader-name');
   let count = 0;
   const interval = setInterval(() => {
@@ -1407,7 +1659,7 @@ function renderTeam() {
     let timeoffInfo = '';
     if (memberTimeOffs.length > 0) {
       const nextTo = memberTimeOffs[0];
-      const type = nextTo.timeOffType || 'Tiempo libre';
+      const type = nextTo.timeOffType || 'Time Off';
       timeoffInfo = `<div class="member-timeoff-info">
         <span class="material-icons-round">beach_access</span>
         ${escHtml(type)}: ${formatDate(nextTo.timeOffStart)} - ${formatDate(nextTo.timeOffEnd)}
@@ -1436,7 +1688,6 @@ function renderTeam() {
     grid.appendChild(card);
   });
 
-  // Edit member
   grid.querySelectorAll('.member-edit').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1447,7 +1698,6 @@ function renderTeam() {
     });
   });
 
-  // Delete member
   grid.querySelectorAll('.member-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -1529,14 +1779,12 @@ function openEditMemberModal(member) {
 
     const initialsVal = document.getElementById('prompt-modal-initials')?.value?.trim() || '';
 
-    // Update member in settings
     const oldName = member.name;
     settings.teamMembers[idx] = { name, color, role, initials: initialsVal || getInitials(name) };
 
     try {
       await api('PUT', '/settings', { teamMembers: settings.teamMembers });
 
-      // If name changed, update all tasks referencing this member
       if (oldName !== name) {
         const updatePromises = [];
         tasks.forEach(t => {
@@ -1718,9 +1966,370 @@ function getDeadlineClass(dateStr) {
   return '';
 }
 
+// --- CELL SAVE HIGHLIGHT ---
+function highlightCell(taskId, field) {
+  setTimeout(() => {
+    const row = document.querySelector(`tr[data-id="${taskId}"]`);
+    if (!row) return;
+    const cell = row.querySelector(`[data-field="${field}"]`);
+    if (!cell) return;
+    cell.classList.add('cell-saved');
+    setTimeout(() => cell.classList.remove('cell-saved'), 800);
+  }, 50);
+}
+
+// --- UNDO SYSTEM ---
+function pushUndo(taskId, field, oldValue, newValue) {
+  if (oldValue === newValue) return;
+  undoStack.push({ taskId, field, oldValue, newValue, timestamp: Date.now() });
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+
+  const fieldNames = {
+    client: 'Cliente', project: 'Proyecto', assignee: 'Asignado',
+    supervisor: 'Supervisor', priority: 'Prioridad', deadline: 'Deadline',
+    status: 'Status', owner: 'Owner', comments: 'Comentario'
+  };
+  const label = fieldNames[field] || field;
+  toast(`${label} actualizado`, 'success', {
+    label: 'Deshacer',
+    callback: performUndo
+  });
+}
+
+async function performUndo() {
+  if (undoStack.length === 0) {
+    toast('Nada para deshacer', 'info');
+    return;
+  }
+  const entry = undoStack.pop();
+  try {
+    const update = {};
+    update[entry.field] = entry.oldValue;
+    await api('PUT', `/tasks/${entry.taskId}`, update);
+    const task = tasks.find(t => t.id === entry.taskId);
+    if (task) task[entry.field] = entry.oldValue;
+    renderTasks();
+    updateStats();
+    updateOverdueBadge();
+    toast('Cambio deshecho');
+    highlightCell(entry.taskId, entry.field);
+  } catch (err) {
+    toast('Error al deshacer: ' + err.message, 'error');
+    // Put it back
+    undoStack.push(entry);
+  }
+}
+
+// --- SEARCH OVERLAY (Ctrl+K) ---
+function openSearchOverlay() {
+  const overlay = document.getElementById('search-overlay');
+  const input = document.getElementById('search-overlay-input');
+  const results = document.getElementById('search-overlay-results');
+
+  overlay.classList.remove('hidden');
+  input.value = '';
+  results.innerHTML = '';
+  searchSelectedIdx = -1;
+  setTimeout(() => input.focus(), 50);
+
+  // Close on backdrop click
+  overlay.querySelector('.search-overlay-backdrop').onclick = closeSearchOverlay;
+}
+
+function closeSearchOverlay() {
+  document.getElementById('search-overlay').classList.add('hidden');
+  searchSelectedIdx = -1;
+}
+
+function performOverlaySearch(query) {
+  const results = document.getElementById('search-overlay-results');
+  if (!query || query.length < 2) {
+    results.innerHTML = '<div class="search-no-results">Escribí al menos 2 caracteres...</div>';
+    return;
+  }
+
+  const q = query.toLowerCase();
+  const matches = getRegularTasks().filter(t => {
+    const hay = [t.client, t.project, t.assignee, t.supervisor, t.owner, t.comments, t.status]
+      .filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 10);
+
+  if (matches.length === 0) {
+    results.innerHTML = '<div class="search-no-results">Sin resultados</div>';
+    return;
+  }
+
+  results.innerHTML = '';
+  searchSelectedIdx = -1;
+
+  matches.forEach((t, i) => {
+    const item = document.createElement('div');
+    item.className = 'search-result-item';
+    item.dataset.index = i;
+    item.dataset.taskId = t.id;
+
+    const clientColor = getClientColor(t.client);
+    item.innerHTML = `
+      <span class="material-icons-round result-icon">assignment</span>
+      <div class="search-result-info">
+        <div class="search-result-title">${escHtml(t.project || 'Sin proyecto')}</div>
+        <div class="search-result-meta">
+          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.65rem;padding:.1rem .35rem">${escHtml(t.client || '—')}</span>
+          ${t.assignee ? `&nbsp;·&nbsp;${escHtml(t.assignee)}` : ''}
+          ${t.status ? `&nbsp;·&nbsp;${escHtml(t.status)}` : ''}
+        </div>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      navigateToTask(t.id);
+      closeSearchOverlay();
+    });
+
+    results.appendChild(item);
+  });
+}
+
+function navigateToTask(taskId) {
+  switchView('agenda');
+  // Reset filters to show all
+  currentFilter = { priority: 'all', assignee: '', status: '', client: '', search: '' };
+  document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
+  document.querySelector('.chip[data-filter="all"]')?.classList.add('active');
+  document.getElementById('filter-assignee').value = '';
+  document.getElementById('filter-status').value = '';
+  document.getElementById('filter-client').value = '';
+  document.getElementById('search-input').value = '';
+
+  // Expand all groups
+  collapsedGroups = {};
+  localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+
+  renderTasks();
+  updateStats();
+
+  setTimeout(() => {
+    const row = document.querySelector(`tr[data-id="${taskId}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('cell-saved');
+      setTimeout(() => row.classList.remove('cell-saved'), 1200);
+    }
+  }, 100);
+}
+
+// Search overlay input listener
+document.getElementById('search-overlay-input').addEventListener('input', (e) => {
+  performOverlaySearch(e.target.value.trim());
+});
+
+// Search overlay keyboard navigation
+document.getElementById('search-overlay-input').addEventListener('keydown', (e) => {
+  const results = document.getElementById('search-overlay-results');
+  const items = results.querySelectorAll('.search-result-item');
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    searchSelectedIdx = Math.min(searchSelectedIdx + 1, items.length - 1);
+    items.forEach((item, i) => item.classList.toggle('active', i === searchSelectedIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    searchSelectedIdx = Math.max(searchSelectedIdx - 1, 0);
+    items.forEach((item, i) => item.classList.toggle('active', i === searchSelectedIdx));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (searchSelectedIdx >= 0 && items[searchSelectedIdx]) {
+      const taskId = items[searchSelectedIdx].dataset.taskId;
+      navigateToTask(taskId);
+      closeSearchOverlay();
+    }
+  } else if (e.key === 'Escape') {
+    closeSearchOverlay();
+  }
+});
+
+// --- CSV EXPORT ---
+function exportCSV() {
+  const regularTasks = getRegularTasks();
+  if (regularTasks.length === 0) {
+    toast('No hay tareas para exportar', 'info');
+    return;
+  }
+
+  const headers = ['#', 'Cliente', 'Proyecto', 'Asignado', 'Supervisor', 'Prioridad', 'Deadline', 'Status', 'Owner', 'Comentarios'];
+  const rows = regularTasks.map(t => [
+    t.taskNumber || '',
+    t.client || '',
+    t.project || '',
+    t.assignee || '',
+    t.supervisor || '',
+    t.priority || '',
+    t.deadline || '',
+    t.status || '',
+    t.owner || '',
+    (t.comments || '').replace(/"/g, '""')
+  ]);
+
+  let csv = headers.map(h => `"${h}"`).join(',') + '\n';
+  rows.forEach(row => {
+    csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+  });
+
+  // BOM for Excel UTF-8 compatibility
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `agenda-lc-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV exportado');
+}
+
+document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
+
+// --- COMPLETION CELEBRATION ---
+function checkCelebration(task) {
+  if (!task.assignee) return;
+  const personTasks = getRegularTasks().filter(t => t.assignee === task.assignee);
+  const allDone = personTasks.every(t => t.status === 'completado');
+
+  // Always celebrate individual completion
+  const row = document.querySelector(`tr[data-id="${task.id}"]`);
+  if (row) {
+    row.classList.add('row-completed');
+    setTimeout(() => row.classList.remove('row-completed'), 1200);
+  }
+
+  // All tasks done for person → big celebration
+  if (allDone && personTasks.length > 0) {
+    toast(`${task.assignee} completó todas sus tareas!`);
+    launchConfetti();
+  }
+}
+
+function launchConfetti() {
+  const container = document.createElement('div');
+  container.className = 'confetti-container';
+  document.body.appendChild(container);
+
+  const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#ef4444', '#8b5cf6'];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    const angle = (Math.PI * 2 * i) / 40;
+    const distance = 80 + Math.random() * 200;
+    piece.style.setProperty('--x', `${Math.cos(angle) * distance}px`);
+    piece.style.setProperty('--y', `${Math.sin(angle) * distance - 100}px`);
+    piece.style.setProperty('--r', `${Math.random() * 720 - 360}deg`);
+    piece.style.animationDelay = `${Math.random() * 0.3}s`;
+    container.appendChild(piece);
+  }
+
+  setTimeout(() => container.remove(), 2000);
+}
+
+// --- PRESENCE SYSTEM ---
+function reportPresence(taskId, field) {
+  fetch('/api/presence', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ sessionId, taskId, field })
+  }).catch(() => {});
+}
+
+function clearPresence() {
+  fetch('/api/presence', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ sessionId })
+  }).catch(() => {});
+}
+
+async function pollPresence() {
+  try {
+    const res = await fetch(`/api/presence?exclude=${sessionId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    renderPresenceIndicators(data);
+  } catch {}
+}
+
+function renderPresenceIndicators(data) {
+  // Remove old presence indicators
+  document.querySelectorAll('.cell-presence').forEach(el => {
+    el.classList.remove('cell-presence');
+    el.style.removeProperty('--presence-color');
+    const dot = el.querySelector('.presence-dot');
+    if (dot) dot.remove();
+  });
+
+  const presenceColors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'];
+
+  data.forEach((p, i) => {
+    const row = document.querySelector(`tr[data-id="${p.taskId}"]`);
+    if (!row) return;
+    const cell = row.querySelector(`[data-field="${p.field}"]`);
+    if (!cell) return;
+
+    const color = presenceColors[i % presenceColors.length];
+    cell.classList.add('cell-presence');
+    cell.style.setProperty('--presence-color', color);
+
+    const dot = document.createElement('div');
+    dot.className = 'presence-dot';
+    dot.style.background = color;
+    cell.style.position = 'relative';
+    cell.appendChild(dot);
+  });
+}
+
+function startPresencePolling() {
+  if (presenceInterval) return;
+  presenceInterval = setInterval(pollPresence, 3000);
+  pollPresence();
+}
+
+function stopPresencePolling() {
+  if (presenceInterval) {
+    clearInterval(presenceInterval);
+    presenceInterval = null;
+  }
+  clearPresence();
+}
+
 // --- KEYBOARD SHORTCUTS ---
 document.addEventListener('keydown', (e) => {
+  // Ctrl+K or Cmd+K → search overlay
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    const overlay = document.getElementById('search-overlay');
+    if (overlay.classList.contains('hidden')) {
+      openSearchOverlay();
+    } else {
+      closeSearchOverlay();
+    }
+    return;
+  }
+
+  // Ctrl+Z or Cmd+Z → undo (only when not in an input)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.target.closest('input, textarea, select, [contenteditable]')) {
+    e.preventDefault();
+    performUndo();
+    return;
+  }
+
   if (e.key === 'Escape') {
+    // Close search overlay first if open
+    if (!document.getElementById('search-overlay').classList.contains('hidden')) {
+      closeSearchOverlay();
+      return;
+    }
     closeEditDropdown();
     closeInlineInput();
     closePromptModal();

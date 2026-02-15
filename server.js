@@ -275,6 +275,35 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
+// PRESENCE - lightweight polling for real-time cell editing
+// ============================================================
+const presenceStore = {};
+
+app.post('/api/presence', authMiddleware, (req, res) => {
+  const { sessionId, taskId, field } = req.body;
+  if (!sessionId) return res.json({ ok: true });
+  if (taskId && field) {
+    presenceStore[sessionId] = { taskId, field, ts: Date.now() };
+  } else {
+    delete presenceStore[sessionId];
+  }
+  res.json({ ok: true });
+});
+
+app.get('/api/presence', authMiddleware, (req, res) => {
+  const exclude = req.query.exclude;
+  const now = Date.now();
+  // Auto-cleanup stale entries (>10s)
+  for (const id of Object.keys(presenceStore)) {
+    if (now - presenceStore[id].ts > 10000) delete presenceStore[id];
+  }
+  const result = Object.entries(presenceStore)
+    .filter(([id]) => id !== exclude)
+    .map(([, data]) => ({ taskId: data.taskId, field: data.field }));
+  res.json(result);
+});
+
+// ============================================================
 // SEED ENDPOINT - to populate Redis from initial data
 // ============================================================
 app.post('/api/seed', async (req, res) => {

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Agenda LC</title>
@@ -46,7 +46,7 @@
         <button class="btn-icon sidebar-close" id="sidebar-close"><span class="material-icons-round">close</span></button>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span></a>
+        <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span><span class="nav-badge hidden" id="nav-overdue-badge">0</span></a>
         <a href="#" class="nav-item" data-view="calendar"><span class="material-icons-round">calendar_month</span><span>Calendario</span></a>
         <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
         <a href="#" class="nav-item" data-view="settings"><span class="material-icons-round">settings</span><span>Configuración</span></a>
@@ -148,6 +148,11 @@
             <p id="password-msg" class="hidden"></p>
           </form>
         </div>
+        <div class="settings-card">
+          <h2>Exportar datos</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Descargá todas las tareas en formato CSV para abrir en Google Sheets o Excel.</p>
+          <button class="btn btn-ghost" id="export-csv-btn"><span class="material-icons-round">download</span> Exportar a CSV</button>
+        </div>
       </div>
     </main>
   </div>
@@ -208,6 +213,19 @@
     <input type="text" class="edit-dropdown-search" id="edit-dropdown-search" placeholder="Buscar..." autocomplete="off">
     <div class="edit-dropdown-options" id="edit-dropdown-options"></div>
     <button class="edit-dropdown-add hidden" id="edit-dropdown-add"><span class="material-icons-round">add</span> Agregar nuevo...</button>
+  </div>
+
+  <!-- SEARCH OVERLAY (Ctrl+K) -->
+  <div id="search-overlay" class="search-overlay hidden">
+    <div class="search-overlay-backdrop"></div>
+    <div class="search-overlay-panel">
+      <div class="search-overlay-input-wrap">
+        <span class="material-icons-round">search</span>
+        <input type="text" id="search-overlay-input" placeholder="Buscar tareas, personas, clientes..." autocomplete="off">
+        <kbd>ESC</kbd>
+      </div>
+      <div id="search-overlay-results" class="search-overlay-results"></div>
+    </div>
   </div>
 
   <!-- COMMENT TOOLTIP -->
