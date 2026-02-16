@@ -205,11 +205,10 @@ async function loadData() {
       api('GET', '/settings')
     ]);
 
-    // Force reseed if data version is outdated or no tasks
-    const EXPECTED_DATA_VERSION = 3;
-    if (tasks.length === 0 || (settings.dataVersion || 0) < EXPECTED_DATA_VERSION) {
+    // Only seed if database is completely empty (first deployment)
+    if (tasks.length === 0) {
       try {
-        await fetch('/api/seed?force=1', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        await fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         [tasks, settings] = await Promise.all([
           api('GET', '/tasks'),
           api('GET', '/settings')

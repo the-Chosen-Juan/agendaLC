@@ -382,15 +382,13 @@ app.get('/api/fetch-sheet', authMiddleware, async (req, res) => {
 // ============================================================
 app.post('/api/seed', async (req, res) => {
   try {
-    const force = req.query.force === '1';
     if (USE_REDIS) {
-      if (!force) {
-        const existing = await getTasks();
-        if (existing.length > 0) {
-          return res.json({ message: 'Data already exists', tasks: existing.length });
-        }
+      // Only seed if the database is completely empty - never overwrite live data
+      const existing = await getTasks();
+      if (existing.length > 0) {
+        return res.json({ message: 'Data already exists, skipping seed', tasks: existing.length });
       }
-      // Read seed data from bundled files
+      // Read seed data from bundled files (first deployment only)
       const seedDataPath = path.join(__dirname, 'data', 'agenda.json');
       const seedSettingsPath = path.join(__dirname, 'data', 'settings.json');
       if (fs.existsSync(seedDataPath)) {
@@ -404,7 +402,6 @@ app.post('/api/seed', async (req, res) => {
       const newTasks = await getTasks();
       return res.json({ message: 'Seeded successfully', tasks: newTasks.length });
     }
-    // For file storage, re-read to confirm
     const currentTasks = await getTasks();
     res.json({ message: 'File storage', tasks: currentTasks.length });
   } catch (err) {
