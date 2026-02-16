@@ -2419,6 +2419,51 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 /* ===========================
+   MODAL CUSTOM SELECT
+   =========================== */
+.modal-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .6rem .85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: .9rem;
+  color: var(--text);
+  transition: var(--transition);
+  user-select: none;
+  min-height: 40px;
+}
+.modal-select:hover {
+  border-color: var(--primary);
+}
+.modal-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+}
+.modal-select-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal-select-arrow {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  margin-left: .25rem;
+  transition: transform .2s;
+}
+.modal-select.open .modal-select-arrow {
+  transform: rotate(180deg);
+}
+.modal-select[data-value=""] .modal-select-text {
+  color: var(--text-muted);
+}
+
+/* ===========================
    ACTIVITY LOG VIEW
    =========================== */
 .activity-toolbar {

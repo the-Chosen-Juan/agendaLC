@@ -356,25 +356,31 @@ app.get('/api/fetch-sheet', authMiddleware, async (req, res) => {
 // ============================================================
 app.post('/api/seed', async (req, res) => {
   try {
+    const force = req.query.force === '1';
     if (USE_REDIS) {
-      const existing = await getTasks();
-      if (existing.length > 0) {
-        return res.json({ message: 'Data already exists', tasks: existing.length });
+      if (!force) {
+        const existing = await getTasks();
+        if (existing.length > 0) {
+          return res.json({ message: 'Data already exists', tasks: existing.length });
+        }
       }
       // Read seed data from bundled files
       const seedDataPath = path.join(__dirname, 'data', 'agenda.json');
       const seedSettingsPath = path.join(__dirname, 'data', 'settings.json');
       if (fs.existsSync(seedDataPath)) {
         const data = JSON.parse(fs.readFileSync(seedDataPath, 'utf-8'));
-        await saveTasks(data.tasks || []);
+        await saveTasks(data.tasks || data);
       }
       if (fs.existsSync(seedSettingsPath)) {
         const settingsData = JSON.parse(fs.readFileSync(seedSettingsPath, 'utf-8'));
         await saveSettings(settingsData);
       }
-      return res.json({ message: 'Seeded successfully' });
+      const newTasks = await getTasks();
+      return res.json({ message: 'Seeded successfully', tasks: newTasks.length });
     }
-    res.json({ message: 'File storage - no seed needed' });
+    // For file storage, re-read to confirm
+    const currentTasks = await getTasks();
+    res.json({ message: 'File storage', tasks: currentTasks.length });
   } catch (err) {
     console.error('Seed error:', err);
     res.status(500).json({ error: 'Seed failed' });

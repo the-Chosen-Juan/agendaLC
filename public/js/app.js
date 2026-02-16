@@ -207,7 +207,7 @@ async function loadData() {
 
     if (tasks.length === 0) {
       try {
-        await fetch('/api/seed', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        await fetch('/api/seed?force=1', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         [tasks, settings] = await Promise.all([
           api('GET', '/tasks'),
           api('GET', '/settings')
@@ -287,34 +287,137 @@ function populateFilterDropdowns() {
   populateFormDataLists(assignees, clients);
 }
 
-function populateFormDataLists(assignees, clients) {
-  const allPeople = [...new Set([
-    ...(settings.teamMembers || []).map(m => m.name),
-    ...tasks.map(t => t.assignee).filter(Boolean),
-    ...tasks.map(t => t.supervisor).filter(Boolean),
-    ...tasks.map(t => t.owner).filter(Boolean)
-  ])].sort();
-
-  setDatalistOptions('list-to-members', allPeople);
-
-  // Role-filtered datalists
-  const equipoMembers = (settings.teamMembers || []).filter(m => !m.role || m.role === 'Equipo').map(m => m.name).sort();
-  const ownerMembers = (settings.teamMembers || []).filter(m => m.role === 'Owner').map(m => m.name).sort();
-  const clientNames = [...new Set([
-    ...(settings.clients || []).map(c => c.name),
-    ...tasks.map(t => t.client).filter(Boolean)
-  ])].sort();
-
-  setDatalistOptions('list-to-equipo', equipoMembers.length > 0 ? equipoMembers : allPeople);
-  setDatalistOptions('list-to-owners', ownerMembers.length > 0 ? ownerMembers : allPeople);
-  setDatalistOptions('list-to-clients', clientNames);
+function populateFormDataLists() {
+  // No longer needed - modal dropdowns use getOptionsForField / getModalOptions dynamically
 }
 
-function setDatalistOptions(id, values) {
-  const dl = document.getElementById(id);
-  if (!dl) return;
-  dl.innerHTML = values.map(v => `<option value="${escAttr(v)}">`).join('');
+// --- MODAL CUSTOM SELECT DROPDOWN ---
+let activeModalDropdown = null;
+
+function getModalOptions(field) {
+  if (field === 'timeoff-type') return ['Vacaciones', 'Day Off', 'OOO'];
+  return getOptionsForField(field);
 }
+
+function openModalDropdown(selectEl) {
+  closeModalDropdown();
+
+  const field = selectEl.dataset.field;
+  const currentValue = selectEl.dataset.value || '';
+  const options = getModalOptions(field);
+  const canAdd = ['client', 'assignee', 'supervisor', 'owner'].includes(field);
+
+  const dropdown = document.getElementById('modal-dropdown');
+  const searchInput = document.getElementById('modal-dropdown-search');
+  const optionsContainer = document.getElementById('modal-dropdown-options');
+  const addBtn = document.getElementById('modal-dropdown-add');
+
+  selectEl.classList.add('open');
+
+  // Position dropdown below the select
+  const rect = selectEl.getBoundingClientRect();
+  const dropdownMaxHeight = 280;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  if (spaceBelow < dropdownMaxHeight && rect.top > dropdownMaxHeight) {
+    dropdown.style.top = (rect.top - dropdownMaxHeight - 4) + 'px';
+  } else {
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+  }
+  dropdown.style.left = rect.left + 'px';
+  dropdown.style.minWidth = Math.max(rect.width, 200) + 'px';
+  dropdown.style.maxWidth = Math.max(rect.width, 320) + 'px';
+
+  searchInput.value = '';
+  searchInput.placeholder = 'Buscar...';
+  addBtn.classList.toggle('hidden', !canAdd);
+
+  function renderOptions(filter) {
+    const filtered = filter
+      ? options.filter(o => o.toLowerCase().includes(filter.toLowerCase()))
+      : options;
+
+    optionsContainer.innerHTML = '';
+    filtered.forEach(opt => {
+      const div = document.createElement('div');
+      div.className = 'edit-dropdown-option' + (opt === currentValue ? ' active' : '');
+      div.innerHTML = '<span class="option-label">' + escHtml(opt) + '</span>';
+      div.addEventListener('click', () => {
+        selectModalValue(selectEl, opt);
+      });
+      optionsContainer.appendChild(div);
+    });
+
+    if (filtered.length === 0) {
+      optionsContainer.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem;text-align:center">Sin resultados</div>';
+    }
+  }
+
+  renderOptions('');
+
+  searchInput.oninput = () => renderOptions(searchInput.value);
+
+  addBtn.onclick = () => {
+    const newName = searchInput.value.trim();
+    if (!newName) {
+      toast('Escribí un nombre en el buscador', 'error');
+      return;
+    }
+    selectModalValue(selectEl, newName);
+    // Add to settings if appropriate
+    if (field === 'client') {
+      const color = getColorForName(newName);
+      const bg = color + '18';
+      if (!(settings.clients || []).some(c => c.name === newName)) {
+        settings.clients = [...(settings.clients || []), { name: newName, color: bg, textColor: color }];
+        api('PUT', '/settings', { clients: settings.clients }).catch(() => {});
+      }
+    } else if (['assignee', 'supervisor', 'owner'].includes(field)) {
+      if (!(settings.teamMembers || []).some(m => m.name === newName)) {
+        const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+        settings.teamMembers = [...(settings.teamMembers || []), { name: newName, color, role: 'Equipo' }];
+        api('PUT', '/settings', { teamMembers: settings.teamMembers }).catch(() => {});
+      }
+    }
+  };
+
+  dropdown.classList.remove('hidden');
+  searchInput.focus();
+
+  activeModalDropdown = { dropdown, selectEl, field };
+}
+
+function selectModalValue(selectEl, value) {
+  selectEl.dataset.value = value;
+  selectEl.querySelector('.modal-select-text').textContent = value || selectEl.getAttribute('data-placeholder') || '';
+  closeModalDropdown();
+}
+
+function closeModalDropdown() {
+  const dropdown = document.getElementById('modal-dropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+  if (activeModalDropdown) {
+    activeModalDropdown.selectEl.classList.remove('open');
+    activeModalDropdown = null;
+  }
+}
+
+// Bind click to all modal-select elements
+document.addEventListener('click', (e) => {
+  const selectEl = e.target.closest('.modal-select');
+  if (selectEl) {
+    e.stopPropagation();
+    if (activeModalDropdown && activeModalDropdown.selectEl === selectEl) {
+      closeModalDropdown();
+    } else {
+      openModalDropdown(selectEl);
+    }
+    return;
+  }
+  // Close modal dropdown if clicking outside
+  if (activeModalDropdown && !e.target.closest('#modal-dropdown')) {
+    closeModalDropdown();
+  }
+});
 
 // --- GET OPTIONS FOR DROPDOWN FIELDS (role-filtered) ---
 function getOptionsForField(field) {
@@ -844,9 +947,8 @@ function buildMobileCards(taskList, groupAssignee = '') {
     card.querySelector('.task-action-btn.copy').addEventListener('click', (e) => {
       e.stopPropagation();
       copyingTaskId = t.id;
-      document.getElementById('copy-assignee').value = '';
+      setModalSelect('copy-assignee', '');
       document.getElementById('copy-modal').classList.remove('hidden');
-      setTimeout(() => document.getElementById('copy-assignee').focus(), 100);
     });
 
     container.appendChild(card);
@@ -924,9 +1026,8 @@ function bindTaskRows(wrapper) {
       const task = tasks.find(t => t.id === taskId);
       if (!task) { toast('No se encontró la tarea', 'error'); return; }
       copyingTaskId = taskId;
-      document.getElementById('copy-assignee').value = '';
+      setModalSelect('copy-assignee', '');
       document.getElementById('copy-modal').classList.remove('hidden');
-      setTimeout(() => document.getElementById('copy-assignee').focus(), 100);
     });
   });
 
@@ -1458,7 +1559,7 @@ document.getElementById('copy-modal').querySelector('.modal-backdrop').addEventL
 });
 
 document.getElementById('copy-modal-save').addEventListener('click', async () => {
-  const newAssignee = document.getElementById('copy-assignee').value.trim();
+  const newAssignee = getModalSelect('copy-assignee');
   if (!newAssignee) {
     toast('Seleccioná un asignado', 'error');
     return;
@@ -1502,11 +1603,11 @@ function openTimeOffModal(entry = null) {
   titleEl.textContent = entry ? 'Editar Time Off' : 'Time Off';
   document.getElementById('timeoff-delete').classList.toggle('hidden', !entry);
 
-  document.getElementById('timeoff-member').value = entry?.assignee || '';
+  setModalSelect('timeoff-member', entry?.assignee || '');
   document.getElementById('timeoff-title').value = entry?.timeOffTitle || '';
   document.getElementById('timeoff-start').value = entry?.timeOffStart || '';
   document.getElementById('timeoff-end').value = entry?.timeOffEnd || '';
-  document.getElementById('timeoff-type').value = entry?.timeOffType || 'Vacaciones';
+  setModalSelect('timeoff-type', entry?.timeOffType || 'Vacaciones');
 
   document.getElementById('timeoff-modal').classList.remove('hidden');
 }
@@ -1521,11 +1622,11 @@ document.getElementById('timeoff-cancel').addEventListener('click', closeTimeOff
 document.getElementById('timeoff-modal').querySelector('.modal-backdrop').addEventListener('click', closeTimeOffModal);
 
 document.getElementById('timeoff-save').addEventListener('click', async () => {
-  const member = document.getElementById('timeoff-member').value.trim();
+  const member = getModalSelect('timeoff-member');
   const title = document.getElementById('timeoff-title').value.trim();
   const start = document.getElementById('timeoff-start').value;
   const end = document.getElementById('timeoff-end').value;
-  const type = document.getElementById('timeoff-type').value;
+  const type = getModalSelect('timeoff-type');
 
   if (!member || !start || !end) {
     toast('Completá todos los campos', 'error');
@@ -1577,23 +1678,49 @@ document.getElementById('timeoff-delete').addEventListener('click', async () => 
   }
 });
 
+// --- MODAL SELECT HELPERS ---
+function setModalSelect(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.dataset.value = value;
+  const textEl = el.querySelector('.modal-select-text');
+  if (textEl) textEl.textContent = value || el.getAttribute('data-placeholder') || getModalSelectPlaceholder(id);
+}
+
+function getModalSelect(id) {
+  const el = document.getElementById(id);
+  return el ? (el.dataset.value || '').trim() : '';
+}
+
+function getModalSelectPlaceholder(id) {
+  const map = {
+    'new-task-client': 'Seleccionar cliente...',
+    'new-task-assignee': 'Miembro del equipo...',
+    'new-task-supervisor': 'Supervisor...',
+    'new-task-priority': 'TBD',
+    'new-task-status': 'Sin empezar',
+    'new-task-owner': 'Owner...',
+    'timeoff-member': 'Seleccioná...',
+    'timeoff-type': 'Vacaciones',
+    'copy-assignee': 'Seleccioná...'
+  };
+  return map[id] || 'Seleccionar...';
+}
+
 // --- NEW TASK CREATION MODAL ---
 function openNewTaskModal(prefillAssignee = '') {
-  populateFormDataLists();
-
-  document.getElementById('new-task-client').value = '';
+  setModalSelect('new-task-client', '');
   document.getElementById('new-task-project').value = '';
-  document.getElementById('new-task-assignee').value = prefillAssignee;
-  document.getElementById('new-task-supervisor').value = '';
-  document.getElementById('new-task-priority').value = 'TBD';
+  setModalSelect('new-task-assignee', prefillAssignee);
+  setModalSelect('new-task-supervisor', '');
+  setModalSelect('new-task-priority', 'TBD');
   document.getElementById('new-task-deadline').value = '';
-  document.getElementById('new-task-status').value = 'sin empezar';
-  document.getElementById('new-task-owner').value = '';
+  setModalSelect('new-task-status', 'sin empezar');
+  setModalSelect('new-task-owner', '');
   document.getElementById('new-task-comments').value = '';
   document.getElementById('new-task-supervision').checked = false;
 
   document.getElementById('new-task-modal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('new-task-client').focus(), 100);
 }
 
 function closeNewTaskModal() {
@@ -1605,14 +1732,14 @@ document.getElementById('new-task-cancel').addEventListener('click', closeNewTas
 document.getElementById('new-task-modal').querySelector('.modal-backdrop').addEventListener('click', closeNewTaskModal);
 
 document.getElementById('new-task-save').addEventListener('click', async () => {
-  const client = document.getElementById('new-task-client').value.trim();
+  const client = getModalSelect('new-task-client');
   const project = document.getElementById('new-task-project').value.trim();
-  const assignee = document.getElementById('new-task-assignee').value.trim();
-  const supervisor = document.getElementById('new-task-supervisor').value.trim();
-  const priority = document.getElementById('new-task-priority').value;
+  const assignee = getModalSelect('new-task-assignee');
+  const supervisor = getModalSelect('new-task-supervisor');
+  const priority = getModalSelect('new-task-priority');
   const deadline = document.getElementById('new-task-deadline').value;
-  const status = document.getElementById('new-task-status').value;
-  const owner = document.getElementById('new-task-owner').value.trim();
+  const status = getModalSelect('new-task-status');
+  const owner = getModalSelect('new-task-owner');
   const comments = document.getElementById('new-task-comments').value.trim();
   const isSupervision = document.getElementById('new-task-supervision').checked;
 
@@ -2801,6 +2928,7 @@ document.addEventListener('keydown', (e) => {
     }
     closeEditDropdown();
     closeInlineInput();
+    closeModalDropdown();
     closePromptModal();
     closeTimeOffModal();
     closeNewTaskModal();
