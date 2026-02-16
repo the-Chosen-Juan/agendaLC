@@ -157,9 +157,21 @@
           <button class="btn btn-ghost btn-sm" id="save-auto-delete" style="margin-top:.75rem"><span class="material-icons-round">save</span> Guardar</button>
         </div>
         <div class="settings-card">
-          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">download</span>Exportar datos</h2>
-          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Descargá todas las tareas en formato CSV para abrir en Google Sheets o Excel.</p>
-          <button class="btn btn-ghost" id="export-csv-btn"><span class="material-icons-round">download</span> Exportar a CSV</button>
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">sync</span>Importar / Exportar / Sincronizar</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Sincronizá con Google Sheets o importá/exportá archivos CSV.</p>
+          <div style="margin-bottom:1.25rem">
+            <label style="font-weight:500;font-size:.9rem;display:block;margin-bottom:.5rem">Google Sheets URL</label>
+            <div style="display:flex;gap:.5rem">
+              <input type="text" id="sheets-url" placeholder="https://docs.google.com/spreadsheets/d/..." style="flex:1;padding:.55rem .75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:.85rem">
+              <button class="btn btn-primary btn-sm" id="sync-sheets-btn"><span class="material-icons-round">sync</span> Sincronizar</button>
+            </div>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.35rem">El documento debe ser público ("Cualquier persona con el enlace puede ver")</p>
+          </div>
+          <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+            <input type="file" id="csv-file-input" accept=".csv" style="display:none">
+            <button class="btn btn-ghost" id="import-csv-btn"><span class="material-icons-round">upload</span> Importar CSV</button>
+            <button class="btn btn-ghost" id="export-csv-btn"><span class="material-icons-round">download</span> Exportar CSV</button>
+          </div>
         </div>
         <div class="settings-card">
           <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">lock</span>Cambiar contraseña</h2>
@@ -255,6 +267,23 @@
           <button class="btn btn-danger" id="cal-event-delete"><span class="material-icons-round">delete</span> Eliminar</button>
           <button class="btn btn-ghost" id="cal-event-cancel">Cancelar</button>
           <button class="btn btn-primary" id="cal-event-save"><span class="material-icons-round">check</span> Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT PREVIEW MODAL -->
+  <div id="import-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-sm">
+      <div class="modal-header"><h2>Importar tareas</h2><button class="btn-icon modal-close" id="import-modal-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-body">
+        <p id="import-preview" style="margin-bottom:1rem;color:var(--text-secondary);font-size:.9rem"></p>
+        <div id="import-column-info" style="margin-bottom:1rem;font-size:.8rem;color:var(--text-muted)"></div>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <button class="btn btn-primary" id="import-replace" style="width:100%"><span class="material-icons-round">swap_horiz</span> Reemplazar todo</button>
+          <button class="btn btn-ghost" id="import-add" style="width:100%"><span class="material-icons-round">add</span> Agregar a las existentes</button>
+          <button class="btn btn-ghost" id="import-cancel" style="width:100%">Cancelar</button>
         </div>
       </div>
     </div>

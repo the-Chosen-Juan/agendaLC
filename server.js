@@ -310,6 +310,52 @@ app.get('/api/presence', authMiddleware, (req, res) => {
 });
 
 // ============================================================
+// GOOGLE SHEETS PROXY - fetch public sheet as CSV
+// ============================================================
+function fetchUrl(targetUrl, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) return reject(new Error('Too many redirects'));
+    const mod = targetUrl.startsWith('https') ? require('https') : require('http');
+    mod.get(targetUrl, (response) => {
+      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        fetchUrl(response.headers.location, maxRedirects - 1).then(resolve).catch(reject);
+        return;
+      }
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+      let data = '';
+      response.on('data', chunk => data += chunk);
+      response.on('end', () => resolve(data));
+      response.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+app.get('/api/fetch-sheet', authMiddleware, async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) return res.status(400).json({ error: 'URL de Google Sheets no válida' });
+
+  const sheetId = match[1];
+  // Support gid parameter for specific sheet tabs
+  const gidMatch = url.match(/gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+
+  try {
+    const csv = await fetchUrl(csvUrl);
+    res.json({ csv });
+  } catch (err) {
+    console.error('Fetch sheet error:', err);
+    res.status(500).json({ error: 'No se pudo obtener el documento. Verificá que el link sea público.' });
+  }
+});
+
+// ============================================================
 // SEED ENDPOINT - to populate Redis from initial data
 // ============================================================
 app.post('/api/seed', async (req, res) => {

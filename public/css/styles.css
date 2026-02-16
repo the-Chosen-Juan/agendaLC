@@ -1236,10 +1236,14 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .calendar-day {
   background: var(--surface);
   padding: .5rem;
-  min-height: 100px;
+  min-height: 120px;
   font-size: .8rem;
   position: relative;
   vertical-align: top;
+}
+.calendar-day .calendar-events {
+  max-height: none;
+  overflow: visible;
 }
 
 .calendar-day.today {
@@ -1270,14 +1274,14 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   display: flex;
   align-items: center;
   gap: .2rem;
-  padding: .1rem .35rem;
+  padding: .15rem .35rem;
   border-radius: 4px;
-  font-size: .63rem;
+  font-size: .6rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .calendar-event.deadline {
@@ -1718,7 +1722,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
   }
-  .calendar-day { min-height: 80px; }
+  .calendar-day { min-height: 90px; }
 }
 
 @media (max-width: 768px) {

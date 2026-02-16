@@ -295,6 +295,25 @@ async function loadData() {
   }
 }
 
+// Soft refresh: re-fetch data and re-render WITHOUT showing skeleton
+async function softRefresh() {
+  try {
+    [tasks, settings] = await Promise.all([
+      api('GET', '/tasks'),
+      api('GET', '/settings')
+    ]);
+    await autoDeleteCompletedTasks();
+    populateFilterDropdowns();
+    renderTasks();
+    renderTeam();
+    updateStats();
+    renderLeader();
+    updateOverdueBadge();
+  } catch (err) {
+    console.error('Refresh failed:', err);
+  }
+}
+
 async function autoDeleteCompletedTasks() {
   const days = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
@@ -880,7 +899,7 @@ function buildMobileCards(taskList, groupAssignee = '') {
       try {
         await api('DELETE', `/tasks/${t.id}`);
         toast('Tarea eliminada');
-        await loadData();
+        await softRefresh();
       } catch (err) {
         toast('Error: ' + err.message, 'error');
       }
@@ -953,7 +972,7 @@ function bindTaskRows(wrapper) {
       try {
         await api('DELETE', `/tasks/${taskId}`);
         toast('Tarea eliminada');
-        await loadData();
+        await softRefresh();
       } catch (err) {
         toast('Error al eliminar: ' + err.message, 'error');
       }
@@ -1518,7 +1537,7 @@ document.getElementById('copy-modal-save').addEventListener('click', async () =>
     toast(`Tarea copiada a ${newAssignee}`);
     document.getElementById('copy-modal').classList.add('hidden');
     copyingTaskId = null;
-    await loadData();
+    await softRefresh();
   } catch (err) {
     toast('Error al copiar: ' + err.message, 'error');
   }
@@ -1587,7 +1606,7 @@ document.getElementById('timeoff-save').addEventListener('click', async () => {
       toast('Time off registrado');
     }
     closeTimeOffModal();
-    await loadData();
+    await softRefresh();
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
@@ -1600,7 +1619,7 @@ document.getElementById('timeoff-delete').addEventListener('click', async () => 
     await api('DELETE', `/tasks/${editingTimeOffId}`);
     toast('Time off eliminado');
     closeTimeOffModal();
-    await loadData();
+    await softRefresh();
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
@@ -1656,7 +1675,7 @@ document.getElementById('new-task-save').addEventListener('click', async () => {
     await api('POST', '/tasks', body);
     toast('Tarea creada');
     closeNewTaskModal();
-    await loadData();
+    await softRefresh();
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
@@ -1810,12 +1829,8 @@ function renderCalendar() {
     const timeoffs = timeoffMap[dateStr] || [];
 
     let eventsHtml = '<div class="calendar-events">';
-    let eventCount = 0;
-    const maxEvents = 3;
 
     timeoffs.forEach(to => {
-      if (eventCount >= maxEvents) return;
-      eventCount++;
       const memberObj = (settings.teamMembers || []).find(m => m.name === to.assignee);
       const color = memberObj?.color || getColorForName(to.assignee);
       const typeLabel = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
@@ -1828,19 +1843,12 @@ function renderCalendar() {
     });
 
     deadlines.forEach(t => {
-      if (eventCount >= maxEvents) return;
-      eventCount++;
       const isOverdue = new Date(dateStr + 'T00:00:00') < today && t.status !== 'completado';
       const cls = isOverdue ? 'deadline-overdue' : 'deadline';
       eventsHtml += `<div class="calendar-event ${cls}" title="${escAttr(t.project)} - ${escAttr(t.assignee)}" data-task-id="${t.id}" data-event-type="deadline">
         <span class="material-icons-round">flag</span>${escHtml(t.project || t.client)}
       </div>`;
     });
-
-    const remaining = (deadlines.length + timeoffs.length) - eventCount;
-    if (remaining > 0) {
-      eventsHtml += `<div class="calendar-more">+${remaining} más</div>`;
-    }
 
     eventsHtml += '</div>';
 
@@ -1917,7 +1925,7 @@ document.getElementById('cal-event-delete').addEventListener('click', async () =
     await api('DELETE', `/tasks/${calEventEditData.taskId}`);
     toast('Evento eliminado');
     closeCalEventModal();
-    await loadData();
+    await softRefresh();
     renderCalendar();
   } catch (err) {
     toast('Error: ' + err.message, 'error');
@@ -2079,7 +2087,7 @@ function openEditMemberModal(member) {
         await Promise.all(updatePromises);
       }
 
-      await loadData();
+      await softRefresh();
       toast('Miembro actualizado');
     } catch (err) {
       toast('Error: ' + err.message, 'error');
@@ -2514,6 +2522,190 @@ function exportCSV() {
 
 document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
 
+// --- CSV IMPORT & GOOGLE SHEETS SYNC ---
+let pendingImportTasks = [];
+
+function parseCSV(csvText) {
+  const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+
+  // Parse header row (handle quoted fields)
+  const parseRow = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const headers = parseRow(lines[0]).map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
+
+  // Map common header names to task fields
+  const fieldMap = {
+    '#': 'taskNumber', 'numero': 'taskNumber', 'number': 'taskNumber',
+    'cliente': 'client', 'client': 'client',
+    'proyecto': 'project', 'project': 'project', 'tema': 'project', 'tema / proyecto': 'project',
+    'asignado': 'assignee', 'assignee': 'assignee', 'assigned': 'assignee',
+    'supervisor': 'supervisor',
+    'prioridad': 'priority', 'priority': 'priority',
+    'deadline': 'deadline', 'fecha': 'deadline', 'fecha limite': 'deadline',
+    'status': 'status', 'estado': 'status',
+    'owner': 'owner', 'dueño': 'owner',
+    'comentarios': 'comments', 'comments': 'comments', 'notas': 'comments'
+  };
+
+  const colMapping = headers.map(h => fieldMap[h] || null);
+
+  const parsed = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseRow(lines[i]);
+    const task = {
+      client: '', project: '', assignee: '', supervisor: '',
+      priority: 'TBD', deadline: '', status: 'sin empezar',
+      owner: '', comments: '', isSupervision: false, taskNumber: ''
+    };
+
+    colMapping.forEach((field, idx) => {
+      if (field && values[idx] !== undefined) {
+        let val = values[idx].replace(/^"|"$/g, '');
+        // Skip TIME OFF rows
+        if (field === 'client' && val === 'TIME OFF') return;
+        task[field] = val;
+      }
+    });
+
+    // Only add if there's at least some content
+    if (task.client || task.project || task.assignee) {
+      parsed.push(task);
+    }
+  }
+
+  return parsed;
+}
+
+function openImportModal(parsedTasks) {
+  pendingImportTasks = parsedTasks;
+  document.getElementById('import-preview').textContent =
+    `Se encontraron ${parsedTasks.length} tareas para importar.`;
+
+  const sampleFields = parsedTasks.length > 0
+    ? Object.entries(parsedTasks[0]).filter(([,v]) => v).map(([k]) => k).join(', ')
+    : '';
+  document.getElementById('import-column-info').textContent =
+    sampleFields ? `Campos detectados: ${sampleFields}` : '';
+
+  document.getElementById('import-modal').classList.remove('hidden');
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').classList.add('hidden');
+  pendingImportTasks = [];
+}
+
+async function executeImport(mode) {
+  if (pendingImportTasks.length === 0) return;
+  closeImportModal();
+
+  try {
+    if (mode === 'replace') {
+      // Delete all existing regular tasks first
+      const existing = getRegularTasks();
+      if (existing.length > 0) {
+        toast(`Eliminando ${existing.length} tareas existentes...`, 'info');
+        await Promise.all(existing.map(t => api('DELETE', `/tasks/${t.id}`)));
+      }
+    }
+
+    toast(`Importando ${pendingImportTasks.length} tareas...`, 'info');
+    // Create tasks in batches of 10 for speed
+    for (let i = 0; i < pendingImportTasks.length; i += 10) {
+      const batch = pendingImportTasks.slice(i, i + 10);
+      await Promise.all(batch.map(t => api('POST', '/tasks', t)));
+    }
+
+    await softRefresh();
+    toast(`${pendingImportTasks.length} tareas importadas correctamente`);
+    pendingImportTasks = [];
+  } catch (err) {
+    toast('Error al importar: ' + err.message, 'error');
+  }
+}
+
+// Import modal handlers
+document.getElementById('import-modal-close').addEventListener('click', closeImportModal);
+document.getElementById('import-cancel').addEventListener('click', closeImportModal);
+document.getElementById('import-modal').querySelector('.modal-backdrop').addEventListener('click', closeImportModal);
+
+document.getElementById('import-replace').addEventListener('click', () => executeImport('replace'));
+document.getElementById('import-add').addEventListener('click', () => executeImport('add'));
+
+// CSV file import
+document.getElementById('import-csv-btn').addEventListener('click', () => {
+  document.getElementById('csv-file-input').click();
+});
+
+document.getElementById('csv-file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    const csvText = evt.target.result;
+    const parsed = parseCSV(csvText);
+    if (parsed.length === 0) {
+      toast('No se encontraron tareas en el archivo CSV', 'error');
+      return;
+    }
+    openImportModal(parsed);
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // Reset so same file can be re-imported
+});
+
+// Google Sheets sync
+document.getElementById('sync-sheets-btn').addEventListener('click', async () => {
+  const url = document.getElementById('sheets-url').value.trim();
+  if (!url) {
+    toast('Pegá la URL del documento de Google Sheets', 'error');
+    return;
+  }
+
+  if (!url.includes('docs.google.com/spreadsheets')) {
+    toast('URL no válida. Debe ser un link de Google Sheets', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('sync-sheets-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Cargando...';
+
+  try {
+    const result = await api('GET', `/fetch-sheet?url=${encodeURIComponent(url)}`);
+    const parsed = parseCSV(result.csv);
+    if (parsed.length === 0) {
+      toast('No se encontraron tareas en el documento', 'error');
+      return;
+    }
+    openImportModal(parsed);
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-round">sync</span> Sincronizar';
+  }
+});
+
 // --- COMPLETION CELEBRATION (confetti on EACH completed task) ---
 function checkCelebration(task) {
   // Always launch confetti for individual task completion
@@ -2660,6 +2852,7 @@ document.addEventListener('keydown', (e) => {
     closeTimeOffModal();
     closeNewTaskModal();
     closeCalEventModal();
+    closeImportModal();
     document.getElementById('copy-modal').classList.add('hidden');
   }
 });
