@@ -1127,6 +1127,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
    ESPERANDO RESPUESTA SECTION
    =========================== */
 .esperando-section {
+  margin-top: 2rem;
   margin-bottom: 1.5rem;
   border: 2px dashed var(--status-esperando);
   border-radius: var(--radius);
@@ -2415,6 +2416,128 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .calendar-event:hover {
   filter: brightness(1.1);
   transform: scale(1.02);
+}
+
+/* ===========================
+   ACTIVITY LOG VIEW
+   =========================== */
+.activity-toolbar {
+  padding: 1.25rem 1.75rem .75rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+.activity-filters {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.activity-log-container {
+  padding: 0 1.75rem 2rem;
+}
+.activity-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.activity-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .85rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+.activity-log-item:hover {
+  box-shadow: var(--shadow-sm);
+}
+.activity-log-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.activity-log-icon .material-icons-round {
+  font-size: 1.1rem;
+}
+.activity-log-icon.action-create {
+  background: rgba(16, 185, 129, .12);
+  color: #10b981;
+}
+.activity-log-icon.action-update {
+  background: rgba(99, 102, 241, .12);
+  color: #6366f1;
+}
+.activity-log-icon.action-delete {
+  background: rgba(239, 68, 68, .12);
+  color: #ef4444;
+}
+.activity-log-info {
+  flex: 1;
+  min-width: 0;
+}
+.activity-log-title {
+  font-size: .9rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.activity-log-title strong {
+  font-weight: 600;
+  color: var(--primary);
+}
+.activity-log-meta {
+  font-size: .75rem;
+  color: var(--text-muted);
+  margin-top: .2rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.activity-log-values {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin-top: .35rem;
+  font-size: .8rem;
+}
+.activity-log-old {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  padding: .1rem .4rem;
+  background: rgba(239, 68, 68, .08);
+  border-radius: 4px;
+}
+.activity-log-new {
+  color: var(--text);
+  padding: .1rem .4rem;
+  background: rgba(16, 185, 129, .08);
+  border-radius: 4px;
+  font-weight: 500;
+}
+.activity-log-arrow {
+  color: var(--text-muted);
+  font-size: .85rem;
+}
+.activity-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+}
+.activity-empty .material-icons-round {
+  font-size: 3rem;
+  margin-bottom: .75rem;
+  opacity: .5;
+}
+
+@media (max-width: 768px) {
+  .activity-toolbar { padding: 1rem; }
+  .activity-log-container { padding: 0 .75rem 2rem; }
 }
 
 @media (max-width: 768px) {

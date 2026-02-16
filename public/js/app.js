@@ -51,9 +51,6 @@ async function api(method, path, body) {
 
   const res = await fetch(`/api${path}`, opts);
   if (res.status === 401) {
-    token = null;
-    localStorage.removeItem('agenda_token');
-    showLogin();
     throw new Error('Unauthorized');
   }
   if (!res.ok) {
@@ -110,70 +107,7 @@ darkModeToggle.addEventListener('click', () => {
   }
 });
 
-// --- LOGIN / LOGOUT ---
-function showLogin() {
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
-}
-
-function showApp() {
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-}
-
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const pw = document.getElementById('login-password').value;
-  const errEl = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
-
-  btn.disabled = true;
-  errEl.classList.add('hidden');
-
-  try {
-    const data = await api('POST', '/login', { password: pw });
-    token = data.token;
-    localStorage.setItem('agenda_token', token);
-    showApp();
-    await loadData();
-  } catch {
-    errEl.textContent = 'Contraseña incorrecta';
-    errEl.classList.remove('hidden');
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-document.getElementById('logout-btn').addEventListener('click', async () => {
-  try { await api('POST', '/logout'); } catch {}
-  token = null;
-  localStorage.removeItem('agenda_token');
-  stopPresencePolling();
-  showLogin();
-  document.getElementById('login-password').value = '';
-});
-
-// --- CHANGE PASSWORD ---
-document.getElementById('change-password-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const msg = document.getElementById('password-msg');
-  try {
-    await api('POST', '/change-password', {
-      currentPassword: document.getElementById('current-password').value,
-      newPassword: document.getElementById('new-password').value
-    });
-    msg.textContent = 'Contraseña cambiada correctamente';
-    msg.style.color = '#059669';
-    msg.classList.remove('hidden');
-    document.getElementById('current-password').value = '';
-    document.getElementById('new-password').value = '';
-    toast('Contraseña actualizada');
-  } catch {
-    msg.textContent = 'Error al cambiar la contraseña';
-    msg.style.color = '#ef4444';
-    msg.classList.remove('hidden');
-  }
-});
+// --- LOGIN REMOVED - App loads directly ---
 
 // --- NAV ---
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -191,7 +125,7 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
 
-  const titles = { agenda: 'Agenda', calendar: 'Calendario', team: 'Equipo', settings: 'Configuración' };
+  const titles = { agenda: 'Agenda', calendar: 'Calendario', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
   const searchBox = document.getElementById('search-box');
@@ -205,6 +139,7 @@ function switchView(view) {
   }
 
   if (view === 'calendar') renderCalendar();
+  if (view === 'activity') loadActivityLog();
   if (view === 'settings') renderSettingsPage();
 }
 
@@ -898,6 +833,7 @@ function buildMobileCards(taskList, groupAssignee = '') {
       if (!confirm('¿Eliminar esta tarea?')) return;
       try {
         await api('DELETE', `/tasks/${t.id}`);
+        logActivity('delete', t.id, '', '', '', `${t.client || ''} - ${t.project || ''}`);
         toast('Tarea eliminada');
         await softRefresh();
       } catch (err) {
@@ -969,8 +905,10 @@ function bindTaskRows(wrapper) {
       e.stopPropagation();
       const taskId = btn.dataset.taskId;
       if (!confirm('¿Eliminar esta tarea?')) return;
+      const deletedTask = tasks.find(t => t.id === taskId);
       try {
         await api('DELETE', `/tasks/${taskId}`);
+        logActivity('delete', taskId, '', '', '', `${deletedTask?.client || ''} - ${deletedTask?.project || ''}`);
         toast('Tarea eliminada');
         await softRefresh();
       } catch (err) {
@@ -1089,6 +1027,7 @@ function openTextInput(cell, task, field) {
         await api('PUT', `/tasks/${task.id}`, update);
         if (update[field] !== undefined) {
           pushUndo(task.id, field, currentValue, newValue);
+          logActivity('update', task.id, field, currentValue, newValue, `${task.client || ''} - ${task.project || ''}`);
           task[field] = newValue;
         }
         if (update.isSupervision !== undefined) {
@@ -1137,6 +1076,7 @@ function openDateInput(cell, task) {
       try {
         await api('PUT', `/tasks/${task.id}`, { deadline: newValue });
         pushUndo(task.id, 'deadline', currentValue, newValue);
+        logActivity('update', task.id, 'deadline', currentValue, newValue, `${task.client || ''} - ${task.project || ''}`);
         task.deadline = newValue;
       } catch (err) {
         toast('Error: ' + err.message, 'error');
@@ -1174,11 +1114,21 @@ function openEditDropdown(cell, task, field) {
 
   // Position dropdown
   const rect = cell.getBoundingClientRect();
-  dropdown.style.top = (rect.bottom + 4) + 'px';
   dropdown.style.left = rect.left + 'px';
   dropdown.style.minWidth = Math.max(rect.width, 200) + 'px';
 
-  // Adjust if off-screen
+  // Flip dropdown above cell if near bottom of viewport
+  const dropdownMaxHeight = 320;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  if (spaceBelow < dropdownMaxHeight && rect.top > dropdownMaxHeight) {
+    dropdown.style.top = (rect.top - dropdownMaxHeight - 4) + 'px';
+    dropdown.style.maxHeight = dropdownMaxHeight + 'px';
+  } else {
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.maxHeight = Math.min(dropdownMaxHeight, spaceBelow - 8) + 'px';
+  }
+
+  // Adjust if off-screen horizontally
   const maxLeft = window.innerWidth - 320;
   if (rect.left > maxLeft) {
     dropdown.style.left = maxLeft + 'px';
@@ -1264,6 +1214,8 @@ async function selectDropdownOption(task, field, value, oldValue) {
     pushUndo(task.id, field, previousValue, value);
     task[field] = value;
     if (update.completedAt !== undefined) task.completedAt = update.completedAt;
+
+    logActivity('update', task.id, field, previousValue, value, `${task.client || ''} - ${task.project || ''}`);
 
     renderTasks();
     updateStats();
@@ -1672,7 +1624,8 @@ document.getElementById('new-task-save').addEventListener('click', async () => {
   const body = { client, project, assignee, supervisor, priority, deadline, status, owner, comments, isSupervision };
 
   try {
-    await api('POST', '/tasks', body);
+    const created = await api('POST', '/tasks', body);
+    logActivity('create', created.id, '', '', '', `${client} - ${project}`);
     toast('Tarea creada');
     closeNewTaskModal();
     await softRefresh();
@@ -2857,10 +2810,94 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// --- INIT ---
-if (token) {
-  showApp();
-  loadData();
-} else {
-  showLogin();
+// --- ACTIVITY LOG ---
+let activityLog = [];
+
+async function logActivity(action, taskId, field, oldValue, newValue, taskInfo) {
+  try {
+    await api('POST', '/activity-log', { action, taskId, field, oldValue, newValue, taskInfo });
+  } catch {}
 }
+
+async function loadActivityLog() {
+  const container = document.getElementById('activity-log-container');
+  container.innerHTML = '<div class="activity-empty"><span class="material-icons-round">hourglass_empty</span><p>Cargando actividad...</p></div>';
+  try {
+    activityLog = await api('GET', '/activity-log');
+    renderActivityLog();
+  } catch (err) {
+    container.innerHTML = '<div class="activity-empty"><span class="material-icons-round">error_outline</span><p>Error al cargar actividad</p></div>';
+  }
+}
+
+function renderActivityLog() {
+  const container = document.getElementById('activity-log-container');
+  const filterAction = document.getElementById('activity-filter-action').value;
+  const sortOrder = document.getElementById('activity-sort').value;
+
+  let filtered = [...activityLog];
+  if (filterAction) {
+    filtered = filtered.filter(e => e.action === filterAction);
+  }
+
+  if (sortOrder === 'newest') {
+    filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  } else {
+    filtered.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="activity-empty"><span class="material-icons-round">history</span><p>No hay actividad registrada</p></div>';
+    return;
+  }
+
+  const fieldNames = {
+    client: 'Cliente', project: 'Proyecto', assignee: 'Asignado',
+    supervisor: 'Supervisor', priority: 'Prioridad', deadline: 'Deadline',
+    status: 'Status', owner: 'Owner', comments: 'Comentario', taskNumber: '#'
+  };
+
+  const actionLabels = { create: 'Tarea creada', update: 'Actualización', delete: 'Tarea eliminada' };
+  const actionIcons = { create: 'add_circle', update: 'edit', delete: 'delete' };
+
+  let html = '<div class="activity-log-list">';
+  filtered.forEach(entry => {
+    const actionClass = entry.action || 'update';
+    const icon = actionIcons[actionClass] || 'edit';
+    const actionLabel = actionLabels[actionClass] || 'Cambio';
+    const fieldLabel = fieldNames[entry.field] || entry.field || '';
+    const ts = new Date(entry.timestamp);
+    const timeStr = ts.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+    let valuesHtml = '';
+    if (entry.action === 'update' && entry.field) {
+      valuesHtml = `<div class="activity-log-values">
+        ${entry.oldValue ? `<span class="activity-log-old">${escHtml(entry.oldValue)}</span>` : '<span class="activity-log-old">(vacío)</span>'}
+        <span class="activity-log-arrow">\u2192</span>
+        <span class="activity-log-new">${escHtml(entry.newValue || '(vacío)')}</span>
+      </div>`;
+    }
+
+    html += `<div class="activity-log-item">
+      <div class="activity-log-icon action-${actionClass}">
+        <span class="material-icons-round">${icon}</span>
+      </div>
+      <div class="activity-log-info">
+        <div class="activity-log-title">${escHtml(actionLabel)}${fieldLabel ? ` - <strong>${escHtml(fieldLabel)}</strong>` : ''}</div>
+        ${entry.taskInfo ? `<div class="activity-log-meta">${escHtml(entry.taskInfo)}</div>` : ''}
+        ${valuesHtml}
+        <div class="activity-log-meta"><span class="material-icons-round" style="font-size:.85rem">schedule</span>${timeStr}</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// Activity log filter/sort handlers
+document.getElementById('activity-filter-action')?.addEventListener('change', renderActivityLog);
+document.getElementById('activity-sort')?.addEventListener('change', renderActivityLog);
+document.getElementById('activity-refresh')?.addEventListener('click', loadActivityLog);
+
+// --- INIT ---
+loadData();

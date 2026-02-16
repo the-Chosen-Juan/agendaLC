@@ -14,31 +14,8 @@
 </head>
 <body>
 
-  <!-- LOGIN SCREEN -->
-  <div id="login-screen" class="login-screen">
-    <div class="login-backdrop"></div>
-    <div class="login-card">
-      <div class="login-logo">
-        <span class="material-icons-round logo-icon">event_note</span>
-        <h1>Agenda <span class="accent">LC</span></h1>
-        <p class="login-subtitle">Team Task Management</p>
-      </div>
-      <form id="login-form" autocomplete="on">
-        <div class="input-group">
-          <span class="material-icons-round input-icon">lock</span>
-          <input type="password" id="login-password" placeholder="Ingresá la contraseña" required autocomplete="current-password" inputmode="text">
-        </div>
-        <button type="submit" class="btn btn-primary btn-login" id="login-btn">
-          <span>Entrar</span>
-          <span class="material-icons-round">arrow_forward</span>
-        </button>
-        <p id="login-error" class="login-error hidden"></p>
-      </form>
-    </div>
-  </div>
-
   <!-- MAIN APP -->
-  <div id="app" class="app hidden">
+  <div id="app" class="app">
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <span class="material-icons-round logo-icon-sm">event_note</span>
@@ -49,11 +26,9 @@
         <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span><span class="nav-badge hidden" id="nav-overdue-badge">0</span></a>
         <a href="#" class="nav-item" data-view="calendar"><span class="material-icons-round">calendar_month</span><span>Calendario</span></a>
         <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
+        <a href="#" class="nav-item" data-view="activity"><span class="material-icons-round">history</span><span>Actividad</span></a>
         <a href="#" class="nav-item" data-view="settings"><span class="material-icons-round">settings</span><span>Configuración</span></a>
       </nav>
-      <div class="sidebar-footer">
-        <button class="btn btn-ghost btn-logout" id="logout-btn"><span class="material-icons-round">logout</span><span>Cerrar sesión</span></button>
-      </div>
     </aside>
 
     <main class="main-content">
@@ -173,15 +148,26 @@
             <button class="btn btn-ghost" id="export-csv-btn"><span class="material-icons-round">download</span> Exportar CSV</button>
           </div>
         </div>
-        <div class="settings-card">
-          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">lock</span>Cambiar contraseña</h2>
-          <form id="change-password-form">
-            <div class="input-group"><span class="material-icons-round input-icon">lock</span><input type="password" id="current-password" placeholder="Contraseña actual" required></div>
-            <div class="input-group"><span class="material-icons-round input-icon">lock_reset</span><input type="password" id="new-password" placeholder="Nueva contraseña" required></div>
-            <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
-            <p id="password-msg" class="hidden"></p>
-          </form>
+      </div>
+
+      <!-- ACTIVITY LOG VIEW -->
+      <div id="view-activity" class="view hidden">
+        <div class="activity-toolbar">
+          <div class="activity-filters">
+            <select id="activity-filter-action" class="filter-select">
+              <option value="">Todas las acciones</option>
+              <option value="create">Creación</option>
+              <option value="update">Actualización</option>
+              <option value="delete">Eliminación</option>
+            </select>
+            <select id="activity-sort" class="filter-select">
+              <option value="newest">Más recientes</option>
+              <option value="oldest">Más antiguos</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" id="activity-refresh"><span class="material-icons-round">refresh</span><span>Actualizar</span></button>
+          </div>
         </div>
+        <div id="activity-log-container" class="activity-log-container"></div>
       </div>
     </main>
   </div>

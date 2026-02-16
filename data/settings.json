@@ -32,6 +32,46 @@
       "role": "Equipo"
     },
     {
+      "name": "Juli y Sofi",
+      "color": "#06b6d4",
+      "role": "Equipo"
+    },
+    {
+      "name": "Ruls",
+      "color": "#ef4444",
+      "role": "Equipo"
+    },
+    {
+      "name": "Meli",
+      "color": "#d946ef",
+      "role": "Equipo"
+    },
+    {
+      "name": "Jota",
+      "color": "#f97316",
+      "role": "Equipo"
+    },
+    {
+      "name": "Bua",
+      "color": "#14b8a6",
+      "role": "Equipo"
+    },
+    {
+      "name": "Jose",
+      "color": "#0ea5e9",
+      "role": "Equipo"
+    },
+    {
+      "name": "Cesi",
+      "color": "#84cc16",
+      "role": "Equipo"
+    },
+    {
+      "name": "Ubi",
+      "color": "#e11d48",
+      "role": "Equipo"
+    },
+    {
       "name": "Liso",
       "color": "#06b6d4",
       "role": "Supervisor"
@@ -80,6 +120,11 @@
       "name": "Luli",
       "color": "#ec4899",
       "role": "Owner"
+    },
+    {
+      "name": "Sol",
+      "color": "#a855f7",
+      "role": "Owner"
     }
   ],
   "clients": [
@@ -105,7 +150,7 @@
     },
     {
       "name": "Black",
-      "color": "#0f172a20",
+      "color": "#0f172a18",
       "textColor": "#0f172a"
     },
     {
@@ -127,7 +172,48 @@
       "name": "Dadá",
       "color": "#d946ef18",
       "textColor": "#d946ef"
+    },
+    {
+      "name": "El Esteco",
+      "color": "#14b8a618",
+      "textColor": "#14b8a6"
+    },
+    {
+      "name": "FLM",
+      "color": "#f9731618",
+      "textColor": "#f97316"
+    },
+    {
+      "name": "JW CORE",
+      "color": "#ef444418",
+      "textColor": "#ef4444"
+    },
+    {
+      "name": "JW**",
+      "color": "#ec489918",
+      "textColor": "#ec4899"
+    },
+    {
+      "name": "Bodegas",
+      "color": "#6366f118",
+      "textColor": "#6366f1"
     }
+  ],
+  "assigneeOrder": [
+    "Whalys",
+    "Nacho",
+    "Nia Freelo",
+    "Tomi",
+    "Agus y Pau",
+    "Chiari & Marti",
+    "Juli y Sofi",
+    "Ruls",
+    "Meli",
+    "Jota",
+    "Bua",
+    "Jose",
+    "Cesi",
+    "Ubi"
   ],
   "supervisors": [],
   "owners": []
