@@ -269,7 +269,8 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       assigneeOrder: settings.assigneeOrder || [],
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
-      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2
+      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,
+      dataVersion: settings.dataVersion || 0
     });
   } catch (err) {
     console.error('Update settings error:', err);
@@ -313,7 +314,16 @@ function fetchUrl(targetUrl, maxRedirects = 5) {
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) return reject(new Error('Too many redirects'));
     const mod = targetUrl.startsWith('https') ? require('https') : require('http');
-    mod.get(targetUrl, (response) => {
+    const parsed = new URL(targetUrl);
+    const options = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; AgendaLC/1.0)',
+        'Accept': 'text/csv,text/plain,*/*'
+      }
+    };
+    mod.get(options, (response) => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         fetchUrl(response.headers.location, maxRedirects - 1).then(resolve).catch(reject);
         return;
@@ -342,13 +352,28 @@ app.get('/api/fetch-sheet', authMiddleware, async (req, res) => {
   const gidMatch = url.match(/gid=(\d+)/);
   const gid = gidMatch ? gidMatch[1] : '0';
   const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
 
   try {
-    const csv = await fetchUrl(csvUrl);
+    let csv;
+    try {
+      csv = await fetchUrl(csvUrl);
+    } catch {
+      // Fallback: gviz endpoint works better for some public sheets
+      csv = await fetchUrl(gvizUrl);
+    }
+    // Detect if Google returned an HTML page instead of CSV
+    if (csv.trim().startsWith('<!DOCTYPE') || csv.trim().startsWith('<html')) {
+      // Try the gviz fallback
+      csv = await fetchUrl(gvizUrl);
+      if (csv.trim().startsWith('<!DOCTYPE') || csv.trim().startsWith('<html')) {
+        throw new Error('Google returned HTML instead of CSV');
+      }
+    }
     res.json({ csv });
   } catch (err) {
     console.error('Fetch sheet error:', err);
-    res.status(500).json({ error: 'No se pudo obtener el documento. Verificá que el link sea público.' });
+    res.status(500).json({ error: 'No se pudo obtener el documento. Verificá que el link sea público y que tenga permisos de \"Cualquier persona con el enlace\".' });
   }
 });
 

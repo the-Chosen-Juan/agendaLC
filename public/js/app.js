@@ -206,7 +206,7 @@ async function loadData() {
     ]);
 
     // Force reseed if data version is outdated or no tasks
-    const EXPECTED_DATA_VERSION = 2;
+    const EXPECTED_DATA_VERSION = 3;
     if (tasks.length === 0 || (settings.dataVersion || 0) < EXPECTED_DATA_VERSION) {
       try {
         await fetch('/api/seed?force=1', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
@@ -1795,6 +1795,16 @@ document.getElementById('cal-filter-timeoff').addEventListener('click', (e) => {
   renderCalendar();
 });
 
+document.getElementById('cal-all-on').addEventListener('click', () => {
+  Object.keys(calAssigneeFilters).forEach(k => calAssigneeFilters[k] = true);
+  renderCalendar();
+});
+
+document.getElementById('cal-all-off').addEventListener('click', () => {
+  Object.keys(calAssigneeFilters).forEach(k => calAssigneeFilters[k] = false);
+  renderCalendar();
+});
+
 function renderCalendarAssigneeFilters() {
   const container = document.getElementById('cal-assignee-filters');
   const allAssignees = [...new Set([
@@ -3008,6 +3018,12 @@ function renderActivityLog() {
       </div>`;
     }
 
+    // Only show revert for update actions that have a taskId and field
+    const canRevert = entry.action === 'update' && entry.taskId && entry.field;
+    const revertBtn = canRevert
+      ? `<button class="btn btn-ghost btn-xs activity-revert-btn" data-entry-id="${entry.id}" data-task-id="${entry.taskId}" data-field="${escAttr(entry.field)}" data-old-value="${escAttr(entry.oldValue || '')}" data-task-info="${escAttr(entry.taskInfo || '')}" title="Revertir este cambio"><span class="material-icons-round" style="font-size:.95rem">undo</span></button>`
+      : '';
+
     html += `<div class="activity-log-item">
       <div class="activity-log-icon action-${actionClass}">
         <span class="material-icons-round">${icon}</span>
@@ -3018,10 +3034,38 @@ function renderActivityLog() {
         ${valuesHtml}
         <div class="activity-log-meta"><span class="material-icons-round" style="font-size:.85rem">schedule</span>${timeStr}</div>
       </div>
+      ${revertBtn}
     </div>`;
   });
   html += '</div>';
   container.innerHTML = html;
+
+  // Bind revert button click handlers
+  container.querySelectorAll('.activity-revert-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const taskId = btn.dataset.taskId;
+      const field = btn.dataset.field;
+      const oldValue = btn.dataset.oldValue;
+      const taskInfo = btn.dataset.taskInfo;
+
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) {
+        toast('Tarea no encontrada - puede haber sido eliminada', 'error');
+        return;
+      }
+
+      try {
+        await api('PUT', `/tasks/${taskId}`, { [field]: oldValue });
+        task[field] = oldValue;
+        toast(`Revertido: ${taskInfo || 'cambio deshecho'}`);
+        renderTasks();
+        updateStats();
+        renderActivityLog();
+      } catch (err) {
+        toast('Error al revertir: ' + err.message, 'error');
+      }
+    });
+  });
 }
 
 // Activity log filter/sort handlers
