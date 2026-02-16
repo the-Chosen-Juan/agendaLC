@@ -451,7 +451,11 @@ function getOptionsForField(field) {
 
 // --- RENDER TASKS ---
 function getRegularTasks() {
-  return tasks.filter(t => !t.isTimeOff);
+  return tasks.filter(t => !t.isTimeOff && (t.client || '').toLowerCase() !== 'contrato');
+}
+
+function getContractTasks() {
+  return tasks.filter(t => !t.isTimeOff && (t.client || '').toLowerCase() === 'contrato');
 }
 
 function getTimeOffEntries() {
@@ -635,6 +639,7 @@ function renderGroupedTasks(container, filtered) {
     const initials = member?.initials || getInitials(assignee);
 
     const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
+    const memberContracts = getContractTasks().filter(c => c.assignee === assignee);
 
     // Count overdue tasks in this group
     const overdueCount = groupTasks.filter(t => {
@@ -671,6 +676,18 @@ function renderGroupedTasks(container, filtered) {
       </span>`;
     }
 
+    let contractHtml = '';
+    if (memberContracts.length > 0) {
+      memberContracts.forEach(ct => {
+        const deadlineClass = ct.deadline ? getDeadlineClass(ct.deadline) : '';
+        const dateStr = ct.deadline ? formatDate(ct.deadline) : 'Sin fecha';
+        contractHtml += `<span class="contrato-badge ${deadlineClass}" data-id="${ct.id}" title="Contrato hasta ${dateStr}">
+          <span class="material-icons-round">description</span>
+          Contrato: ${dateStr}
+        </span>`;
+      });
+    }
+
     header.innerHTML = `
       <span class="material-icons-round drag-handle">drag_indicator</span>
       <div class="group-avatar" style="background:${color}">${initials}</div>
@@ -678,6 +695,7 @@ function renderGroupedTasks(container, filtered) {
       <span class="group-count">${groupTasks.length} tarea${groupTasks.length !== 1 ? 's' : ''}</span>
       ${overdueHtml}
       ${timeoffHtml}
+      ${contractHtml}
       <span class="material-icons-round group-toggle ${isCollapsed ? 'collapsed' : ''}">expand_more</span>
     `;
 
@@ -747,7 +765,7 @@ function renderGroupedTasks(container, filtered) {
 
     // Toggle collapse
     header.addEventListener('click', (e) => {
-      if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge')) return;
+      if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge') || e.target.closest('.contrato-badge')) return;
       const toggle = header.querySelector('.group-toggle');
       toggle.classList.toggle('collapsed');
       tableWrapper.classList.toggle('hidden');
@@ -763,6 +781,17 @@ function renderGroupedTasks(container, filtered) {
         e.stopPropagation();
         const toTask = tasks.find(t => t.id === badge.dataset.id);
         if (toTask) openTimeOffModal(toTask);
+      });
+    });
+
+    // Contract badge click - open inline editor
+    header.querySelectorAll('.contrato-badge').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = badge.dataset.id;
+        const ct = tasks.find(t => t.id === taskId);
+        if (!ct) return;
+        openContractEditor(badge, ct);
       });
     });
 
@@ -1536,6 +1565,87 @@ document.querySelectorAll('.stat-card').forEach(card => {
   });
 });
 
+// --- CONTRACT BADGE EDITOR ---
+function openContractEditor(badgeEl, contractTask) {
+  // Close any existing contract editor
+  document.querySelectorAll('.contrato-editor-popup').forEach(el => el.remove());
+
+  const popup = document.createElement('div');
+  popup.className = 'contrato-editor-popup';
+  popup.innerHTML = `
+    <div class="contrato-editor-header">
+      <span style="font-weight:600;font-size:.85rem">Contrato - ${escHtml(contractTask.assignee)}</span>
+    </div>
+    <div class="contrato-editor-body">
+      <label style="font-size:.8rem;color:var(--text-secondary)">Fecha de vencimiento</label>
+      <input type="date" class="contrato-date-input" value="${contractTask.deadline || ''}">
+    </div>
+    <div class="contrato-editor-actions">
+      <button class="btn btn-ghost btn-xs contrato-delete-btn" style="color:#ef4444">
+        <span class="material-icons-round" style="font-size:.9rem">delete</span> Eliminar
+      </button>
+      <button class="btn btn-primary btn-xs contrato-save-btn">
+        <span class="material-icons-round" style="font-size:.9rem">check</span> Guardar
+      </button>
+    </div>
+  `;
+
+  // Position near the badge
+  const rect = badgeEl.getBoundingClientRect();
+  popup.style.position = 'fixed';
+  popup.style.top = (rect.bottom + 6) + 'px';
+  popup.style.left = rect.left + 'px';
+  popup.style.zIndex = '9999';
+  document.body.appendChild(popup);
+
+  // Keep popup in viewport
+  requestAnimationFrame(() => {
+    const popupRect = popup.getBoundingClientRect();
+    if (popupRect.right > window.innerWidth - 8) {
+      popup.style.left = (window.innerWidth - popupRect.width - 8) + 'px';
+    }
+  });
+
+  // Save handler
+  popup.querySelector('.contrato-save-btn').addEventListener('click', async () => {
+    const newDate = popup.querySelector('.contrato-date-input').value;
+    try {
+      await api('PUT', `/tasks/${contractTask.id}`, { deadline: newDate });
+      contractTask.deadline = newDate;
+      toast('Contrato actualizado');
+      popup.remove();
+      renderTasks();
+      updateStats();
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+
+  // Delete handler
+  popup.querySelector('.contrato-delete-btn').addEventListener('click', async () => {
+    if (!confirm('¿Eliminar este contrato?')) return;
+    try {
+      await api('DELETE', `/tasks/${contractTask.id}`);
+      tasks = tasks.filter(t => t.id !== contractTask.id);
+      toast('Contrato eliminado');
+      popup.remove();
+      renderTasks();
+      updateStats();
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+
+  // Close on outside click
+  const closeOnOutside = (e) => {
+    if (!popup.contains(e.target) && !badgeEl.contains(e.target)) {
+      popup.remove();
+      document.removeEventListener('click', closeOnOutside, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeOnOutside, true), 10);
+}
+
 // --- LEADER OF THE WEEK (uses leaderPool) ---
 function renderLeader() {
   const nameEl = document.getElementById('leader-name');
@@ -1878,7 +1988,8 @@ function renderCalendar() {
   const timeoffMap = {};
 
   if (calFilters.deadlines) {
-    getRegularTasks().forEach(t => {
+    // Include both regular tasks and contract tasks on calendar
+    [...getRegularTasks(), ...getContractTasks()].forEach(t => {
       if (!t.deadline) return;
       // Apply assignee filter
       if (t.assignee && calAssigneeFilters[t.assignee] === false) return;
