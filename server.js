@@ -242,7 +242,9 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       supervisors: settings.supervisors || [],
       owners: settings.owners || [],
       assigneeOrder: settings.assigneeOrder || [],
-      weeklyLeader: settings.weeklyLeader || null
+      weeklyLeader: settings.weeklyLeader || null,
+      leaderPool: settings.leaderPool || [],
+      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -259,6 +261,8 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.owners) settings.owners = req.body.owners;
     if (req.body.assigneeOrder !== undefined) settings.assigneeOrder = req.body.assigneeOrder;
     if (req.body.weeklyLeader !== undefined) settings.weeklyLeader = req.body.weeklyLeader;
+    if (req.body.leaderPool !== undefined) settings.leaderPool = req.body.leaderPool;
+    if (req.body.autoDeleteDays !== undefined) settings.autoDeleteDays = req.body.autoDeleteDays;
     await saveSettings(settings);
     res.json({
       teamMembers: settings.teamMembers,
@@ -266,7 +270,9 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       supervisors: settings.supervisors,
       owners: settings.owners,
       assigneeOrder: settings.assigneeOrder || [],
-      weeklyLeader: settings.weeklyLeader || null
+      weeklyLeader: settings.weeklyLeader || null,
+      leaderPool: settings.leaderPool || [],
+      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2
     });
   } catch (err) {
     console.error('Update settings error:', err);

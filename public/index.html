@@ -122,6 +122,7 @@
             <button class="chip active" id="cal-filter-timeoff"><span class="material-icons-round" style="font-size:.9rem">beach_access</span> Time Off</button>
           </div>
         </div>
+        <div class="calendar-assignee-filters" id="cal-assignee-filters"></div>
         <div id="calendar-grid" class="calendar-grid"></div>
       </div>
 
@@ -140,7 +141,28 @@
       <!-- SETTINGS VIEW -->
       <div id="view-settings" class="view hidden">
         <div class="settings-card">
-          <h2>Cambiar contraseña</h2>
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">emoji_events</span>Lider de la semana</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Seleccioná qué miembros participan del sorteo semanal.</p>
+          <div id="leader-pool-list" class="settings-check-list"></div>
+          <button class="btn btn-ghost btn-sm" id="save-leader-pool" style="margin-top:.75rem"><span class="material-icons-round">save</span> Guardar cambios</button>
+        </div>
+        <div class="settings-card">
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">auto_delete</span>Tareas completadas</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Las tareas completadas se mueven a una sección aparte y se eliminan automáticamente.</p>
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <label style="font-size:.9rem">Eliminar después de</label>
+            <input type="number" id="auto-delete-days" min="1" max="30" value="2" class="settings-number-input">
+            <span style="font-size:.9rem;color:var(--text-secondary)">días</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="save-auto-delete" style="margin-top:.75rem"><span class="material-icons-round">save</span> Guardar</button>
+        </div>
+        <div class="settings-card">
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">download</span>Exportar datos</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Descargá todas las tareas en formato CSV para abrir en Google Sheets o Excel.</p>
+          <button class="btn btn-ghost" id="export-csv-btn"><span class="material-icons-round">download</span> Exportar a CSV</button>
+        </div>
+        <div class="settings-card">
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">lock</span>Cambiar contraseña</h2>
           <form id="change-password-form">
             <div class="input-group"><span class="material-icons-round input-icon">lock</span><input type="password" id="current-password" placeholder="Contraseña actual" required></div>
             <div class="input-group"><span class="material-icons-round input-icon">lock_reset</span><input type="password" id="new-password" placeholder="Nueva contraseña" required></div>
@@ -148,13 +170,43 @@
             <p id="password-msg" class="hidden"></p>
           </form>
         </div>
-        <div class="settings-card">
-          <h2>Exportar datos</h2>
-          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Descargá todas las tareas en formato CSV para abrir en Google Sheets o Excel.</p>
-          <button class="btn btn-ghost" id="export-csv-btn"><span class="material-icons-round">download</span> Exportar a CSV</button>
-        </div>
       </div>
     </main>
+  </div>
+
+  <!-- NEW TASK MODAL -->
+  <div id="new-task-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header"><h2>Nueva tarea</h2><button class="btn-icon modal-close" id="new-task-modal-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Cliente</label><input type="text" id="new-task-client" list="list-to-clients" placeholder="Seleccionar cliente..."></div>
+          <div class="form-group"><label>Proyecto / Tema</label><input type="text" id="new-task-project" placeholder="Descripción del proyecto..."></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Asignado</label><input type="text" id="new-task-assignee" list="list-to-equipo" placeholder="Miembro del equipo..."></div>
+          <div class="form-group"><label>Supervisor</label><input type="text" id="new-task-supervisor" list="list-to-members" placeholder="Supervisor..."></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Prioridad</label><select id="new-task-priority" class="filter-select" style="width:100%;padding:.65rem .85rem"><option value="TBD">TBD</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
+          <div class="form-group"><label>Deadline</label><input type="date" id="new-task-deadline"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Status</label><select id="new-task-status" class="filter-select" style="width:100%;padding:.65rem .85rem"><option value="sin empezar">Sin empezar</option><option value="en progreso">En progreso</option><option value="on going">On going</option></select></div>
+          <div class="form-group"><label>Owner</label><input type="text" id="new-task-owner" list="list-to-owners" placeholder="Owner..."></div>
+        </div>
+        <div class="form-group"><label>Comentarios</label><input type="text" id="new-task-comments" placeholder="Notas adicionales..."></div>
+        <div class="form-group" style="display:flex;align-items:center;gap:.5rem">
+          <input type="checkbox" id="new-task-supervision" style="width:auto">
+          <label for="new-task-supervision" style="margin:0;cursor:pointer;font-size:.9rem">Tarea de supervisión</label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="new-task-cancel">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="new-task-save"><span class="material-icons-round">add</span> Crear tarea</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- TIME OFF MODAL -->
@@ -164,6 +216,7 @@
       <div class="modal-header"><h2 id="timeoff-modal-title">Time Off</h2><button class="btn-icon modal-close" id="timeoff-modal-close"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <div class="form-group"><label>Miembro</label><input type="text" id="timeoff-member" list="list-to-members" placeholder="Seleccioná..." required><datalist id="list-to-members"></datalist></div>
+        <div class="form-group"><label>Título / Descripción</label><input type="text" id="timeoff-title" placeholder="Ej: Vacaciones Juan, Licencia María..."></div>
         <div class="form-row"><div class="form-group"><label>Desde</label><input type="date" id="timeoff-start" required></div><div class="form-group"><label>Hasta</label><input type="date" id="timeoff-end" required></div></div>
         <div class="form-group"><label>Tipo</label><select id="timeoff-type" class="filter-select" style="width:100%;padding:.65rem .85rem;font-size:.9rem"><option value="Vacaciones">Vacaciones</option><option value="Day Off">Day Off</option><option value="OOO">OOO (Out of Office)</option></select></div>
         <div class="modal-footer">
@@ -190,7 +243,24 @@
     </div>
   </div>
 
-  <!-- PROMPT MODAL -->
+  <!-- CALENDAR EVENT EDIT MODAL -->
+  <div id="cal-event-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-sm">
+      <div class="modal-header"><h2 id="cal-event-title">Editar evento</h2><button class="btn-icon modal-close" id="cal-event-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-body">
+        <p id="cal-event-info" style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem"></p>
+        <div class="form-group"><label id="cal-event-label">Fecha</label><input type="date" id="cal-event-date"></div>
+        <div class="modal-footer">
+          <button class="btn btn-danger" id="cal-event-delete"><span class="material-icons-round">delete</span> Eliminar</button>
+          <button class="btn btn-ghost" id="cal-event-cancel">Cancelar</button>
+          <button class="btn btn-primary" id="cal-event-save"><span class="material-icons-round">check</span> Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROMPT MODAL (add/edit member) -->
   <div id="prompt-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
@@ -198,8 +268,8 @@
       <div class="modal-body">
         <div class="form-group"><label id="prompt-modal-label">Nombre</label><input type="text" id="prompt-modal-input" required></div>
         <div class="form-group hidden" id="prompt-modal-color-group"><label>Color</label><div class="color-picker" id="prompt-modal-colors"></div></div>
-        <div class="form-group hidden" id="prompt-modal-initials-group"><label>Iniciales (2 caracteres)</label><input type="text" id="prompt-modal-initials" maxlength="2" placeholder="Ej: JP"></div>
-        <div class="form-group hidden" id="prompt-modal-role-group"><label>Rol</label><input type="text" id="prompt-modal-role" placeholder="Ej: Diseñador, PM..."></div>
+        <div class="form-group hidden" id="prompt-modal-initials-group"><label>Iniciales (3 caracteres)</label><input type="text" id="prompt-modal-initials" maxlength="3" placeholder="Ej: JPG"></div>
+        <div class="form-group hidden" id="prompt-modal-role-group"><label>Rol</label><select id="prompt-modal-role" class="filter-select" style="width:100%;padding:.65rem .85rem;font-size:.9rem"><option value="Equipo">Equipo</option><option value="Supervisor">Supervisor</option><option value="Owner">Owner</option></select></div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="prompt-modal-cancel">Cancelar</button>
           <button class="btn btn-primary" id="prompt-modal-save">Guardar</button>
@@ -207,6 +277,11 @@
       </div>
     </div>
   </div>
+
+  <!-- Datalists for role-filtered suggestions -->
+  <datalist id="list-to-clients"></datalist>
+  <datalist id="list-to-equipo"></datalist>
+  <datalist id="list-to-owners"></datalist>
 
   <!-- GLOBAL EDIT DROPDOWN -->
   <div id="edit-dropdown" class="edit-dropdown hidden">

@@ -5,7 +5,7 @@
 // --- STATE ---
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
-let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], weeklyLeader: null };
+let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2 };
 let currentFilter = { priority: 'all', assignee: '', status: '', client: '', search: '' };
 let grouped = true;
 let editingTaskId = null;
@@ -13,6 +13,8 @@ let editingTimeOffId = null;
 let calMonth = new Date().getMonth();
 let calYear = new Date().getFullYear();
 let calFilters = { deadlines: true, timeoff: true };
+let calAssigneeFilters = {};
+let calEventEditData = null;
 let draggedGroup = null;
 let activeEditDropdown = null;
 let activeInlineInput = null;
@@ -203,6 +205,7 @@ function switchView(view) {
   }
 
   if (view === 'calendar') renderCalendar();
+  if (view === 'settings') renderSettingsPage();
 }
 
 // Sidebar toggle (mobile)
@@ -230,36 +233,10 @@ document.addEventListener('click', (e) => {
   }
 });
 
-document.getElementById('add-task-regular').addEventListener('click', async () => {
+// "Nueva tarea" now opens a creation modal
+document.getElementById('add-task-regular').addEventListener('click', () => {
   addTaskMenu.classList.add('hidden');
-  try {
-    const body = {
-      client: '',
-      project: '',
-      assignee: '',
-      supervisor: '',
-      priority: 'TBD',
-      deadline: '',
-      status: 'sin empezar',
-      owner: '',
-      comments: '',
-      isSupervision: false
-    };
-    const newTask = await api('POST', '/tasks', body);
-    await loadData();
-    toast('Nueva tarea creada — editá los campos directamente');
-    // Auto-focus on the new task's client cell
-    setTimeout(() => {
-      const row = document.querySelector(`tr[data-id="${newTask.id}"]`);
-      if (row) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const clientCell = row.querySelector('[data-field="client"]');
-        if (clientCell) clientCell.click();
-      }
-    }, 100);
-  } catch (err) {
-    toast('Error al crear tarea: ' + err.message, 'error');
-  }
+  openNewTaskModal();
 });
 
 document.getElementById('add-timeoff-btn').addEventListener('click', () => {
@@ -303,6 +280,9 @@ async function loadData() {
       } catch {}
     }
 
+    // Auto-delete completed tasks older than configured days
+    await autoDeleteCompletedTasks();
+
     populateFilterDropdowns();
     renderTasks();
     renderTeam();
@@ -312,6 +292,16 @@ async function loadData() {
     startPresencePolling();
   } catch (err) {
     console.error('Failed to load data:', err);
+  }
+}
+
+async function autoDeleteCompletedTasks() {
+  const days = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const toDelete = tasks.filter(t => t.completedAt && new Date(t.completedAt).getTime() < cutoff);
+  if (toDelete.length > 0) {
+    await Promise.all(toDelete.map(t => api('DELETE', `/tasks/${t.id}`)));
+    tasks = tasks.filter(t => !toDelete.some(d => d.id === t.id));
   }
 }
 
@@ -352,6 +342,18 @@ function populateFormDataLists(assignees, clients) {
   ])].sort();
 
   setDatalistOptions('list-to-members', allPeople);
+
+  // Role-filtered datalists
+  const equipoMembers = (settings.teamMembers || []).filter(m => !m.role || m.role === 'Equipo').map(m => m.name).sort();
+  const ownerMembers = (settings.teamMembers || []).filter(m => m.role === 'Owner').map(m => m.name).sort();
+  const clientNames = [...new Set([
+    ...(settings.clients || []).map(c => c.name),
+    ...tasks.map(t => t.client).filter(Boolean)
+  ])].sort();
+
+  setDatalistOptions('list-to-equipo', equipoMembers.length > 0 ? equipoMembers : allPeople);
+  setDatalistOptions('list-to-owners', ownerMembers.length > 0 ? ownerMembers : allPeople);
+  setDatalistOptions('list-to-clients', clientNames);
 }
 
 function setDatalistOptions(id, values) {
@@ -360,7 +362,7 @@ function setDatalistOptions(id, values) {
   dl.innerHTML = values.map(v => `<option value="${escAttr(v)}">`).join('');
 }
 
-// --- GET OPTIONS FOR DROPDOWN FIELDS ---
+// --- GET OPTIONS FOR DROPDOWN FIELDS (role-filtered) ---
 function getOptionsForField(field) {
   const allPeople = [...new Set([
     ...(settings.teamMembers || []).map(m => m.name),
@@ -374,11 +376,15 @@ function getOptionsForField(field) {
     ...tasks.map(t => t.client).filter(Boolean)
   ])].sort();
 
+  // Role-based filtering
+  const equipoMembers = (settings.teamMembers || []).filter(m => !m.role || m.role === 'Equipo').map(m => m.name).sort();
+  const ownerMembers = (settings.teamMembers || []).filter(m => m.role === 'Owner').map(m => m.name).sort();
+
   switch (field) {
     case 'client': return allClients;
-    case 'assignee': return allPeople;
+    case 'assignee': return equipoMembers.length > 0 ? equipoMembers : allPeople;
     case 'supervisor': return allPeople;
-    case 'owner': return allPeople;
+    case 'owner': return ownerMembers.length > 0 ? ownerMembers : allPeople;
     case 'status': return STATUS_OPTIONS;
     case 'priority': return PRIORITY_CYCLE;
     default: return [];
@@ -406,18 +412,14 @@ function renderTasks() {
   const container = document.getElementById('tasks-container');
   const allFiltered = getFilteredTasks();
 
-  // Separate esperando respuesta tasks
+  // Separate completed and esperando
+  const completedTasks = allFiltered.filter(t => t.status === 'completado');
   const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta');
-  const regularFiltered = allFiltered.filter(t => t.status !== 'esperando respuesta');
+  const regularFiltered = allFiltered.filter(t => t.status !== 'esperando respuesta' && t.status !== 'completado');
 
   container.innerHTML = '';
 
-  // Render esperando respuesta section if any
-  if (esperandoTasks.length > 0) {
-    renderEsperandoSection(container, esperandoTasks);
-  }
-
-  if (regularFiltered.length === 0 && esperandoTasks.length === 0) {
+  if (regularFiltered.length === 0 && esperandoTasks.length === 0 && completedTasks.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <span class="material-icons-round">inbox</span>
@@ -426,6 +428,7 @@ function renderTasks() {
     return;
   }
 
+  // Render active tasks first
   if (grouped) {
     renderGroupedTasks(container, regularFiltered);
   } else {
@@ -436,9 +439,18 @@ function renderTasks() {
     container.appendChild(wrapper);
     bindTaskRows(wrapper);
 
-    // Mobile cards
     const cards = buildMobileCards(sorted);
     container.appendChild(cards);
+  }
+
+  // Render esperando at bottom
+  if (esperandoTasks.length > 0) {
+    renderEsperandoSection(container, esperandoTasks);
+  }
+
+  // Render completed section at very bottom
+  if (completedTasks.length > 0) {
+    renderCompletedSection(container, completedTasks);
   }
 }
 
@@ -463,7 +475,6 @@ function renderEsperandoSection(container, esperandoTasks) {
   const sorted = sortTasksByNumber(esperandoTasks);
   tableWrapper.innerHTML = buildTaskTable(sorted, true);
 
-  // Mobile cards for esperando
   const cards = buildMobileCards(sorted);
   if (isCollapsed) cards.classList.add('hidden');
 
@@ -482,7 +493,7 @@ function renderEsperandoSection(container, esperandoTasks) {
   container.appendChild(section);
   bindTaskRows(tableWrapper);
 
-  // Drag from esperando: rows can be dragged to group headers to reassign
+  // Drag from esperando
   tableWrapper.querySelectorAll('tr[data-id]').forEach(row => {
     row.setAttribute('draggable', 'true');
     row.addEventListener('dragstart', (e) => {
@@ -495,6 +506,46 @@ function renderEsperandoSection(container, esperandoTasks) {
       document.querySelectorAll('.group-header.drop-target').forEach(h => h.classList.remove('drop-target'));
     });
   });
+}
+
+function renderCompletedSection(container, completedTasks) {
+  const section = document.createElement('div');
+  section.className = 'completed-section';
+
+  const isCollapsed = collapsedGroups['__completed__'] !== false; // collapsed by default
+
+  const header = document.createElement('div');
+  header.className = 'completed-header';
+  header.innerHTML = `
+    <span class="material-icons-round">check_circle</span>
+    <span class="group-name">Completadas</span>
+    <span class="group-count">${completedTasks.length} tarea${completedTasks.length !== 1 ? 's' : ''}</span>
+    <span class="material-icons-round group-toggle ${isCollapsed ? 'collapsed' : ''}">expand_more</span>
+  `;
+
+  const tableWrapper = document.createElement('div');
+  tableWrapper.className = 'table-wrapper';
+  if (isCollapsed) tableWrapper.classList.add('hidden');
+  const sorted = sortTasksByNumber(completedTasks);
+  tableWrapper.innerHTML = buildTaskTable(sorted, true);
+
+  const cards = buildMobileCards(sorted);
+  if (isCollapsed) cards.classList.add('hidden');
+
+  header.addEventListener('click', () => {
+    const toggle = header.querySelector('.group-toggle');
+    toggle.classList.toggle('collapsed');
+    tableWrapper.classList.toggle('hidden');
+    cards.classList.toggle('hidden');
+    collapsedGroups['__completed__'] = tableWrapper.classList.contains('hidden');
+    localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+  });
+
+  section.appendChild(header);
+  section.appendChild(tableWrapper);
+  section.appendChild(cards);
+  container.appendChild(section);
+  bindTaskRows(tableWrapper);
 }
 
 function renderGroupedTasks(container, filtered) {
@@ -546,10 +597,10 @@ function renderGroupedTasks(container, filtered) {
       memberTimeOffs.forEach(to => {
         const start = formatDate(to.timeOffStart);
         const end = formatDate(to.timeOffEnd);
-        const type = to.timeOffType || 'Time Off';
-        timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(type)}">
+        const label = to.timeOffTitle || to.timeOffType || 'Time Off';
+        timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(to.timeOffTitle || to.timeOffType || 'Time Off')}">
           <span class="material-icons-round">beach_access</span>
-          ${escHtml(type)}: ${start} - ${end}
+          ${escHtml(label)}: ${start} - ${end}
         </span>`;
       });
       timeoffHtml += '</div>';
@@ -577,17 +628,54 @@ function renderGroupedTasks(container, filtered) {
     if (isCollapsed) tableWrapper.classList.add('hidden');
     tableWrapper.innerHTML = buildTaskTable(groupTasks, false, assignee);
 
-    // Mobile cards
     const cards = buildMobileCards(groupTasks, assignee);
     if (isCollapsed) cards.classList.add('hidden');
 
-    // Toggle collapse (with localStorage persistence)
+    // Supervisor linked tasks: tasks this person supervises from other assignees
+    const supervisedTasks = getRegularTasks().filter(t =>
+      t.supervisor === assignee &&
+      t.assignee !== assignee &&
+      t.status !== 'completado' &&
+      t.status !== 'esperando respuesta'
+    );
+
+    let supervisedSection = null;
+    if (supervisedTasks.length > 0) {
+      supervisedSection = document.createElement('div');
+      supervisedSection.className = 'supervised-section';
+      if (isCollapsed) supervisedSection.classList.add('hidden');
+      supervisedSection.innerHTML = `
+        <div class="supervised-header">
+          <span class="material-icons-round">visibility</span>
+          Supervisando (${supervisedTasks.length} tarea${supervisedTasks.length !== 1 ? 's' : ''} de otros equipos)
+        </div>
+      `;
+
+      supervisedTasks.forEach(t => {
+        const clientColor = getClientColor(t.client);
+        const statusClass = (t.status || '').toLowerCase().replace(/ /g, '-');
+        const item = document.createElement('div');
+        item.className = 'supervised-item';
+        item.dataset.taskId = t.id;
+        item.innerHTML = `
+          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.7rem;padding:.1rem .35rem">${escHtml(t.client || '—')}</span>
+          <span>${escHtml(t.project || 'Sin proyecto')}</span>
+          <span class="status-badge ${statusClass}" style="font-size:.65rem">${escHtml(t.status || '—')}</span>
+          <span class="supervised-assignee">\u2192 ${escHtml(t.assignee)}</span>
+        `;
+        item.addEventListener('click', () => navigateToTask(t.id));
+        supervisedSection.appendChild(item);
+      });
+    }
+
+    // Toggle collapse
     header.addEventListener('click', (e) => {
       if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge')) return;
       const toggle = header.querySelector('.group-toggle');
       toggle.classList.toggle('collapsed');
       tableWrapper.classList.toggle('hidden');
       cards.classList.toggle('hidden');
+      if (supervisedSection) supervisedSection.classList.toggle('hidden');
       collapsedGroups[assignee] = tableWrapper.classList.contains('hidden');
       localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
     });
@@ -676,6 +764,7 @@ function renderGroupedTasks(container, filtered) {
     container.appendChild(header);
     container.appendChild(tableWrapper);
     container.appendChild(cards);
+    if (supervisedSection) container.appendChild(supervisedSection);
     bindTaskRows(tableWrapper);
   });
 }
@@ -712,7 +801,7 @@ function buildTaskTable(taskList, showAssignee = false, groupAssignee = '') {
     html += `
       <tr data-id="${t.id}">
         <td class="editable-cell" data-field="client"><span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text}">${escHtml(t.client || '—')}</span></td>
-        <td style="color:var(--text-muted);font-size:.8rem">${t.taskNumber || ''}</td>
+        <td class="editable-cell" data-field="taskNumber" style="color:var(--text-muted);font-size:.8rem">${escHtml(t.taskNumber || '')}</td>
         <td class="editable-cell task-project-cell" data-field="project">${escHtml(t.project || '—')}${supervisionTag}</td>
         ${showAssignee ? `<td class="editable-cell" data-field="assignee" style="color:var(--text-secondary)">${escHtml(t.assignee || '—')}</td>` : ''}
         <td class="editable-cell" data-field="supervisor" style="color:var(--text-secondary)">${escHtml(t.supervisor || '—')}</td>
@@ -772,7 +861,6 @@ function buildMobileCards(taskList, groupAssignee = '') {
       </div>
     `;
 
-    // Mobile card tap -> open inline editing for project
     card.addEventListener('click', (e) => {
       if (e.target.closest('.task-action-btn')) return;
       switchView('agenda');
@@ -786,7 +874,6 @@ function buildMobileCards(taskList, groupAssignee = '') {
       }, 100);
     });
 
-    // Mobile card action buttons
     card.querySelector('.task-action-btn.delete').addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!confirm('¿Eliminar esta tarea?')) return;
@@ -844,7 +931,7 @@ function bindTaskRows(wrapper) {
 
   // Comment tooltip on hover
   wrapper.querySelectorAll('.comment-cell').forEach(cell => {
-    cell.addEventListener('mouseenter', (e) => {
+    cell.addEventListener('mouseenter', () => {
       const row = cell.closest('tr[data-id]');
       if (!row) return;
       const task = tasks.find(t => t.id === row.dataset.id);
@@ -895,39 +982,23 @@ function bindTaskRows(wrapper) {
   });
 }
 
-// --- QUICK ADD TASK ---
-async function quickAddTask(assignee) {
-  try {
-    const body = {
-      client: '',
-      project: '',
-      assignee: assignee,
-      supervisor: '',
-      priority: 'TBD',
-      deadline: '',
-      status: 'sin empezar',
-      owner: '',
-      comments: '',
-      isSupervision: false
-    };
-    const newTask = await api('POST', '/tasks', body);
-    await loadData();
-    toast('Tarea creada');
-    setTimeout(() => {
-      const row = document.querySelector(`tr[data-id="${newTask.id}"]`);
-      if (row) {
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const cell = row.querySelector('[data-field="client"]');
-        if (cell) cell.click();
-      }
-    }, 100);
-  } catch (err) {
-    toast('Error al crear tarea: ' + err.message, 'error');
-  }
+// --- QUICK ADD TASK (now opens modal with pre-filled assignee) ---
+function quickAddTask(assignee) {
+  openNewTaskModal(assignee);
 }
 
-// --- INLINE EDITING ---
+// --- INLINE EDITING (with toggle fix) ---
 function startInlineEdit(cell, task, field) {
+  // FIX: If clicking the same cell that already has an active dropdown, close it
+  if (activeEditDropdown && activeEditDropdown.cell === cell) {
+    closeEditDropdown();
+    return;
+  }
+  // FIX: If clicking the same cell that already has an active text input, do nothing
+  if (activeInlineInput && activeInlineInput.cell === cell) {
+    return;
+  }
+
   closeEditDropdown();
   closeInlineInput();
 
@@ -935,7 +1006,7 @@ function startInlineEdit(cell, task, field) {
   reportPresence(task.id, field);
 
   const dropdownFields = ['client', 'assignee', 'supervisor', 'owner', 'status', 'priority'];
-  const textFields = ['project', 'comments'];
+  const textFields = ['project', 'comments', 'taskNumber'];
 
   if (dropdownFields.includes(field)) {
     openEditDropdown(cell, task, field);
@@ -948,17 +1019,31 @@ function startInlineEdit(cell, task, field) {
 
 function openTextInput(cell, task, field) {
   const currentValue = task[field] || '';
-  const rect = cell.getBoundingClientRect();
-
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'cell-edit-input';
   input.value = currentValue;
-  input.placeholder = field === 'comments' ? 'Agregar comentario...' : 'Escribir...';
+  input.placeholder = field === 'comments' ? 'Agregar comentario...' : field === 'taskNumber' ? '#' : 'Escribir...';
 
   const originalHtml = cell.innerHTML;
   cell.innerHTML = '';
   cell.appendChild(input);
+
+  // Add supervision toggle if editing project field
+  let supervisionCheckbox = null;
+  if (field === 'project') {
+    const wrap = document.createElement('label');
+    wrap.className = 'supervision-inline-wrap';
+    supervisionCheckbox = document.createElement('input');
+    supervisionCheckbox.type = 'checkbox';
+    supervisionCheckbox.checked = task.isSupervision || false;
+    wrap.appendChild(supervisionCheckbox);
+    wrap.appendChild(document.createTextNode(' Supervisión'));
+    cell.appendChild(wrap);
+    // Prevent checkbox click from bubbling to cell
+    wrap.addEventListener('click', (e) => e.stopPropagation());
+  }
+
   input.focus();
   input.select();
 
@@ -966,14 +1051,30 @@ function openTextInput(cell, task, field) {
 
   const save = async () => {
     const newValue = input.value.trim();
+    const update = {};
+    let changed = false;
+
     if (newValue !== currentValue) {
+      update[field] = newValue;
+      changed = true;
+    }
+
+    // Check supervision toggle
+    if (supervisionCheckbox && supervisionCheckbox.checked !== (task.isSupervision || false)) {
+      update.isSupervision = supervisionCheckbox.checked;
+      changed = true;
+    }
+
+    if (changed) {
       try {
-        const update = {};
-        update[field] = newValue;
         await api('PUT', `/tasks/${task.id}`, update);
-        // Push undo
-        pushUndo(task.id, field, currentValue, newValue);
-        task[field] = newValue;
+        if (update[field] !== undefined) {
+          pushUndo(task.id, field, currentValue, newValue);
+          task[field] = newValue;
+        }
+        if (update.isSupervision !== undefined) {
+          task.isSupervision = update.isSupervision;
+        }
       } catch (err) {
         toast('Error: ' + err.message, 'error');
       }
@@ -982,7 +1083,6 @@ function openTextInput(cell, task, field) {
     clearPresence();
     renderTasks();
     updateStats();
-    // Highlight saved cell
     highlightCell(task.id, field);
   };
 
@@ -1112,7 +1212,7 @@ function openEditDropdown(cell, task, field) {
     } else if (field === 'assignee' || field === 'supervisor' || field === 'owner') {
       if (!(settings.teamMembers || []).some(m => m.name === newName)) {
         const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-        settings.teamMembers = [...(settings.teamMembers || []), { name: newName, color, role: '' }];
+        settings.teamMembers = [...(settings.teamMembers || []), { name: newName, color, role: 'Equipo' }];
         api('PUT', '/settings', { teamMembers: settings.teamMembers }).catch(() => {});
       }
     }
@@ -1131,9 +1231,21 @@ async function selectDropdownOption(task, field, value, oldValue) {
   try {
     const update = {};
     update[field] = value;
+
+    // Handle completedAt for status changes
+    if (field === 'status') {
+      if (value === 'completado') {
+        update.completedAt = new Date().toISOString();
+      } else if (task.status === 'completado') {
+        update.completedAt = null;
+      }
+    }
+
     await api('PUT', `/tasks/${task.id}`, update);
     pushUndo(task.id, field, previousValue, value);
     task[field] = value;
+    if (update.completedAt !== undefined) task.completedAt = update.completedAt;
+
     renderTasks();
     updateStats();
     updateOverdueBadge();
@@ -1329,7 +1441,7 @@ document.querySelectorAll('.stat-card').forEach(card => {
   });
 });
 
-// --- LEADER OF THE WEEK ---
+// --- LEADER OF THE WEEK (uses leaderPool) ---
 function renderLeader() {
   const nameEl = document.getElementById('leader-name');
   const leader = settings.weeklyLeader;
@@ -1337,8 +1449,12 @@ function renderLeader() {
 }
 
 document.getElementById('leader-randomize').addEventListener('click', async () => {
-  const members = (settings.teamMembers || []).map(m => m.name);
-  if (members.length === 0) {
+  // Use leaderPool if set, otherwise all team members
+  const pool = (settings.leaderPool || []).length > 0
+    ? settings.leaderPool
+    : (settings.teamMembers || []).map(m => m.name);
+
+  if (pool.length === 0) {
     toast('Agregá miembros al equipo primero', 'error');
     return;
   }
@@ -1346,11 +1462,11 @@ document.getElementById('leader-randomize').addEventListener('click', async () =
   const nameEl = document.getElementById('leader-name');
   let count = 0;
   const interval = setInterval(() => {
-    nameEl.textContent = members[Math.floor(Math.random() * members.length)];
+    nameEl.textContent = pool[Math.floor(Math.random() * pool.length)];
     count++;
     if (count >= 15) {
       clearInterval(interval);
-      const winner = members[Math.floor(Math.random() * members.length)];
+      const winner = pool[Math.floor(Math.random() * pool.length)];
       nameEl.textContent = winner;
       settings.weeklyLeader = winner;
       api('PUT', '/settings', { weeklyLeader: winner }).catch(() => {});
@@ -1408,7 +1524,7 @@ document.getElementById('copy-modal-save').addEventListener('click', async () =>
   }
 });
 
-// --- TIME OFF MODAL ---
+// --- TIME OFF MODAL (with title field) ---
 function openTimeOffModal(entry = null) {
   editingTimeOffId = entry ? entry.id : null;
   const titleEl = document.getElementById('timeoff-modal-title');
@@ -1416,6 +1532,7 @@ function openTimeOffModal(entry = null) {
   document.getElementById('timeoff-delete').classList.toggle('hidden', !entry);
 
   document.getElementById('timeoff-member').value = entry?.assignee || '';
+  document.getElementById('timeoff-title').value = entry?.timeOffTitle || '';
   document.getElementById('timeoff-start').value = entry?.timeOffStart || '';
   document.getElementById('timeoff-end').value = entry?.timeOffEnd || '';
   document.getElementById('timeoff-type').value = entry?.timeOffType || 'Vacaciones';
@@ -1434,6 +1551,7 @@ document.getElementById('timeoff-modal').querySelector('.modal-backdrop').addEve
 
 document.getElementById('timeoff-save').addEventListener('click', async () => {
   const member = document.getElementById('timeoff-member').value.trim();
+  const title = document.getElementById('timeoff-title').value.trim();
   const start = document.getElementById('timeoff-start').value;
   const end = document.getElementById('timeoff-end').value;
   const type = document.getElementById('timeoff-type').value;
@@ -1452,11 +1570,12 @@ document.getElementById('timeoff-save').addEventListener('click', async () => {
     status: 'on going',
     supervisor: '',
     owner: '',
-    comments: `${type}: ${start} - ${end}`,
+    comments: title ? `${title} - ${type}: ${start} - ${end}` : `${type}: ${start} - ${end}`,
     isTimeOff: true,
     timeOffStart: start,
     timeOffEnd: end,
-    timeOffType: type
+    timeOffType: type,
+    timeOffTitle: title
   };
 
   try {
@@ -1487,7 +1606,63 @@ document.getElementById('timeoff-delete').addEventListener('click', async () => 
   }
 });
 
-// --- CALENDAR VIEW ---
+// --- NEW TASK CREATION MODAL ---
+function openNewTaskModal(prefillAssignee = '') {
+  populateFormDataLists();
+
+  document.getElementById('new-task-client').value = '';
+  document.getElementById('new-task-project').value = '';
+  document.getElementById('new-task-assignee').value = prefillAssignee;
+  document.getElementById('new-task-supervisor').value = '';
+  document.getElementById('new-task-priority').value = 'TBD';
+  document.getElementById('new-task-deadline').value = '';
+  document.getElementById('new-task-status').value = 'sin empezar';
+  document.getElementById('new-task-owner').value = '';
+  document.getElementById('new-task-comments').value = '';
+  document.getElementById('new-task-supervision').checked = false;
+
+  document.getElementById('new-task-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('new-task-client').focus(), 100);
+}
+
+function closeNewTaskModal() {
+  document.getElementById('new-task-modal').classList.add('hidden');
+}
+
+document.getElementById('new-task-modal-close').addEventListener('click', closeNewTaskModal);
+document.getElementById('new-task-cancel').addEventListener('click', closeNewTaskModal);
+document.getElementById('new-task-modal').querySelector('.modal-backdrop').addEventListener('click', closeNewTaskModal);
+
+document.getElementById('new-task-save').addEventListener('click', async () => {
+  const client = document.getElementById('new-task-client').value.trim();
+  const project = document.getElementById('new-task-project').value.trim();
+  const assignee = document.getElementById('new-task-assignee').value.trim();
+  const supervisor = document.getElementById('new-task-supervisor').value.trim();
+  const priority = document.getElementById('new-task-priority').value;
+  const deadline = document.getElementById('new-task-deadline').value;
+  const status = document.getElementById('new-task-status').value;
+  const owner = document.getElementById('new-task-owner').value.trim();
+  const comments = document.getElementById('new-task-comments').value.trim();
+  const isSupervision = document.getElementById('new-task-supervision').checked;
+
+  if (!client && !project) {
+    toast('Completá al menos un cliente o proyecto', 'error');
+    return;
+  }
+
+  const body = { client, project, assignee, supervisor, priority, deadline, status, owner, comments, isSupervision };
+
+  try {
+    await api('POST', '/tasks', body);
+    toast('Tarea creada');
+    closeNewTaskModal();
+    await loadData();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
+// --- CALENDAR VIEW (with assignee filters and clickable events) ---
 document.getElementById('cal-prev').addEventListener('click', () => {
   calMonth--;
   if (calMonth < 0) { calMonth = 11; calYear--; }
@@ -1519,9 +1694,37 @@ document.getElementById('cal-filter-timeoff').addEventListener('click', (e) => {
   renderCalendar();
 });
 
+function renderCalendarAssigneeFilters() {
+  const container = document.getElementById('cal-assignee-filters');
+  const allAssignees = [...new Set([
+    ...(settings.teamMembers || []).map(m => m.name),
+    ...tasks.map(t => t.assignee).filter(Boolean)
+  ])].sort();
+
+  container.innerHTML = '';
+  allAssignees.forEach(name => {
+    if (calAssigneeFilters[name] === undefined) calAssigneeFilters[name] = true;
+    const member = (settings.teamMembers || []).find(m => m.name === name);
+    const color = member?.color || getColorForName(name);
+
+    const chip = document.createElement('button');
+    chip.className = `cal-assignee-chip ${calAssigneeFilters[name] ? 'active' : ''}`;
+    chip.innerHTML = `<span class="chip-dot" style="background:${color}"></span>${escHtml(name)}`;
+    chip.addEventListener('click', () => {
+      calAssigneeFilters[name] = !calAssigneeFilters[name];
+      chip.classList.toggle('active', calAssigneeFilters[name]);
+      renderCalendar();
+    });
+    container.appendChild(chip);
+  });
+}
+
 function renderCalendar() {
   const grid = document.getElementById('calendar-grid');
   const titleEl = document.getElementById('cal-month-title');
+
+  // Render assignee filter chips
+  renderCalendarAssigneeFilters();
 
   const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -1545,6 +1748,8 @@ function renderCalendar() {
   if (calFilters.deadlines) {
     getRegularTasks().forEach(t => {
       if (!t.deadline) return;
+      // Apply assignee filter
+      if (t.assignee && calAssigneeFilters[t.assignee] === false) return;
       if (!deadlineMap[t.deadline]) deadlineMap[t.deadline] = [];
       deadlineMap[t.deadline].push(t);
     });
@@ -1553,6 +1758,8 @@ function renderCalendar() {
   if (calFilters.timeoff) {
     getTimeOffEntries().forEach(to => {
       if (!to.timeOffStart || !to.timeOffEnd) return;
+      // Apply assignee filter
+      if (to.assignee && calAssigneeFilters[to.assignee] === false) return;
       const start = new Date(to.timeOffStart + 'T00:00:00');
       const end = new Date(to.timeOffEnd + 'T00:00:00');
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -1611,11 +1818,12 @@ function renderCalendar() {
       eventCount++;
       const memberObj = (settings.teamMembers || []).find(m => m.name === to.assignee);
       const color = memberObj?.color || getColorForName(to.assignee);
-      const label = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
+      const typeLabel = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
       const pos = to._pos || 'single';
       const showLabel = pos === 'start' || pos === 'single';
-      eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="background:${color}" title="${escAttr(to.assignee)} - ${escAttr(to.timeOffType)}">
-        ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(to.assignee)} (${label})` : '&nbsp;'}
+      const displayLabel = to.timeOffTitle || `${to.assignee} (${typeLabel})`;
+      eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="background:${color}" title="${escAttr(displayLabel)}" data-task-id="${to.id}" data-event-type="timeoff">
+        ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(displayLabel)}` : '&nbsp;'}
       </div>`;
     });
 
@@ -1624,7 +1832,7 @@ function renderCalendar() {
       eventCount++;
       const isOverdue = new Date(dateStr + 'T00:00:00') < today && t.status !== 'completado';
       const cls = isOverdue ? 'deadline-overdue' : 'deadline';
-      eventsHtml += `<div class="calendar-event ${cls}" title="${escAttr(t.project)} - ${escAttr(t.assignee)}">
+      eventsHtml += `<div class="calendar-event ${cls}" title="${escAttr(t.project)} - ${escAttr(t.assignee)}" data-task-id="${t.id}" data-event-type="deadline">
         <span class="material-icons-round">flag</span>${escHtml(t.project || t.client)}
       </div>`;
     });
@@ -1643,7 +1851,78 @@ function renderCalendar() {
   }
 
   grid.innerHTML = html;
+
+  // Bind click events on calendar events
+  grid.querySelectorAll('.calendar-event[data-task-id]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const taskId = el.dataset.taskId;
+      const type = el.dataset.eventType;
+      if (type === 'timeoff') {
+        const toTask = tasks.find(t => t.id === taskId);
+        if (toTask) openTimeOffModal(toTask);
+      } else {
+        openCalEventModal(taskId);
+      }
+    });
+  });
 }
+
+// --- CALENDAR EVENT EDIT MODAL ---
+function openCalEventModal(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  calEventEditData = { taskId };
+
+  document.getElementById('cal-event-title').textContent = 'Editar deadline';
+  document.getElementById('cal-event-info').textContent = `${task.project || task.client} \u2192 ${task.assignee || 'Sin asignar'}`;
+  document.getElementById('cal-event-label').textContent = 'Deadline';
+  document.getElementById('cal-event-date').value = task.deadline || '';
+  document.getElementById('cal-event-modal').classList.remove('hidden');
+}
+
+function closeCalEventModal() {
+  document.getElementById('cal-event-modal').classList.add('hidden');
+  calEventEditData = null;
+}
+
+document.getElementById('cal-event-close').addEventListener('click', closeCalEventModal);
+document.getElementById('cal-event-cancel').addEventListener('click', closeCalEventModal);
+document.getElementById('cal-event-modal').querySelector('.modal-backdrop').addEventListener('click', closeCalEventModal);
+
+document.getElementById('cal-event-save').addEventListener('click', async () => {
+  if (!calEventEditData) return;
+  const { taskId } = calEventEditData;
+  const newDate = document.getElementById('cal-event-date').value;
+  try {
+    await api('PUT', `/tasks/${taskId}`, { deadline: newDate });
+    const task = tasks.find(t => t.id === taskId);
+    if (task) task.deadline = newDate;
+    toast('Fecha actualizada');
+    closeCalEventModal();
+    renderCalendar();
+    renderTasks();
+    updateStats();
+    updateOverdueBadge();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
+document.getElementById('cal-event-delete').addEventListener('click', async () => {
+  if (!calEventEditData) return;
+  if (!confirm('¿Eliminar este evento/tarea?')) return;
+  try {
+    await api('DELETE', `/tasks/${calEventEditData.taskId}`);
+    toast('Evento eliminado');
+    closeCalEventModal();
+    await loadData();
+    renderCalendar();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
 
 // --- TEAM VIEW ---
 function renderTeam() {
@@ -1659,7 +1938,7 @@ function renderTeam() {
     let timeoffInfo = '';
     if (memberTimeOffs.length > 0) {
       const nextTo = memberTimeOffs[0];
-      const type = nextTo.timeOffType || 'Time Off';
+      const type = nextTo.timeOffTitle || nextTo.timeOffType || 'Time Off';
       timeoffInfo = `<div class="member-timeoff-info">
         <span class="material-icons-round">beach_access</span>
         ${escHtml(type)}: ${formatDate(nextTo.timeOffStart)} - ${formatDate(nextTo.timeOffEnd)}
@@ -1667,6 +1946,7 @@ function renderTeam() {
     }
 
     const initials = member.initials || getInitials(member.name);
+    const roleLabel = member.role || 'Equipo';
 
     const card = document.createElement('div');
     card.className = 'member-card';
@@ -1674,7 +1954,7 @@ function renderTeam() {
       <div class="member-avatar" style="background:${member.color || getColorForName(member.name)}">${initials}</div>
       <div class="member-info">
         <h3>${escHtml(member.name)}</h3>
-        <p>${escHtml(member.role || 'Equipo')}</p>
+        <p>${escHtml(roleLabel)}</p>
         ${timeoffInfo}
       </div>
       <span class="member-tasks-count">${taskCount} tarea${taskCount !== 1 ? 's' : ''}</span>
@@ -1754,7 +2034,7 @@ function openEditMemberModal(member) {
   document.getElementById('prompt-modal-role-group').classList.remove('hidden');
   document.getElementById('prompt-modal-initials-group').classList.remove('hidden');
 
-  document.getElementById('prompt-modal-role').value = member.role || '';
+  document.getElementById('prompt-modal-role').value = member.role || 'Equipo';
 
   const initialsInput = document.getElementById('prompt-modal-initials');
   if (initialsInput) initialsInput.value = member.initials || getInitials(member.name);
@@ -1800,7 +2080,7 @@ function openEditMemberModal(member) {
       }
 
       await loadData();
-      toast(`Miembro actualizado`);
+      toast('Miembro actualizado');
     } catch (err) {
       toast('Error: ' + err.message, 'error');
     }
@@ -1818,7 +2098,7 @@ function openPromptModal(title, label, showColor, showRole, callback) {
   document.getElementById('prompt-modal-title').textContent = title;
   document.getElementById('prompt-modal-label').textContent = label;
   document.getElementById('prompt-modal-input').value = '';
-  document.getElementById('prompt-modal-role').value = '';
+  document.getElementById('prompt-modal-role').value = 'Equipo';
   document.getElementById('prompt-modal-color-group').classList.toggle('hidden', !showColor);
   document.getElementById('prompt-modal-role-group').classList.toggle('hidden', !showRole);
   document.getElementById('prompt-modal-initials-group').classList.toggle('hidden', !showRole);
@@ -1862,7 +2142,7 @@ document.getElementById('prompt-modal-save').addEventListener('click', () => {
   if (!name) return;
   const selectedColor = document.querySelector('#prompt-modal-colors .color-swatch.selected');
   const color = selectedColor?.dataset.color || COLORS[0];
-  const role = document.getElementById('prompt-modal-role').value.trim();
+  const role = document.getElementById('prompt-modal-role').value;
   if (promptCallback) promptCallback({ name, color, role });
   closePromptModal();
 });
@@ -1874,7 +2154,7 @@ document.getElementById('add-member-btn').addEventListener('click', () => {
       return;
     }
     const initialsVal = document.getElementById('prompt-modal-initials')?.value?.trim() || '';
-    settings.teamMembers = [...(settings.teamMembers || []), { name, color, role, initials: initialsVal || getInitials(name) }];
+    settings.teamMembers = [...(settings.teamMembers || []), { name, color, role: role || 'Equipo', initials: initialsVal || getInitials(name) }];
     try {
       await api('PUT', '/settings', { teamMembers: settings.teamMembers });
       renderTeam();
@@ -1905,6 +2185,57 @@ document.getElementById('add-client-btn').addEventListener('click', () => {
   });
 });
 
+// --- SETTINGS PAGE ---
+function renderSettingsPage() {
+  renderLeaderPool();
+  document.getElementById('auto-delete-days').value = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
+}
+
+function renderLeaderPool() {
+  const container = document.getElementById('leader-pool-list');
+  const pool = settings.leaderPool || [];
+  const members = settings.teamMembers || [];
+
+  container.innerHTML = '';
+  members.forEach(m => {
+    const isInPool = pool.length === 0 || pool.includes(m.name);
+    const item = document.createElement('label');
+    item.className = 'settings-check-item';
+    item.innerHTML = `
+      <input type="checkbox" value="${escAttr(m.name)}" ${isInPool ? 'checked' : ''}>
+      <span>${escHtml(m.name)}</span>
+      <span style="color:var(--text-muted);font-size:.8rem;margin-left:auto">${escHtml(m.role || 'Equipo')}</span>
+    `;
+    container.appendChild(item);
+  });
+}
+
+document.getElementById('save-leader-pool').addEventListener('click', async () => {
+  const checks = document.querySelectorAll('#leader-pool-list input[type="checkbox"]');
+  const pool = [];
+  checks.forEach(cb => {
+    if (cb.checked) pool.push(cb.value);
+  });
+  settings.leaderPool = pool;
+  try {
+    await api('PUT', '/settings', { leaderPool: pool });
+    toast('Pool del líder actualizado');
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
+document.getElementById('save-auto-delete').addEventListener('click', async () => {
+  const days = parseInt(document.getElementById('auto-delete-days').value) || 2;
+  settings.autoDeleteDays = days;
+  try {
+    await api('PUT', '/settings', { autoDeleteDays: days });
+    toast('Configuración guardada');
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
 // --- HELPERS ---
 function escHtml(str) {
   if (!str) return '';
@@ -1920,7 +2251,7 @@ function escAttr(str) {
 
 function getInitials(name) {
   if (!name) return '?';
-  return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 3);
 }
 
 function getColorForName(name) {
@@ -1987,7 +2318,7 @@ function pushUndo(taskId, field, oldValue, newValue) {
   const fieldNames = {
     client: 'Cliente', project: 'Proyecto', assignee: 'Asignado',
     supervisor: 'Supervisor', priority: 'Prioridad', deadline: 'Deadline',
-    status: 'Status', owner: 'Owner', comments: 'Comentario'
+    status: 'Status', owner: 'Owner', comments: 'Comentario', taskNumber: '#'
   };
   const label = fieldNames[field] || field;
   toast(`${label} actualizado`, 'success', {
@@ -2015,7 +2346,6 @@ async function performUndo() {
     highlightCell(entry.taskId, entry.field);
   } catch (err) {
     toast('Error al deshacer: ' + err.message, 'error');
-    // Put it back
     undoStack.push(entry);
   }
 }
@@ -2032,7 +2362,6 @@ function openSearchOverlay() {
   searchSelectedIdx = -1;
   setTimeout(() => input.focus(), 50);
 
-  // Close on backdrop click
   overlay.querySelector('.search-overlay-backdrop').onclick = closeSearchOverlay;
 }
 
@@ -2093,7 +2422,6 @@ function performOverlaySearch(query) {
 
 function navigateToTask(taskId) {
   switchView('agenda');
-  // Reset filters to show all
   currentFilter = { priority: 'all', assignee: '', status: '', client: '', search: '' };
   document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
   document.querySelector('.chip[data-filter="all"]')?.classList.add('active');
@@ -2102,7 +2430,6 @@ function navigateToTask(taskId) {
   document.getElementById('filter-client').value = '';
   document.getElementById('search-input').value = '';
 
-  // Expand all groups
   collapsedGroups = {};
   localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
 
@@ -2119,12 +2446,10 @@ function navigateToTask(taskId) {
   }, 100);
 }
 
-// Search overlay input listener
 document.getElementById('search-overlay-input').addEventListener('input', (e) => {
   performOverlaySearch(e.target.value.trim());
 });
 
-// Search overlay keyboard navigation
 document.getElementById('search-overlay-input').addEventListener('keydown', (e) => {
   const results = document.getElementById('search-overlay-results');
   const items = results.querySelectorAll('.search-result-item');
@@ -2176,7 +2501,6 @@ function exportCSV() {
     csv += row.map(cell => `"${cell}"`).join(',') + '\n';
   });
 
-  // BOM for Excel UTF-8 compatibility
   const bom = '\uFEFF';
   const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -2190,23 +2514,25 @@ function exportCSV() {
 
 document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
 
-// --- COMPLETION CELEBRATION ---
+// --- COMPLETION CELEBRATION (confetti on EACH completed task) ---
 function checkCelebration(task) {
-  if (!task.assignee) return;
-  const personTasks = getRegularTasks().filter(t => t.assignee === task.assignee);
-  const allDone = personTasks.every(t => t.status === 'completado');
+  // Always launch confetti for individual task completion
+  launchConfetti();
 
-  // Always celebrate individual completion
+  // Row animation
   const row = document.querySelector(`tr[data-id="${task.id}"]`);
   if (row) {
     row.classList.add('row-completed');
     setTimeout(() => row.classList.remove('row-completed'), 1200);
   }
 
-  // All tasks done for person → big celebration
-  if (allDone && personTasks.length > 0) {
-    toast(`${task.assignee} completó todas sus tareas!`);
-    launchConfetti();
+  // All tasks done for person -> extra toast
+  if (task.assignee) {
+    const personTasks = getRegularTasks().filter(t => t.assignee === task.assignee);
+    const allDone = personTasks.every(t => t.status === 'completado');
+    if (allDone && personTasks.length > 0) {
+      setTimeout(() => toast(`${task.assignee} completó todas sus tareas!`), 500);
+    }
   }
 }
 
@@ -2261,7 +2587,6 @@ async function pollPresence() {
 }
 
 function renderPresenceIndicators(data) {
-  // Remove old presence indicators
   document.querySelectorAll('.cell-presence').forEach(el => {
     el.classList.remove('cell-presence');
     el.style.removeProperty('--presence-color');
@@ -2305,7 +2630,7 @@ function stopPresencePolling() {
 
 // --- KEYBOARD SHORTCUTS ---
 document.addEventListener('keydown', (e) => {
-  // Ctrl+K or Cmd+K → search overlay
+  // Ctrl+K or Cmd+K -> search overlay
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
     const overlay = document.getElementById('search-overlay');
@@ -2317,7 +2642,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Ctrl+Z or Cmd+Z → undo (only when not in an input)
+  // Ctrl+Z or Cmd+Z -> undo
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.target.closest('input, textarea, select, [contenteditable]')) {
     e.preventDefault();
     performUndo();
@@ -2325,7 +2650,6 @@ document.addEventListener('keydown', (e) => {
   }
 
   if (e.key === 'Escape') {
-    // Close search overlay first if open
     if (!document.getElementById('search-overlay').classList.contains('hidden')) {
       closeSearchOverlay();
       return;
@@ -2334,6 +2658,8 @@ document.addEventListener('keydown', (e) => {
     closeInlineInput();
     closePromptModal();
     closeTimeOffModal();
+    closeNewTaskModal();
+    closeCalEventModal();
     document.getElementById('copy-modal').classList.add('hidden');
   }
 });
