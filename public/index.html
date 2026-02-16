@@ -121,9 +121,9 @@
       <div id="view-settings" class="view hidden">
         <div class="settings-card">
           <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">emoji_events</span>Lider de la semana</h2>
-          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Seleccioná qué miembros participan del sorteo semanal.</p>
-          <div id="leader-pool-list" class="settings-check-list"></div>
-          <button class="btn btn-ghost btn-sm" id="save-leader-pool" style="margin-top:.75rem"><span class="material-icons-round">save</span> Guardar cambios</button>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Miembros que participan del sorteo semanal.</p>
+          <div id="leader-pool-list" class="settings-leader-list"></div>
+          <button class="btn btn-ghost btn-sm" id="add-leader-btn" style="margin-top:.75rem"><span class="material-icons-round">person_add</span> Agregar líder</button>
         </div>
         <div class="settings-card">
           <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">auto_delete</span>Tareas completadas</h2>
@@ -288,7 +288,7 @@
         <div class="form-group"><label id="prompt-modal-label">Nombre</label><input type="text" id="prompt-modal-input" required></div>
         <div class="form-group hidden" id="prompt-modal-color-group"><label>Color</label><div class="color-picker" id="prompt-modal-colors"></div></div>
         <div class="form-group hidden" id="prompt-modal-initials-group"><label>Iniciales (3 caracteres)</label><input type="text" id="prompt-modal-initials" maxlength="3" placeholder="Ej: JPG"></div>
-        <div class="form-group hidden" id="prompt-modal-role-group"><label>Rol</label><select id="prompt-modal-role" class="filter-select" style="width:100%;padding:.65rem .85rem;font-size:.9rem"><option value="Equipo">Equipo</option><option value="Supervisor">Supervisor</option><option value="Owner">Owner</option></select></div>
+        <div class="form-group hidden" id="prompt-modal-role-group"><label>Rol</label><select id="prompt-modal-role" class="filter-select" style="width:100%;padding:.65rem .85rem;font-size:.9rem"><option value="Equipo">Equipo</option><option value="Freelance">Freelance</option><option value="Supervisor">Supervisor</option><option value="Owner">Owner</option></select></div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="prompt-modal-cancel">Cancelar</button>
           <button class="btn btn-primary" id="prompt-modal-save">Guardar</button>

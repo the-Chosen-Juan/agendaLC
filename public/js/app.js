@@ -571,7 +571,7 @@ function renderCompletedSection(container, completedTasks) {
   const section = document.createElement('div');
   section.className = 'completed-section';
 
-  const isCollapsed = collapsedGroups['__completed__'] !== false; // collapsed by default
+  const isCollapsed = collapsedGroups['__completed__'] === true; // visible by default
 
   const header = document.createElement('div');
   header.className = 'completed-header';
@@ -703,13 +703,19 @@ function renderGroupedTasks(container, filtered) {
       supervisedSection = document.createElement('div');
       supervisedSection.className = 'supervised-section';
       if (isCollapsed) supervisedSection.classList.add('hidden');
+
+      const supKey = `__sup_${assignee}`;
+      const isSupCollapsed = collapsedGroups[supKey] === true; // visible by default
+
       supervisedSection.innerHTML = `
-        <div class="supervised-header">
-          <span class="material-icons-round">visibility</span>
+        <div class="supervised-header" data-sup-key="${escAttr(supKey)}">
+          <span class="material-icons-round supervised-eye">${isSupCollapsed ? 'visibility_off' : 'visibility'}</span>
           Supervisando (${supervisedTasks.length} tarea${supervisedTasks.length !== 1 ? 's' : ''} de otros equipos)
         </div>
+        <div class="supervised-items ${isSupCollapsed ? 'hidden' : ''}"></div>
       `;
 
+      const itemsContainer = supervisedSection.querySelector('.supervised-items');
       supervisedTasks.forEach(t => {
         const clientColor = getClientColor(t.client);
         const statusClass = (t.status || '').toLowerCase().replace(/ /g, '-');
@@ -723,7 +729,20 @@ function renderGroupedTasks(container, filtered) {
           <span class="supervised-assignee">\u2192 ${escHtml(t.assignee)}</span>
         `;
         item.addEventListener('click', () => navigateToTask(t.id));
-        supervisedSection.appendChild(item);
+        itemsContainer.appendChild(item);
+      });
+
+      // Toggle supervised items on eye icon click
+      const supHeader = supervisedSection.querySelector('.supervised-header');
+      supHeader.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const supItemsDiv = supervisedSection.querySelector('.supervised-items');
+        const eyeIcon = supHeader.querySelector('.supervised-eye');
+        supItemsDiv.classList.toggle('hidden');
+        const nowHidden = supItemsDiv.classList.contains('hidden');
+        eyeIcon.textContent = nowHidden ? 'visibility_off' : 'visibility';
+        collapsedGroups[supKey] = nowHidden;
+        localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
       });
     }
 
@@ -1285,7 +1304,10 @@ function openEditDropdown(cell, task, field) {
       if (!(settings.teamMembers || []).some(m => m.name === newName)) {
         const color = COLORS[Math.floor(Math.random() * COLORS.length)];
         settings.teamMembers = [...(settings.teamMembers || []), { name: newName, color, role: 'Equipo' }];
-        api('PUT', '/settings', { teamMembers: settings.teamMembers }).catch(() => {});
+        if (field === 'assignee' && !(settings.assigneeOrder || []).includes(newName)) {
+          settings.assigneeOrder = [...(settings.assigneeOrder || []), newName];
+        }
+        api('PUT', '/settings', { teamMembers: settings.teamMembers, assigneeOrder: settings.assigneeOrder }).catch(() => {});
       }
     }
   };
@@ -2082,12 +2104,29 @@ function renderTeam() {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const name = btn.dataset.name;
-      if (!confirm(`¿Eliminar a ${name} del equipo?`)) return;
+      if (!confirm(`¿Eliminar a ${name} del equipo? Se quitará de todas las tareas asignadas.`)) return;
       settings.teamMembers = settings.teamMembers.filter(m => m.name !== name);
+      // Also remove from assigneeOrder and leaderPool
+      settings.assigneeOrder = (settings.assigneeOrder || []).filter(n => n !== name);
+      settings.leaderPool = (settings.leaderPool || []).filter(n => n !== name);
       try {
-        await api('PUT', '/settings', { teamMembers: settings.teamMembers });
+        await api('PUT', '/settings', { teamMembers: settings.teamMembers, assigneeOrder: settings.assigneeOrder, leaderPool: settings.leaderPool });
+        // Clear assignee from all tasks where this person is assigned
+        const updatePromises = [];
+        tasks.forEach(t => {
+          const updates = {};
+          if (t.assignee === name) { updates.assignee = ''; t.assignee = ''; }
+          if (t.supervisor === name) { updates.supervisor = ''; t.supervisor = ''; }
+          if (t.owner === name) { updates.owner = ''; t.owner = ''; }
+          if (Object.keys(updates).length > 0) {
+            updatePromises.push(api('PUT', `/tasks/${t.id}`, updates));
+          }
+        });
+        await Promise.all(updatePromises);
         renderTeam();
         populateFilterDropdowns();
+        renderTasks();
+        updateStats();
         toast(`${name} eliminado del equipo`);
       } catch (err) {
         toast('Error: ' + err.message, 'error');
@@ -2101,11 +2140,54 @@ function renderTeam() {
     tag.className = 'tag';
     tag.innerHTML = `
       <span class="client-badge" style="background:${client.color || '#f1f5f9'};color:${client.textColor || '#64748b'}">${escHtml(client.name)}</span>
+      <button class="tag-edit" data-name="${escAttr(client.name)}" title="Editar">
+        <span class="material-icons-round">edit</span>
+      </button>
       <button class="tag-delete" data-name="${escAttr(client.name)}" title="Eliminar">
         <span class="material-icons-round">close</span>
       </button>
     `;
     clientsList.appendChild(tag);
+  });
+
+  clientsList.querySelectorAll('.tag-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.name;
+      const client = (settings.clients || []).find(c => c.name === name);
+      if (!client) return;
+      openPromptModal('Editar cliente', 'Nombre del cliente', true, false, async ({ name: newName, color }) => {
+        const idx = settings.clients.findIndex(c => c.name === name);
+        if (idx === -1) return;
+        const bg = color + '18';
+        const oldName = client.name;
+        settings.clients[idx] = { name: newName, color: bg, textColor: color };
+        try {
+          await api('PUT', '/settings', { clients: settings.clients });
+          if (oldName !== newName) {
+            const updatePromises = [];
+            tasks.forEach(t => {
+              if (t.client === oldName) {
+                updatePromises.push(api('PUT', `/tasks/${t.id}`, { client: newName }));
+                t.client = newName;
+              }
+            });
+            await Promise.all(updatePromises);
+          }
+          await softRefresh();
+          toast('Cliente actualizado');
+        } catch (err) {
+          toast('Error: ' + err.message, 'error');
+        }
+      });
+      // Pre-select the current color
+      setTimeout(() => {
+        const colorsDiv = document.getElementById('prompt-modal-colors');
+        colorsDiv.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        const matchSwatch = colorsDiv.querySelector(`[data-color="${client.textColor}"]`);
+        if (matchSwatch) matchSwatch.classList.add('selected');
+        document.getElementById('prompt-modal-input').value = client.name;
+      }, 50);
+    });
   });
 
   clientsList.querySelectorAll('.tag-delete').forEach(btn => {
@@ -2294,35 +2376,84 @@ function renderSettingsPage() {
 function renderLeaderPool() {
   const container = document.getElementById('leader-pool-list');
   const pool = settings.leaderPool || [];
-  const members = settings.teamMembers || [];
 
   container.innerHTML = '';
-  members.forEach(m => {
-    const isInPool = pool.length === 0 || pool.includes(m.name);
-    const item = document.createElement('label');
-    item.className = 'settings-check-item';
+  if (pool.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">No hay líderes configurados. Agregá uno.</p>';
+    return;
+  }
+  pool.forEach(name => {
+    const member = (settings.teamMembers || []).find(m => m.name === name);
+    const color = member?.color || getColorForName(name);
+    const item = document.createElement('div');
+    item.className = 'settings-leader-item';
     item.innerHTML = `
-      <input type="checkbox" value="${escAttr(m.name)}" ${isInPool ? 'checked' : ''}>
-      <span>${escHtml(m.name)}</span>
-      <span style="color:var(--text-muted);font-size:.8rem;margin-left:auto">${escHtml(m.role || 'Equipo')}</span>
+      <div class="leader-avatar-mini" style="background:${color}">${getInitials(name)}</div>
+      <span>${escHtml(name)}</span>
+      <button class="leader-delete-btn" data-name="${escAttr(name)}" title="Quitar del sorteo">
+        <span class="material-icons-round">close</span>
+      </button>
     `;
     container.appendChild(item);
   });
+
+  container.querySelectorAll('.leader-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.name;
+      settings.leaderPool = (settings.leaderPool || []).filter(n => n !== name);
+      try {
+        await api('PUT', '/settings', { leaderPool: settings.leaderPool });
+        renderLeaderPool();
+        toast(`${name} quitado del sorteo`);
+      } catch (err) {
+        toast('Error: ' + err.message, 'error');
+      }
+    });
+  });
 }
 
-document.getElementById('save-leader-pool').addEventListener('click', async () => {
-  const checks = document.querySelectorAll('#leader-pool-list input[type="checkbox"]');
-  const pool = [];
-  checks.forEach(cb => {
-    if (cb.checked) pool.push(cb.value);
-  });
-  settings.leaderPool = pool;
-  try {
-    await api('PUT', '/settings', { leaderPool: pool });
-    toast('Pool del líder actualizado');
-  } catch (err) {
-    toast('Error: ' + err.message, 'error');
+document.getElementById('add-leader-btn').addEventListener('click', () => {
+  const pool = settings.leaderPool || [];
+  const allMembers = (settings.teamMembers || []).map(m => m.name);
+  const available = allMembers.filter(n => !pool.includes(n));
+
+  if (available.length === 0) {
+    toast('Todos los miembros ya están en el sorteo', 'error');
+    return;
   }
+
+  // Show a simple select prompt
+  openPromptModal('Agregar líder', 'Nombre', false, false, async ({ name }) => {
+    if (!name) return;
+    if (pool.includes(name)) {
+      toast('Ya está en el sorteo', 'error');
+      return;
+    }
+    settings.leaderPool = [...pool, name];
+    try {
+      await api('PUT', '/settings', { leaderPool: settings.leaderPool });
+      renderLeaderPool();
+      toast(`${name} agregado al sorteo`);
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+
+  // Replace the text input with a dropdown of available members
+  setTimeout(() => {
+    const inputEl = document.getElementById('prompt-modal-input');
+    const selectEl = document.createElement('select');
+    selectEl.id = 'prompt-modal-input';
+    selectEl.className = 'filter-select';
+    selectEl.style.cssText = 'width:100%;padding:.65rem .85rem;font-size:.9rem';
+    available.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      selectEl.appendChild(opt);
+    });
+    inputEl.replaceWith(selectEl);
+  }, 50);
 });
 
 document.getElementById('save-auto-delete').addEventListener('click', async () => {
@@ -2381,7 +2512,10 @@ function formatDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');
   if (isNaN(d)) return dateStr;
-  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 function getDeadlineClass(dateStr) {
