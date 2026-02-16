@@ -240,7 +240,8 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       assigneeOrder: settings.assigneeOrder || [],
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
-      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2
+      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,
+      dataVersion: settings.dataVersion || 0
     });
   } catch (err) {
     console.error('Get settings error:', err);
