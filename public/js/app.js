@@ -1229,18 +1229,27 @@ function openDateInput(cell, task) {
   const originalHtml = cell.innerHTML;
 
   const input = document.createElement('input');
-  input.type = 'date';
+  input.type = 'text';
   input.className = 'cell-edit-input';
-  input.value = currentValue;
+  input.value = isoToDDMMYYYY(currentValue);
+  input.placeholder = 'DD/MM/YYYY';
 
   cell.innerHTML = '';
   cell.appendChild(input);
   input.focus();
+  input.select();
 
   activeInlineInput = { cell, originalHtml, input };
 
   const save = async () => {
-    const newValue = input.value;
+    const raw = input.value.trim();
+    const newValue = raw ? parseDDMMYYYY(raw) : '';
+    if (raw && !newValue) {
+      toast('Formato inválido, usá DD/MM/YYYY', 'error');
+      closeInlineInput();
+      cell.innerHTML = originalHtml;
+      return;
+    }
     if (newValue !== currentValue) {
       try {
         await api('PUT', `/tasks/${task.id}`, { deadline: newValue });
@@ -1259,8 +1268,8 @@ function openDateInput(cell, task) {
     highlightCell(task.id, 'deadline');
   };
 
-  input.addEventListener('change', save);
   input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') save();
     if (e.key === 'Escape') { closeInlineInput(); clearPresence(); cell.innerHTML = originalHtml; }
   });
   input.addEventListener('blur', () => {
@@ -1597,23 +1606,24 @@ function openContractEditor(badgeEl, contractTask) {
     </div>
     <div class="contrato-editor-body">
       <label style="font-size:.8rem;color:var(--text-secondary)">Fecha de vencimiento</label>
-      <input type="date" class="contrato-date-input" value="${contractTask.deadline || ''}">
+      <input type="text" class="contrato-date-input" value="${isoToDDMMYYYY(contractTask.deadline)}" placeholder="DD/MM/YYYY">
     </div>
     <div class="contrato-editor-actions">
       <button class="btn btn-ghost btn-xs contrato-delete-btn" style="color:#ef4444">
         <span class="material-icons-round" style="font-size:.9rem">delete</span> Eliminar
       </button>
+      <button class="btn btn-ghost btn-xs contrato-cancel-btn">Cancelar</button>
       <button class="btn btn-primary btn-xs contrato-save-btn">
         <span class="material-icons-round" style="font-size:.9rem">check</span> Guardar
       </button>
     </div>
   `;
 
-  // Position near the badge
+  // Position near the badge (absolute so it scrolls with content)
   const rect = badgeEl.getBoundingClientRect();
-  popup.style.position = 'fixed';
-  popup.style.top = (rect.bottom + 6) + 'px';
-  popup.style.left = rect.left + 'px';
+  popup.style.position = 'absolute';
+  popup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+  popup.style.left = (rect.left + window.scrollX) + 'px';
   popup.style.zIndex = '9999';
   document.body.appendChild(popup);
 
@@ -1621,13 +1631,20 @@ function openContractEditor(badgeEl, contractTask) {
   requestAnimationFrame(() => {
     const popupRect = popup.getBoundingClientRect();
     if (popupRect.right > window.innerWidth - 8) {
-      popup.style.left = (window.innerWidth - popupRect.width - 8) + 'px';
+      popup.style.left = (window.innerWidth - popupRect.width - 8 + window.scrollX) + 'px';
     }
+  });
+
+  // Cancel handler
+  popup.querySelector('.contrato-cancel-btn').addEventListener('click', () => {
+    popup.remove();
   });
 
   // Save handler
   popup.querySelector('.contrato-save-btn').addEventListener('click', async () => {
-    const newDate = popup.querySelector('.contrato-date-input').value;
+    const raw = popup.querySelector('.contrato-date-input').value.trim();
+    const newDate = raw ? parseDDMMYYYY(raw) : '';
+    if (raw && !newDate) { toast('Formato inválido, usá DD/MM/YYYY', 'error'); return; }
     try {
       await api('PUT', `/tasks/${contractTask.id}`, { deadline: newDate });
       contractTask.deadline = newDate;
@@ -1686,14 +1703,15 @@ function openTimeOffEditor(badgeEl, toTask) {
         <option value="OOO" ${toTask.timeOffType === 'OOO' ? 'selected' : ''}>OOO</option>
       </select>
       <label style="font-size:.8rem;color:var(--text-secondary);margin-top:.35rem">Desde</label>
-      <input type="date" class="contrato-date-input timeoff-start-input" value="${toTask.timeOffStart || ''}">
+      <input type="text" class="contrato-date-input timeoff-start-input" value="${isoToDDMMYYYY(toTask.timeOffStart)}" placeholder="DD/MM/YYYY">
       <label style="font-size:.8rem;color:var(--text-secondary);margin-top:.35rem">Hasta</label>
-      <input type="date" class="contrato-date-input timeoff-end-input" value="${toTask.timeOffEnd || ''}">
+      <input type="text" class="contrato-date-input timeoff-end-input" value="${isoToDDMMYYYY(toTask.timeOffEnd)}" placeholder="DD/MM/YYYY">
     </div>
     <div class="contrato-editor-actions">
       <button class="btn btn-ghost btn-xs timeoff-popup-delete" style="color:#ef4444">
         <span class="material-icons-round" style="font-size:.9rem">delete</span> Eliminar
       </button>
+      <button class="btn btn-ghost btn-xs timeoff-popup-cancel">Cancelar</button>
       <button class="btn btn-primary btn-xs timeoff-popup-save">
         <span class="material-icons-round" style="font-size:.9rem">check</span> Guardar
       </button>
@@ -1701,26 +1719,33 @@ function openTimeOffEditor(badgeEl, toTask) {
   `;
 
   const rect = badgeEl.getBoundingClientRect();
-  popup.style.position = 'fixed';
-  popup.style.top = (rect.bottom + 6) + 'px';
-  popup.style.left = rect.left + 'px';
+  popup.style.position = 'absolute';
+  popup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+  popup.style.left = (rect.left + window.scrollX) + 'px';
   popup.style.zIndex = '9999';
   document.body.appendChild(popup);
 
   requestAnimationFrame(() => {
     const popupRect = popup.getBoundingClientRect();
     if (popupRect.right > window.innerWidth - 8) {
-      popup.style.left = (window.innerWidth - popupRect.width - 8) + 'px';
+      popup.style.left = (window.innerWidth - popupRect.width - 8 + window.scrollX) + 'px';
     }
+  });
+
+  // Cancel
+  popup.querySelector('.timeoff-popup-cancel').addEventListener('click', () => {
+    popup.remove();
   });
 
   // Save
   popup.querySelector('.timeoff-popup-save').addEventListener('click', async () => {
     const title = popup.querySelector('.timeoff-title-input').value.trim();
     const type = popup.querySelector('.timeoff-type-select').value;
-    const start = popup.querySelector('.timeoff-start-input').value;
-    const end = popup.querySelector('.timeoff-end-input').value;
-    if (!start || !end) { toast('Completá las fechas', 'error'); return; }
+    const startRaw = popup.querySelector('.timeoff-start-input').value.trim();
+    const endRaw = popup.querySelector('.timeoff-end-input').value.trim();
+    const start = startRaw ? parseDDMMYYYY(startRaw) : '';
+    const end = endRaw ? parseDDMMYYYY(endRaw) : '';
+    if (!start || !end) { toast('Completá las fechas (DD/MM/YYYY)', 'error'); return; }
     const body = {
       timeOffTitle: title,
       timeOffType: type,
@@ -1859,8 +1884,8 @@ function openTimeOffModal(entry = null) {
 
   setModalSelect('timeoff-member', entry?.assignee || '');
   document.getElementById('timeoff-title').value = entry?.timeOffTitle || '';
-  document.getElementById('timeoff-start').value = entry?.timeOffStart || '';
-  document.getElementById('timeoff-end').value = entry?.timeOffEnd || '';
+  document.getElementById('timeoff-start').value = isoToDDMMYYYY(entry?.timeOffStart || '');
+  document.getElementById('timeoff-end').value = isoToDDMMYYYY(entry?.timeOffEnd || '');
   setModalSelect('timeoff-type', entry?.timeOffType || 'Vacaciones');
 
   document.getElementById('timeoff-modal').classList.remove('hidden');
@@ -1878,12 +1903,14 @@ document.getElementById('timeoff-modal').querySelector('.modal-backdrop').addEve
 document.getElementById('timeoff-save').addEventListener('click', async () => {
   const member = getModalSelect('timeoff-member');
   const title = document.getElementById('timeoff-title').value.trim();
-  const start = document.getElementById('timeoff-start').value;
-  const end = document.getElementById('timeoff-end').value;
+  const startRaw = document.getElementById('timeoff-start').value.trim();
+  const endRaw = document.getElementById('timeoff-end').value.trim();
+  const start = startRaw ? parseDDMMYYYY(startRaw) : '';
+  const end = endRaw ? parseDDMMYYYY(endRaw) : '';
   const type = getModalSelect('timeoff-type');
 
   if (!member || !start || !end) {
-    toast('Completá todos los campos', 'error');
+    toast('Completá todos los campos (fechas en DD/MM/YYYY)', 'error');
     return;
   }
 
@@ -1991,7 +2018,9 @@ document.getElementById('new-task-save').addEventListener('click', async () => {
   const assignee = getModalSelect('new-task-assignee');
   const supervisor = getModalSelect('new-task-supervisor');
   const priority = getModalSelect('new-task-priority');
-  const deadline = document.getElementById('new-task-deadline').value;
+  const deadlineRaw = document.getElementById('new-task-deadline').value.trim();
+  const deadline = deadlineRaw ? parseDDMMYYYY(deadlineRaw) : '';
+  if (deadlineRaw && !deadline) { toast('Formato de fecha inválido, usá DD/MM/YYYY', 'error'); return; }
   const status = getModalSelect('new-task-status');
   const owner = getModalSelect('new-task-owner');
   const comments = document.getElementById('new-task-comments').value.trim();
@@ -2231,7 +2260,7 @@ function openCalEventModal(taskId) {
   document.getElementById('cal-event-title').textContent = 'Editar deadline';
   document.getElementById('cal-event-info').textContent = `${task.project || task.client} \u2192 ${task.assignee || 'Sin asignar'}`;
   document.getElementById('cal-event-label').textContent = 'Deadline';
-  document.getElementById('cal-event-date').value = task.deadline || '';
+  document.getElementById('cal-event-date').value = isoToDDMMYYYY(task.deadline);
   document.getElementById('cal-event-modal').classList.remove('hidden');
 }
 
@@ -2247,7 +2276,9 @@ document.getElementById('cal-event-modal').querySelector('.modal-backdrop').addE
 document.getElementById('cal-event-save').addEventListener('click', async () => {
   if (!calEventEditData) return;
   const { taskId } = calEventEditData;
-  const newDate = document.getElementById('cal-event-date').value;
+  const raw = document.getElementById('cal-event-date').value.trim();
+  const newDate = raw ? parseDDMMYYYY(raw) : '';
+  if (raw && !newDate) { toast('Formato inválido, usá DD/MM/YYYY', 'error'); return; }
   try {
     await api('PUT', `/tasks/${taskId}`, { deadline: newDate });
     const task = tasks.find(t => t.id === taskId);
@@ -2747,6 +2778,28 @@ function formatDate(dateStr) {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
+}
+
+// Parse DD/MM/YYYY to YYYY-MM-DD (ISO), returns '' if invalid
+function parseDDMMYYYY(str) {
+  if (!str) return '';
+  const parts = str.split('/');
+  if (parts.length !== 3) return '';
+  const dd = parts[0].padStart(2, '0');
+  const mm = parts[1].padStart(2, '0');
+  const yyyy = parts[2];
+  if (!dd || !mm || !yyyy || yyyy.length !== 4) return '';
+  const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+  if (isNaN(d)) return '';
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Convert YYYY-MM-DD to DD/MM/YYYY for input display
+function isoToDDMMYYYY(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 function getDeadlineClass(dateStr) {

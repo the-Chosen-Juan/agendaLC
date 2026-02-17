@@ -192,7 +192,7 @@
         </div>
         <div class="form-row">
           <div class="form-group"><label>Prioridad</label><div class="modal-select" id="new-task-priority" data-field="priority" data-value="TBD" tabindex="0"><span class="modal-select-text">TBD</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
-          <div class="form-group"><label>Deadline</label><input type="date" id="new-task-deadline"></div>
+          <div class="form-group"><label>Deadline</label><input type="text" id="new-task-deadline" placeholder="DD/MM/YYYY"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Status</label><div class="modal-select" id="new-task-status" data-field="status" data-value="sin empezar" tabindex="0"><span class="modal-select-text">Sin empezar</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
@@ -219,7 +219,7 @@
       <div class="modal-body">
         <div class="form-group"><label>Miembro</label><div class="modal-select" id="timeoff-member" data-field="assignee" data-value="" tabindex="0"><span class="modal-select-text">Seleccioná...</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
         <div class="form-group"><label>Título / Descripción</label><input type="text" id="timeoff-title" placeholder="Ej: Vacaciones Juan, Licencia María..."></div>
-        <div class="form-row"><div class="form-group"><label>Desde</label><input type="date" id="timeoff-start" required></div><div class="form-group"><label>Hasta</label><input type="date" id="timeoff-end" required></div></div>
+        <div class="form-row"><div class="form-group"><label>Desde</label><input type="text" id="timeoff-start" placeholder="DD/MM/YYYY" required></div><div class="form-group"><label>Hasta</label><input type="text" id="timeoff-end" placeholder="DD/MM/YYYY" required></div></div>
         <div class="form-group"><label>Tipo</label><div class="modal-select" id="timeoff-type" data-field="timeoff-type" data-value="Vacaciones" tabindex="0"><span class="modal-select-text">Vacaciones</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
         <div class="modal-footer">
           <button type="button" class="btn btn-danger hidden" id="timeoff-delete"><span class="material-icons-round">delete</span> Eliminar</button>
@@ -252,7 +252,7 @@
       <div class="modal-header"><h2 id="cal-event-title">Editar evento</h2><button class="btn-icon modal-close" id="cal-event-close"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <p id="cal-event-info" style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem"></p>
-        <div class="form-group"><label id="cal-event-label">Fecha</label><input type="date" id="cal-event-date"></div>
+        <div class="form-group"><label id="cal-event-label">Fecha</label><input type="text" id="cal-event-date" placeholder="DD/MM/YYYY"></div>
         <div class="modal-footer">
           <button class="btn btn-danger" id="cal-event-delete"><span class="material-icons-round">delete</span> Eliminar</button>
           <button class="btn btn-ghost" id="cal-event-cancel">Cancelar</button>
