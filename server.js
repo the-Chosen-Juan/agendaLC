@@ -188,6 +188,7 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
       timeOffStart: req.body.timeOffStart || '',
       timeOffEnd: req.body.timeOffEnd || '',
       timeOffType: req.body.timeOffType || '',
+      timeOffTitle: req.body.timeOffTitle || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

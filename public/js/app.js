@@ -629,8 +629,27 @@ function renderGroupedTasks(container, filtered) {
   });
 
   const timeOffs = getTimeOffEntries();
+  const allContracts = getContractTasks();
   const now = new Date();
   now.setHours(0, 0, 0, 0);
+
+  // Add members who only have timeoff or contract entries (no regular tasks)
+  [...timeOffs, ...allContracts].forEach(t => {
+    const key = t.assignee || 'Sin asignar';
+    if (!groups[key]) {
+      groups[key] = [];
+      sortedKeys.push(key);
+    }
+  });
+  // Re-sort after adding new keys
+  sortedKeys.sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 
   sortedKeys.forEach((assignee) => {
     const groupTasks = sortTasksByNumber(groups[assignee]);
@@ -775,12 +794,12 @@ function renderGroupedTasks(container, filtered) {
       localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
     });
 
-    // Time off badge click
+    // Time off badge click - open inline editor (same as contract)
     header.querySelectorAll('.timeoff-badge').forEach(badge => {
       badge.addEventListener('click', (e) => {
         e.stopPropagation();
         const toTask = tasks.find(t => t.id === badge.dataset.id);
-        if (toTask) openTimeOffModal(toTask);
+        if (toTask) openTimeOffEditor(badge, toTask);
       });
     });
 
@@ -1628,6 +1647,108 @@ function openContractEditor(badgeEl, contractTask) {
       await api('DELETE', `/tasks/${contractTask.id}`);
       tasks = tasks.filter(t => t.id !== contractTask.id);
       toast('Contrato eliminado');
+      popup.remove();
+      renderTasks();
+      updateStats();
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+
+  // Close on outside click
+  const closeOnOutside = (e) => {
+    if (!popup.contains(e.target) && !badgeEl.contains(e.target)) {
+      popup.remove();
+      document.removeEventListener('click', closeOnOutside, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeOnOutside, true), 10);
+}
+
+// --- TIME OFF BADGE EDITOR ---
+function openTimeOffEditor(badgeEl, toTask) {
+  // Close any existing popups
+  document.querySelectorAll('.contrato-editor-popup').forEach(el => el.remove());
+
+  const popup = document.createElement('div');
+  popup.className = 'contrato-editor-popup';
+  popup.innerHTML = `
+    <div class="contrato-editor-header">
+      <span style="font-weight:600;font-size:.85rem">${escHtml(toTask.timeOffType || 'Time Off')} - ${escHtml(toTask.assignee)}</span>
+    </div>
+    <div class="contrato-editor-body">
+      <label style="font-size:.8rem;color:var(--text-secondary)">Título / Descripción</label>
+      <input type="text" class="contrato-date-input timeoff-title-input" value="${escAttr(toTask.timeOffTitle || '')}" placeholder="Ej: Vacaciones...">
+      <label style="font-size:.8rem;color:var(--text-secondary);margin-top:.35rem">Tipo</label>
+      <select class="contrato-date-input timeoff-type-select">
+        <option value="Vacaciones" ${toTask.timeOffType === 'Vacaciones' ? 'selected' : ''}>Vacaciones</option>
+        <option value="Day Off" ${toTask.timeOffType === 'Day Off' ? 'selected' : ''}>Day Off</option>
+        <option value="OOO" ${toTask.timeOffType === 'OOO' ? 'selected' : ''}>OOO</option>
+      </select>
+      <label style="font-size:.8rem;color:var(--text-secondary);margin-top:.35rem">Desde</label>
+      <input type="date" class="contrato-date-input timeoff-start-input" value="${toTask.timeOffStart || ''}">
+      <label style="font-size:.8rem;color:var(--text-secondary);margin-top:.35rem">Hasta</label>
+      <input type="date" class="contrato-date-input timeoff-end-input" value="${toTask.timeOffEnd || ''}">
+    </div>
+    <div class="contrato-editor-actions">
+      <button class="btn btn-ghost btn-xs timeoff-popup-delete" style="color:#ef4444">
+        <span class="material-icons-round" style="font-size:.9rem">delete</span> Eliminar
+      </button>
+      <button class="btn btn-primary btn-xs timeoff-popup-save">
+        <span class="material-icons-round" style="font-size:.9rem">check</span> Guardar
+      </button>
+    </div>
+  `;
+
+  const rect = badgeEl.getBoundingClientRect();
+  popup.style.position = 'fixed';
+  popup.style.top = (rect.bottom + 6) + 'px';
+  popup.style.left = rect.left + 'px';
+  popup.style.zIndex = '9999';
+  document.body.appendChild(popup);
+
+  requestAnimationFrame(() => {
+    const popupRect = popup.getBoundingClientRect();
+    if (popupRect.right > window.innerWidth - 8) {
+      popup.style.left = (window.innerWidth - popupRect.width - 8) + 'px';
+    }
+  });
+
+  // Save
+  popup.querySelector('.timeoff-popup-save').addEventListener('click', async () => {
+    const title = popup.querySelector('.timeoff-title-input').value.trim();
+    const type = popup.querySelector('.timeoff-type-select').value;
+    const start = popup.querySelector('.timeoff-start-input').value;
+    const end = popup.querySelector('.timeoff-end-input').value;
+    if (!start || !end) { toast('Completá las fechas', 'error'); return; }
+    const body = {
+      timeOffTitle: title,
+      timeOffType: type,
+      timeOffStart: start,
+      timeOffEnd: end,
+      deadline: end,
+      project: type,
+      comments: title ? `${title} - ${type}: ${start} - ${end}` : `${type}: ${start} - ${end}`
+    };
+    try {
+      await api('PUT', `/tasks/${toTask.id}`, body);
+      Object.assign(toTask, body);
+      toast('Time off actualizado');
+      popup.remove();
+      renderTasks();
+      updateStats();
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+
+  // Delete
+  popup.querySelector('.timeoff-popup-delete').addEventListener('click', async () => {
+    if (!confirm('¿Eliminar este time off?')) return;
+    try {
+      await api('DELETE', `/tasks/${toTask.id}`);
+      tasks = tasks.filter(t => t.id !== toTask.id);
+      toast('Time off eliminado');
       popup.remove();
       renderTasks();
       updateStats();
