@@ -12,8 +12,13 @@ let editingTaskId = null;
 let editingTimeOffId = null;
 let calMonth = new Date().getMonth();
 let calYear = new Date().getFullYear();
-let calFilters = { deadlines: true, timeoff: true };
-let calAssigneeFilters = {};
+let calFilters = JSON.parse(localStorage.getItem('agenda_calFilters') || '{"deadlines":true,"timeoff":true}');
+let calAssigneeFilters = JSON.parse(localStorage.getItem('agenda_calAssigneeFilters') || '{}');
+
+function saveCalFilters() {
+  localStorage.setItem('agenda_calFilters', JSON.stringify(calFilters));
+  localStorage.setItem('agenda_calAssigneeFilters', JSON.stringify(calAssigneeFilters));
+}
 let calEventEditData = null;
 let draggedGroup = null;
 let activeEditDropdown = null;
@@ -2067,22 +2072,26 @@ document.getElementById('cal-today').addEventListener('click', () => {
 document.getElementById('cal-filter-deadlines').addEventListener('click', (e) => {
   calFilters.deadlines = !calFilters.deadlines;
   e.currentTarget.classList.toggle('active', calFilters.deadlines);
+  saveCalFilters();
   renderCalendar();
 });
 
 document.getElementById('cal-filter-timeoff').addEventListener('click', (e) => {
   calFilters.timeoff = !calFilters.timeoff;
   e.currentTarget.classList.toggle('active', calFilters.timeoff);
+  saveCalFilters();
   renderCalendar();
 });
 
 document.getElementById('cal-all-on').addEventListener('click', () => {
   Object.keys(calAssigneeFilters).forEach(k => calAssigneeFilters[k] = true);
+  saveCalFilters();
   renderCalendar();
 });
 
 document.getElementById('cal-all-off').addEventListener('click', () => {
   Object.keys(calAssigneeFilters).forEach(k => calAssigneeFilters[k] = false);
+  saveCalFilters();
   renderCalendar();
 });
 
@@ -2105,6 +2114,7 @@ function renderCalendarAssigneeFilters() {
     chip.addEventListener('click', () => {
       calAssigneeFilters[name] = !calAssigneeFilters[name];
       chip.classList.toggle('active', calAssigneeFilters[name]);
+      saveCalFilters();
       renderCalendar();
     });
     container.appendChild(chip);
@@ -2114,6 +2124,10 @@ function renderCalendarAssigneeFilters() {
 function renderCalendar() {
   const grid = document.getElementById('calendar-grid');
   const titleEl = document.getElementById('cal-month-title');
+
+  // Sync filter button states from persisted state
+  document.getElementById('cal-filter-deadlines').classList.toggle('active', calFilters.deadlines);
+  document.getElementById('cal-filter-timeoff').classList.toggle('active', calFilters.timeoff);
 
   // Render assignee filter chips
   renderCalendarAssigneeFilters();
