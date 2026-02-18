@@ -25,6 +25,17 @@ let activeEditDropdown = null;
 let activeInlineInput = null;
 let copyingTaskId = null;
 
+// --- FLATPICKR DATE PICKER HELPER ---
+function initDatePicker(el, opts = {}) {
+  return flatpickr(el, {
+    dateFormat: 'd/m/Y',
+    locale: 'es',
+    allowInput: true,
+    disableMobile: true,
+    ...opts
+  });
+}
+
 // --- NEW FEATURE STATE ---
 const undoStack = [];
 const MAX_UNDO = 20;
@@ -1241,8 +1252,6 @@ function openDateInput(cell, task) {
 
   cell.innerHTML = '';
   cell.appendChild(input);
-  input.focus();
-  input.select();
 
   activeInlineInput = { cell, originalHtml, input };
 
@@ -1273,14 +1282,22 @@ function openDateInput(cell, task) {
     highlightCell(task.id, 'deadline');
   };
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') save();
-    if (e.key === 'Escape') { closeInlineInput(); clearPresence(); cell.innerHTML = originalHtml; }
+  const fp = initDatePicker(input, {
+    defaultDate: currentValue ? isoToDDMMYYYY(currentValue) : undefined,
+    onChange(selectedDates, dateStr) {
+      input.value = dateStr;
+    },
+    onClose() {
+      setTimeout(() => {
+        if (activeInlineInput && activeInlineInput.input === input) save();
+      }, 100);
+    }
   });
-  input.addEventListener('blur', () => {
-    setTimeout(() => {
-      if (activeInlineInput && activeInlineInput.input === input) save();
-    }, 150);
+  fp.open();
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { fp.close(); save(); }
+    if (e.key === 'Escape') { fp.close(); closeInlineInput(); clearPresence(); cell.innerHTML = originalHtml; }
   });
 }
 
@@ -1640,6 +1657,9 @@ function openContractEditor(badgeEl, contractTask) {
     }
   });
 
+  // Init date picker on contract date input
+  initDatePicker(popup.querySelector('.contrato-date-input'));
+
   // Cancel handler
   popup.querySelector('.contrato-cancel-btn').addEventListener('click', () => {
     popup.remove();
@@ -1736,6 +1756,10 @@ function openTimeOffEditor(badgeEl, toTask) {
       popup.style.left = (window.innerWidth - popupRect.width - 8 + window.scrollX) + 'px';
     }
   });
+
+  // Init date pickers on time off date inputs
+  initDatePicker(popup.querySelector('.timeoff-start-input'));
+  initDatePicker(popup.querySelector('.timeoff-end-input'));
 
   // Cancel
   popup.querySelector('.timeoff-popup-cancel').addEventListener('click', () => {
@@ -3504,6 +3528,12 @@ function renderActivityLog() {
 document.getElementById('activity-filter-action')?.addEventListener('change', renderActivityLog);
 document.getElementById('activity-sort')?.addEventListener('change', renderActivityLog);
 document.getElementById('activity-refresh')?.addEventListener('click', loadActivityLog);
+
+// --- INIT DATE PICKERS ON STATIC INPUTS ---
+initDatePicker('#new-task-deadline');
+initDatePicker('#timeoff-start');
+initDatePicker('#timeoff-end');
+initDatePicker('#cal-event-date');
 
 // --- INIT ---
 loadData();
