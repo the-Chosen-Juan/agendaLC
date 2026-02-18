@@ -812,6 +812,101 @@ app.get('/api/sheet-sync/debug', authMiddleware, async (req, res) => {
   }
 });
 
+// Detailed CSV structure analysis endpoint
+app.get('/api/sheet-sync/debug-structure', authMiddleware, async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+  try {
+    const csv = await fetchSheetCSV(url);
+    const lines = csv.split('\n');
+    const parseRow = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (ch === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    // Analyze every line
+    const analysis = {
+      totalLines: lines.length,
+      emptyLines: 0,
+      headerLines: [],      // lines that look like column headers
+      sectionHeaders: [],    // lines that look like section dividers
+      dataRows: 0,
+      uniqueCol1Values: {},  // all unique values in column 1
+      uniqueAssignees: {},   // all unique values in assignee column
+      uniqueProjects: {},    // count by project name
+      sampleRows: [],        // first 5 data rows per section
+      rawLines: []           // first 100 lines for manual inspection
+    };
+
+    // Show first 150 raw lines
+    for (let i = 0; i < Math.min(150, lines.length); i++) {
+      analysis.rawLines.push({ line: i + 1, content: lines[i].substring(0, 300) });
+    }
+
+    // Also show lines 200-250 and 400-450 to see repetition
+    analysis.rawLines.push({ line: '---', content: '=== LINES 200-230 ===' });
+    for (let i = 199; i < Math.min(230, lines.length); i++) {
+      analysis.rawLines.push({ line: i + 1, content: lines[i].substring(0, 300) });
+    }
+    analysis.rawLines.push({ line: '---', content: '=== LINES 400-430 ===' });
+    for (let i = 399; i < Math.min(430, lines.length); i++) {
+      analysis.rawLines.push({ line: i + 1, content: lines[i].substring(0, 300) });
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) { analysis.emptyLines++; continue; }
+
+      const cols = parseRow(line);
+      const col1 = (cols[0] || '').replace(/^"|"$/g, '').trim();
+      const col3 = (cols[2] || '').replace(/^"|"$/g, '').trim();
+      const col4 = (cols[3] || '').replace(/^"|"$/g, '').trim();
+
+      // Check if this looks like a header row (contains known header words)
+      if (col1.toLowerCase().includes('column') || col3.toLowerCase().includes('tema') || col4.toLowerCase().includes('asignado')) {
+        analysis.headerLines.push({ line: i + 1, content: line.substring(0, 200) });
+      }
+
+      // Check for section headers (rows where only 1-2 cells are non-empty and contain "Asignado" or assignee pattern)
+      const nonEmptyCols = cols.filter(c => c.replace(/^"|"$/g, '').trim()).length;
+      if (nonEmptyCols <= 2 && col1 && i > 0) {
+        analysis.sectionHeaders.push({ line: i + 1, col1, nonEmptyCols, raw: line.substring(0, 200) });
+      }
+
+      // Track unique values
+      if (col1) analysis.uniqueCol1Values[col1] = (analysis.uniqueCol1Values[col1] || 0) + 1;
+      if (col4) analysis.uniqueAssignees[col4] = (analysis.uniqueAssignees[col4] || 0) + 1;
+      if (col3) analysis.uniqueProjects[col3] = (analysis.uniqueProjects[col3] || 0) + 1;
+    }
+
+    // Limit project listing to show duplicates
+    const projectCounts = Object.entries(analysis.uniqueProjects).sort((a, b) => b[1] - a[1]);
+    analysis.topDuplicatedProjects = projectCounts.slice(0, 30);
+    analysis.projectsAppearingOnce = projectCounts.filter(([, c]) => c === 1).length;
+    analysis.projectsAppearingMultiple = projectCounts.filter(([, c]) => c > 1).length;
+    delete analysis.uniqueProjects;
+
+    res.json(analysis);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Restore tasks from local seed file (emergency recovery)
 app.post('/api/restore-from-seed', authMiddleware, async (req, res) => {
   try {
