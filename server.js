@@ -242,7 +242,12 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,
-      dataVersion: settings.dataVersion || 0
+      dataVersion: settings.dataVersion || 0,
+      sheetSyncUrl: settings.sheetSyncUrl || '',
+      sheetSyncEnabled: settings.sheetSyncEnabled || false,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncLastRun: settings.sheetSyncLastRun || null,
+      sheetSyncLastResult: settings.sheetSyncLastResult || null
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -261,6 +266,9 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.weeklyLeader !== undefined) settings.weeklyLeader = req.body.weeklyLeader;
     if (req.body.leaderPool !== undefined) settings.leaderPool = req.body.leaderPool;
     if (req.body.autoDeleteDays !== undefined) settings.autoDeleteDays = req.body.autoDeleteDays;
+    if (req.body.sheetSyncUrl !== undefined) settings.sheetSyncUrl = req.body.sheetSyncUrl;
+    if (req.body.sheetSyncEnabled !== undefined) settings.sheetSyncEnabled = req.body.sheetSyncEnabled;
+    if (req.body.sheetSyncIntervalSec !== undefined) settings.sheetSyncIntervalSec = req.body.sheetSyncIntervalSec;
     await saveSettings(settings);
     res.json({
       teamMembers: settings.teamMembers,
@@ -271,7 +279,12 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,
-      dataVersion: settings.dataVersion || 0
+      dataVersion: settings.dataVersion || 0,
+      sheetSyncUrl: settings.sheetSyncUrl || '',
+      sheetSyncEnabled: settings.sheetSyncEnabled || false,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncLastRun: settings.sheetSyncLastRun || null,
+      sheetSyncLastResult: settings.sheetSyncLastResult || null
     });
   } catch (err) {
     console.error('Update settings error:', err);
@@ -474,6 +487,323 @@ app.post('/api/activity-log', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+// ============================================================
+// GOOGLE SHEETS AUTO-SYNC
+// ============================================================
+
+// Server-side CSV parser
+function parseCSVServer(csvText) {
+  const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+
+  const parseRow = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const headers = parseRow(lines[0]).map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
+
+  const fieldMap = {
+    '#': 'taskNumber', 'numero': 'taskNumber', 'number': 'taskNumber', 'nro': 'taskNumber',
+    'cliente': 'client', 'client': 'client',
+    'proyecto': 'project', 'project': 'project', 'tema': 'project', 'tema / proyecto': 'project',
+    'asignado': 'assignee', 'assignee': 'assignee', 'assigned': 'assignee',
+    'supervisor': 'supervisor',
+    'prioridad': 'priority', 'priority': 'priority',
+    'deadline': 'deadline', 'fecha': 'deadline', 'fecha limite': 'deadline', 'fecha límite': 'deadline',
+    'status': 'status', 'estado': 'status',
+    'owner': 'owner', 'dueño': 'owner',
+    'comentarios': 'comments', 'comments': 'comments', 'notas': 'comments'
+  };
+
+  const colMapping = headers.map(h => fieldMap[h] || null);
+
+  const parsed = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseRow(lines[i]);
+    const task = {
+      client: '', project: '', assignee: '', supervisor: '',
+      priority: 'TBD', deadline: '', status: 'sin empezar',
+      owner: '', comments: '', taskNumber: ''
+    };
+
+    colMapping.forEach((field, idx) => {
+      if (field && values[idx] !== undefined) {
+        let val = values[idx].replace(/^"|"$/g, '');
+        if (field === 'client' && val.toUpperCase() === 'TIME OFF') return;
+        if (field === 'deadline' && val) {
+          // Normalize DD/MM/YYYY → YYYY-MM-DD
+          const ddmm = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+          if (ddmm) {
+            val = `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`;
+          }
+        }
+        task[field] = val;
+      }
+    });
+
+    if (task.client || task.project || task.assignee) {
+      parsed.push(task);
+    }
+  }
+
+  return parsed;
+}
+
+// Fetch sheet CSV using existing fetchUrl helper
+async function fetchSheetCSV(url) {
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) throw new Error('Invalid Google Sheets URL');
+
+  const sheetId = match[1];
+  const gidMatch = url.match(/gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
+
+  let csv;
+  try {
+    csv = await fetchUrl(csvUrl);
+  } catch {
+    csv = await fetchUrl(gvizUrl);
+  }
+  if (csv.trim().startsWith('<!DOCTYPE') || csv.trim().startsWith('<html')) {
+    csv = await fetchUrl(gvizUrl);
+    if (csv.trim().startsWith('<!DOCTYPE') || csv.trim().startsWith('<html')) {
+      throw new Error('Google returned HTML instead of CSV');
+    }
+  }
+  return csv;
+}
+
+// Core sync logic
+async function performSheetSync() {
+  const settings = await getSettings();
+  const url = settings.sheetSyncUrl;
+  if (!url) throw new Error('No sheet URL configured');
+
+  const csv = await fetchSheetCSV(url);
+  const sheetTasks = parseCSVServer(csv);
+
+  const allTasks = await getTasks();
+  const regularTasks = allTasks.filter(t => !t.isTimeOff && (t.client || '').toLowerCase() !== 'contrato');
+  const otherTasks = allTasks.filter(t => t.isTimeOff || (t.client || '').toLowerCase() === 'contrato');
+
+  // Build lookup of existing regular tasks by taskNumber
+  const existingByNumber = {};
+  regularTasks.forEach(t => {
+    if (t.taskNumber) existingByNumber[String(t.taskNumber)] = t;
+  });
+
+  // Also build a composite key lookup for tasks without numbers
+  const existingByComposite = {};
+  regularTasks.forEach(t => {
+    const key = `${(t.client || '').toLowerCase()}|${(t.project || '').toLowerCase()}|${(t.assignee || '').toLowerCase()}`;
+    if (!existingByComposite[key]) existingByComposite[key] = t;
+  });
+
+  const finalRegular = [];
+  const usedIds = new Set();
+  let created = 0, updated = 0, unchanged = 0;
+
+  for (const st of sheetTasks) {
+    // Try to match: first by taskNumber, then by composite key
+    let existing = null;
+    if (st.taskNumber) {
+      existing = existingByNumber[String(st.taskNumber)];
+    }
+    if (!existing) {
+      const key = `${(st.client || '').toLowerCase()}|${(st.project || '').toLowerCase()}|${(st.assignee || '').toLowerCase()}`;
+      existing = existingByComposite[key];
+      // Don't reuse a task that was already matched
+      if (existing && usedIds.has(existing.id)) existing = null;
+    }
+
+    if (existing && !usedIds.has(existing.id)) {
+      usedIds.add(existing.id);
+      // Check if anything changed
+      let changed = false;
+      const fields = ['client', 'project', 'assignee', 'supervisor', 'priority', 'deadline', 'status', 'owner', 'comments', 'taskNumber'];
+      for (const f of fields) {
+        if ((st[f] || '') !== (existing[f] || '')) {
+          changed = true;
+          break;
+        }
+      }
+      if (changed) {
+        // Update existing task with sheet data, preserve id and timestamps
+        const updatedTask = {
+          ...existing,
+          ...st,
+          isSupervision: existing.isSupervision || false,
+          updatedAt: new Date().toISOString()
+        };
+        finalRegular.push(updatedTask);
+        updated++;
+      } else {
+        finalRegular.push(existing);
+        unchanged++;
+      }
+    } else {
+      // New task from sheet
+      const newTask = {
+        id: crypto.randomUUID(),
+        ...st,
+        isSupervision: false,
+        isTimeOff: false,
+        timeOffStart: '',
+        timeOffEnd: '',
+        timeOffType: '',
+        timeOffTitle: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      finalRegular.push(newTask);
+      created++;
+    }
+  }
+
+  const deleted = regularTasks.length - (updated + unchanged);
+  const finalTasks = [...otherTasks, ...finalRegular];
+  await saveTasks(finalTasks);
+
+  const result = {
+    created,
+    updated,
+    deleted: Math.max(0, deleted),
+    unchanged,
+    total: sheetTasks.length,
+    timestamp: new Date().toISOString()
+  };
+
+  // Save sync status
+  settings.sheetSyncLastRun = result.timestamp;
+  settings.sheetSyncLastResult = result;
+  await saveSettings(settings);
+
+  return result;
+}
+
+// Sync endpoint
+app.post('/api/sheet-sync', authMiddleware, async (req, res) => {
+  try {
+    // If URL provided in body, save it first
+    if (req.body.url) {
+      const settings = await getSettings();
+      settings.sheetSyncUrl = req.body.url;
+      if (req.body.enabled !== undefined) settings.sheetSyncEnabled = req.body.enabled;
+      if (req.body.intervalSec !== undefined) settings.sheetSyncIntervalSec = req.body.intervalSec;
+      await saveSettings(settings);
+    }
+
+    const result = await performSheetSync();
+    console.log(`Sheet sync: +${result.created} ~${result.updated} -${result.deleted} =${result.unchanged}`);
+    res.json(result);
+  } catch (err) {
+    console.error('Sheet sync error:', err.message);
+    // Save error status
+    try {
+      const settings = await getSettings();
+      settings.sheetSyncLastRun = new Date().toISOString();
+      settings.sheetSyncLastResult = { error: err.message, timestamp: new Date().toISOString() };
+      await saveSettings(settings);
+    } catch {}
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Sync config endpoint
+app.put('/api/sheet-sync/config', authMiddleware, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    if (req.body.url !== undefined) settings.sheetSyncUrl = req.body.url;
+    if (req.body.enabled !== undefined) settings.sheetSyncEnabled = req.body.enabled;
+    if (req.body.intervalSec !== undefined) settings.sheetSyncIntervalSec = req.body.intervalSec;
+    await saveSettings(settings);
+    res.json({
+      sheetSyncUrl: settings.sheetSyncUrl || '',
+      sheetSyncEnabled: settings.sheetSyncEnabled || false,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncLastRun: settings.sheetSyncLastRun || null,
+      sheetSyncLastResult: settings.sheetSyncLastResult || null
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/sheet-sync/status', authMiddleware, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    res.json({
+      sheetSyncUrl: settings.sheetSyncUrl || '',
+      sheetSyncEnabled: settings.sheetSyncEnabled || false,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncLastRun: settings.sheetSyncLastRun || null,
+      sheetSyncLastResult: settings.sheetSyncLastResult || null
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Auto-sync timer (local server only, not Vercel)
+if (process.env.VERCEL !== '1') {
+  let syncTimer = null;
+  async function startAutoSync() {
+    if (syncTimer) clearInterval(syncTimer);
+    try {
+      const settings = await getSettings();
+      if (settings.sheetSyncEnabled && settings.sheetSyncUrl) {
+        const interval = (settings.sheetSyncIntervalSec || 60) * 1000;
+        syncTimer = setInterval(async () => {
+          try {
+            const s = await getSettings();
+            if (!s.sheetSyncEnabled || !s.sheetSyncUrl) {
+              clearInterval(syncTimer);
+              syncTimer = null;
+              return;
+            }
+            const result = await performSheetSync();
+            if (result.created || result.updated || result.deleted) {
+              console.log(`Auto-sync: +${result.created} ~${result.updated} -${result.deleted}`);
+            }
+          } catch (err) {
+            console.error('Auto-sync error:', err.message);
+          }
+        }, interval);
+        console.log(`Sheet auto-sync enabled (every ${settings.sheetSyncIntervalSec || 60}s)`);
+      }
+    } catch {}
+  }
+  // Start auto-sync after a short delay to let the server initialize
+  setTimeout(startAutoSync, 3000);
+  // Re-check config periodically to pick up enable/disable changes
+  setInterval(async () => {
+    try {
+      const s = await getSettings();
+      const shouldRun = s.sheetSyncEnabled && s.sheetSyncUrl;
+      if (shouldRun && !syncTimer) startAutoSync();
+      if (!shouldRun && syncTimer) { clearInterval(syncTimer); syncTimer = null; }
+    } catch {}
+  }, 15000);
+}
 
 // Start server (only when not imported by Vercel)
 if (process.env.VERCEL !== '1') {

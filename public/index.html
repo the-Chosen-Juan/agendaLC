@@ -39,6 +39,10 @@
           <h1 class="page-title" id="page-title">Agenda</h1>
         </div>
         <div class="topbar-right">
+          <div id="sync-indicator" class="sync-indicator hidden" title="Google Sheets Sync">
+            <span class="material-icons-round sync-indicator-icon">sync</span>
+            <span class="sync-indicator-dot"></span>
+          </div>
           <button class="btn-icon" id="dark-mode-toggle" title="Modo oscuro"><span class="material-icons-round">dark_mode</span></button>
           <div class="search-box" id="search-box"><span class="material-icons-round">search</span><input type="text" id="search-input" placeholder="Buscar tareas..."></div>
           <div class="dropdown" id="add-task-dropdown">
@@ -137,16 +141,34 @@
           <button class="btn btn-ghost btn-sm" id="save-auto-delete" style="margin-top:.75rem"><span class="material-icons-round">save</span> Guardar</button>
         </div>
         <div class="settings-card">
-          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">sync</span>Importar / Exportar / Sincronizar</h2>
-          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Sincronizá con Google Sheets o importá/exportá archivos CSV.</p>
-          <div style="margin-bottom:1.25rem">
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">sync</span>Google Sheets Auto-Sync</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Sincronización automática con Google Sheets. Los cambios en la hoja se reflejan automáticamente.</p>
+          <div style="margin-bottom:1rem">
             <label style="font-weight:500;font-size:.9rem;display:block;margin-bottom:.5rem">Google Sheets URL</label>
             <div style="display:flex;gap:.5rem">
               <input type="text" id="sheets-url" placeholder="https://docs.google.com/spreadsheets/d/..." style="flex:1;padding:.55rem .75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:.85rem">
-              <button class="btn btn-primary btn-sm" id="sync-sheets-btn"><span class="material-icons-round">sync</span> Sincronizar</button>
             </div>
-            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.35rem">El documento debe ser público ("Cualquier persona con el enlace puede ver")</p>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.35rem">El documento debe ser público ("Cualquier persona con el enlace puede ver/editar")</p>
           </div>
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;font-weight:500">
+              <input type="checkbox" id="sheet-sync-enabled" style="width:auto;accent-color:var(--primary)">
+              Auto-sync activado
+            </label>
+            <div style="display:flex;align-items:center;gap:.35rem">
+              <label style="font-size:.8rem;color:var(--text-secondary)">Cada</label>
+              <input type="number" id="sheet-sync-interval" value="60" min="15" max="600" style="width:60px;padding:.3rem .5rem;border:1px solid var(--border);border-radius:var(--radius-xs);background:var(--surface);color:var(--text);font-size:.85rem;text-align:center">
+              <label style="font-size:.8rem;color:var(--text-secondary)">seg</label>
+            </div>
+            <button class="btn btn-primary btn-sm" id="save-sync-config"><span class="material-icons-round">save</span> Guardar</button>
+            <button class="btn btn-ghost btn-sm" id="sync-now-btn"><span class="material-icons-round">sync</span> Sincronizar ahora</button>
+          </div>
+          <div id="sync-status-box" style="display:none;padding:.65rem .85rem;border-radius:var(--radius-sm);background:var(--surface-hover);font-size:.8rem;color:var(--text-secondary)">
+            <span class="material-icons-round" style="font-size:.85rem;vertical-align:middle;margin-right:.25rem">info</span>
+            <span id="sync-status-text">Sin sincronizar aún</span>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border-light);margin:1.25rem 0">
+          <h3 style="font-size:.9rem;font-weight:600;margin-bottom:.75rem"><span class="material-icons-round" style="vertical-align:middle;margin-right:.35rem;font-size:1rem;color:var(--text-muted)">upload_file</span>Importar / Exportar CSV</h3>
           <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
             <input type="file" id="csv-file-input" accept=".csv" style="display:none">
             <button class="btn btn-ghost" id="import-csv-btn"><span class="material-icons-round">upload</span> Importar CSV</button>

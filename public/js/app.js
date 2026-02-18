@@ -242,6 +242,7 @@ async function loadData() {
     renderLeader();
     updateOverdueBadge();
     startPresencePolling();
+    startSheetSyncPolling();
   } catch (err) {
     console.error('Failed to load data:', err);
   }
@@ -2671,6 +2672,7 @@ document.getElementById('add-client-btn').addEventListener('click', () => {
 function renderSettingsPage() {
   renderLeaderPool();
   document.getElementById('auto-delete-days').value = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
+  renderSyncSettings();
 }
 
 function renderLeaderPool() {
@@ -3221,36 +3223,193 @@ document.getElementById('csv-file-input').addEventListener('change', (e) => {
   e.target.value = ''; // Reset so same file can be re-imported
 });
 
-// Google Sheets sync
-document.getElementById('sync-sheets-btn').addEventListener('click', async () => {
-  const url = document.getElementById('sheets-url').value.trim();
-  if (!url) {
-    toast('Pegá la URL del documento de Google Sheets', 'error');
+// --- GOOGLE SHEETS AUTO-SYNC ---
+let sheetSyncInterval = null;
+
+function updateSyncIndicator(status) {
+  const indicator = document.getElementById('sync-indicator');
+  const dot = indicator.querySelector('.sync-indicator-dot');
+  const icon = indicator.querySelector('.sync-indicator-icon');
+
+  if (!settings.sheetSyncEnabled || !settings.sheetSyncUrl) {
+    indicator.classList.add('hidden');
     return;
   }
 
-  if (!url.includes('docs.google.com/spreadsheets')) {
+  indicator.classList.remove('hidden');
+
+  if (status === 'syncing') {
+    icon.classList.add('spinning');
+    dot.className = 'sync-indicator-dot syncing';
+    indicator.title = 'Sincronizando...';
+  } else if (status === 'ok') {
+    icon.classList.remove('spinning');
+    dot.className = 'sync-indicator-dot ok';
+    const last = settings.sheetSyncLastResult;
+    indicator.title = last ? `Sync OK - ${last.total} tareas (${timeAgo(last.timestamp)})` : 'Sync OK';
+  } else if (status === 'error') {
+    icon.classList.remove('spinning');
+    dot.className = 'sync-indicator-dot error';
+    indicator.title = 'Error de sincronización';
+  } else {
+    icon.classList.remove('spinning');
+    dot.className = 'sync-indicator-dot';
+    indicator.title = 'Auto-sync activado';
+  }
+}
+
+function timeAgo(isoStr) {
+  if (!isoStr) return '';
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60) return 'hace unos segundos';
+  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+  return `hace ${Math.floor(diff / 86400)}d`;
+}
+
+function updateSyncStatusBox() {
+  const box = document.getElementById('sync-status-box');
+  const text = document.getElementById('sync-status-text');
+  if (!box || !text) return;
+
+  const last = settings.sheetSyncLastResult;
+  if (!last) {
+    box.style.display = 'none';
+    return;
+  }
+
+  box.style.display = 'block';
+  if (last.error) {
+    text.textContent = `Error: ${last.error} (${timeAgo(last.timestamp)})`;
+    box.style.background = 'rgba(239,68,68,.1)';
+  } else {
+    text.textContent = `Última sync: ${last.total} tareas (${last.created} nuevas, ${last.updated} actualizadas, ${last.deleted} eliminadas) — ${timeAgo(last.timestamp)}`;
+    box.style.background = '';
+  }
+}
+
+async function triggerSheetSync() {
+  updateSyncIndicator('syncing');
+  try {
+    const result = await api('POST', '/sheet-sync', {});
+    settings.sheetSyncLastRun = result.timestamp;
+    settings.sheetSyncLastResult = result;
+    updateSyncIndicator('ok');
+    updateSyncStatusBox();
+
+    // Refresh UI if there were changes
+    if (result.created || result.updated || result.deleted) {
+      await softRefresh();
+      toast(`Sync: +${result.created} ~${result.updated} -${result.deleted}`, 'info');
+    }
+    return result;
+  } catch (err) {
+    updateSyncIndicator('error');
+    settings.sheetSyncLastResult = { error: err.message, timestamp: new Date().toISOString() };
+    updateSyncStatusBox();
+    throw err;
+  }
+}
+
+function startSheetSyncPolling() {
+  stopSheetSyncPolling();
+  if (!settings.sheetSyncEnabled || !settings.sheetSyncUrl) {
+    updateSyncIndicator();
+    return;
+  }
+
+  const intervalSec = settings.sheetSyncIntervalSec || 60;
+  updateSyncIndicator(settings.sheetSyncLastResult?.error ? 'error' : 'ok');
+
+  sheetSyncInterval = setInterval(async () => {
+    if (document.visibilityState === 'hidden') return;
+    try {
+      await triggerSheetSync();
+    } catch {}
+  }, intervalSec * 1000);
+}
+
+function stopSheetSyncPolling() {
+  if (sheetSyncInterval) {
+    clearInterval(sheetSyncInterval);
+    sheetSyncInterval = null;
+  }
+}
+
+// Settings page: populate sync config when page loads
+function renderSyncSettings() {
+  const urlInput = document.getElementById('sheets-url');
+  const enabledCheckbox = document.getElementById('sheet-sync-enabled');
+  const intervalInput = document.getElementById('sheet-sync-interval');
+  if (!urlInput) return;
+
+  urlInput.value = settings.sheetSyncUrl || '';
+  enabledCheckbox.checked = settings.sheetSyncEnabled || false;
+  intervalInput.value = settings.sheetSyncIntervalSec || 60;
+  updateSyncStatusBox();
+}
+
+// Save sync config
+document.getElementById('save-sync-config').addEventListener('click', async () => {
+  const url = document.getElementById('sheets-url').value.trim();
+  const enabled = document.getElementById('sheet-sync-enabled').checked;
+  const intervalSec = Math.max(15, parseInt(document.getElementById('sheet-sync-interval').value) || 60);
+
+  if (enabled && !url) {
+    toast('Ingresá la URL del Google Sheet', 'error');
+    return;
+  }
+  if (enabled && !url.includes('docs.google.com/spreadsheets')) {
     toast('URL no válida. Debe ser un link de Google Sheets', 'error');
     return;
   }
 
-  const btn = document.getElementById('sync-sheets-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Cargando...';
-
   try {
-    const result = await api('GET', `/fetch-sheet?url=${encodeURIComponent(url)}`);
-    const parsed = parseCSV(result.csv);
-    if (parsed.length === 0) {
-      toast('No se encontraron tareas en el documento', 'error');
-      return;
+    const result = await api('PUT', '/sheet-sync/config', { url, enabled, intervalSec });
+    settings.sheetSyncUrl = result.sheetSyncUrl;
+    settings.sheetSyncEnabled = result.sheetSyncEnabled;
+    settings.sheetSyncIntervalSec = result.sheetSyncIntervalSec;
+    toast(enabled ? 'Auto-sync activado' : 'Auto-sync desactivado');
+    startSheetSyncPolling();
+
+    // If just enabled, trigger an immediate sync
+    if (enabled && url) {
+      try { await triggerSheetSync(); } catch {}
     }
-    openImportModal(parsed);
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
+// Sync now button
+document.getElementById('sync-now-btn').addEventListener('click', async () => {
+  const url = document.getElementById('sheets-url').value.trim();
+  if (!url) {
+    toast('Ingresá la URL del Google Sheet', 'error');
+    return;
+  }
+  if (!url.includes('docs.google.com/spreadsheets')) {
+    toast('URL no válida', 'error');
+    return;
+  }
+
+  // Save URL first if not saved yet
+  if (url !== settings.sheetSyncUrl) {
+    settings.sheetSyncUrl = url;
+    await api('PUT', '/sheet-sync/config', { url });
+  }
+
+  const btn = document.getElementById('sync-now-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Sincronizando...';
+  try {
+    const result = await triggerSheetSync();
+    toast(`Sync completado: ${result.total} tareas`);
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons-round">sync</span> Sincronizar';
+    btn.innerHTML = '<span class="material-icons-round">sync</span> Sincronizar ahora';
   }
 });
 
