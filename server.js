@@ -519,20 +519,52 @@ function parseCSVServer(csvText) {
 
   const headers = parseRow(lines[0]).map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
 
-  const fieldMap = {
-    '#': 'taskNumber', 'numero': 'taskNumber', 'number': 'taskNumber', 'nro': 'taskNumber',
+  // Exact match map
+  const exactMap = {
+    '#': 'taskNumber', 'numero': 'taskNumber', 'number': 'taskNumber', 'nro': 'taskNumber', 'nº': 'taskNumber', 'n°': 'taskNumber', 'no.': 'taskNumber',
     'cliente': 'client', 'client': 'client',
-    'proyecto': 'project', 'project': 'project', 'tema': 'project', 'tema / proyecto': 'project',
-    'asignado': 'assignee', 'assignee': 'assignee', 'assigned': 'assignee',
+    'proyecto': 'project', 'project': 'project', 'tema': 'project', 'tema / proyecto': 'project', 'proyecto / tema': 'project', 'tema/proyecto': 'project',
+    'asignado': 'assignee', 'assignee': 'assignee', 'assigned': 'assignee', 'asignado a': 'assignee', 'responsable': 'assignee',
     'supervisor': 'supervisor',
     'prioridad': 'priority', 'priority': 'priority',
-    'deadline': 'deadline', 'fecha': 'deadline', 'fecha limite': 'deadline', 'fecha límite': 'deadline',
-    'status': 'status', 'estado': 'status',
+    'deadline': 'deadline', 'fecha': 'deadline', 'fecha limite': 'deadline', 'fecha límite': 'deadline', 'vencimiento': 'deadline', 'due date': 'deadline', 'due': 'deadline', 'fecha de entrega': 'deadline',
+    'status': 'status', 'estado': 'status', 'estatus': 'status',
     'owner': 'owner', 'dueño': 'owner',
-    'comentarios': 'comments', 'comments': 'comments', 'notas': 'comments'
+    'comentarios': 'comments', 'comments': 'comments', 'notas': 'comments', 'observaciones': 'comments', 'nota': 'comments', 'descripción': 'comments', 'descripcion': 'comments'
   };
 
-  const colMapping = headers.map(h => fieldMap[h] || null);
+  // Partial/contains match as fallback (order matters - first match wins)
+  const partialMap = [
+    { pattern: 'numer', field: 'taskNumber' },
+    { pattern: 'client', field: 'client' },
+    { pattern: 'proyect', field: 'project' },
+    { pattern: 'tema', field: 'project' },
+    { pattern: 'asignad', field: 'assignee' },
+    { pattern: 'assign', field: 'assignee' },
+    { pattern: 'supervis', field: 'supervisor' },
+    { pattern: 'priorid', field: 'priority' },
+    { pattern: 'priority', field: 'priority' },
+    { pattern: 'deadline', field: 'deadline' },
+    { pattern: 'fecha', field: 'deadline' },
+    { pattern: 'vencim', field: 'deadline' },
+    { pattern: 'status', field: 'status' },
+    { pattern: 'estado', field: 'status' },
+    { pattern: 'owner', field: 'owner' },
+    { pattern: 'dueñ', field: 'owner' },
+    { pattern: 'comentar', field: 'comments' },
+    { pattern: 'comment', field: 'comments' },
+    { pattern: 'nota', field: 'comments' },
+    { pattern: 'observ', field: 'comments' },
+    { pattern: 'descrip', field: 'comments' },
+  ];
+
+  const colMapping = headers.map(h => {
+    if (exactMap[h]) return exactMap[h];
+    for (const { pattern, field } of partialMap) {
+      if (h.includes(pattern)) return field;
+    }
+    return null;
+  });
 
   const parsed = [];
   for (let i = 1; i < lines.length; i++) {
@@ -599,7 +631,17 @@ async function performSheetSync() {
   if (!url) throw new Error('No sheet URL configured');
 
   const csv = await fetchSheetCSV(url);
+  console.log('Sheet CSV first 300 chars:', csv.substring(0, 300));
   const sheetTasks = parseCSVServer(csv);
+  console.log(`Sheet parsed: ${sheetTasks.length} tasks from ${csv.split('\n').length} CSV lines`);
+
+  // SAFETY: never wipe existing tasks if the sheet returned 0 rows
+  // This prevents data loss from fetch errors, wrong URL, or empty sheets
+  if (sheetTasks.length === 0) {
+    const lines = csv.split('\n').filter(l => l.trim());
+    const firstLine = lines[0] || '(empty)';
+    throw new Error(`La hoja no devolvió tareas (${lines.length} líneas CSV). Headers detectados: "${firstLine.substring(0, 200)}"`);
+  }
 
   const allTasks = await getTasks();
   const regularTasks = allTasks.filter(t => !t.isTimeOff && (t.client || '').toLowerCase() !== 'contrato');
@@ -724,6 +766,67 @@ app.post('/api/sheet-sync', authMiddleware, async (req, res) => {
       settings.sheetSyncLastResult = { error: err.message, timestamp: new Date().toISOString() };
       await saveSettings(settings);
     } catch {}
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Debug endpoint: see what headers the sheet returns
+app.get('/api/sheet-sync/debug', authMiddleware, async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+  try {
+    const csv = await fetchSheetCSV(url);
+    const lines = csv.split('\n').filter(l => l.trim());
+    const parseRow = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (ch === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+    const headers = lines.length > 0 ? parseRow(lines[0]) : [];
+    const firstRow = lines.length > 1 ? parseRow(lines[1]) : [];
+    const parsed = parseCSVServer(csv);
+    res.json({
+      totalLines: lines.length,
+      headers,
+      firstRow,
+      parsedTasks: parsed.length,
+      sampleTask: parsed[0] || null,
+      rawFirst200: csv.substring(0, 500)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Restore tasks from local seed file (emergency recovery)
+app.post('/api/restore-from-seed', authMiddleware, async (req, res) => {
+  try {
+    const seedPath = path.join(__dirname, 'data', 'agenda.json');
+    if (!fs.existsSync(seedPath)) {
+      return res.status(404).json({ error: 'No seed file found' });
+    }
+    const data = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+    const seedTasks = data.tasks || data;
+    if (!Array.isArray(seedTasks) || seedTasks.length === 0) {
+      return res.status(400).json({ error: 'Seed file has no tasks' });
+    }
+    await saveTasks(seedTasks);
+    res.json({ message: `Restored ${seedTasks.length} tasks from seed`, count: seedTasks.length });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

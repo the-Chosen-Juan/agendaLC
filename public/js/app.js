@@ -3072,6 +3072,17 @@ function exportCSV() {
 
 document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
 
+document.getElementById('restore-seed-btn').addEventListener('click', async () => {
+  if (!confirm('¿Restaurar datos desde el archivo original? Esto reemplazará todas las tareas actuales.')) return;
+  try {
+    const result = await api('POST', '/restore-from-seed', {});
+    toast(`Restauradas ${result.count} tareas`);
+    await softRefresh();
+  } catch (err) {
+    toast('Error: ' + err.message, 'error');
+  }
+});
+
 // --- CSV IMPORT & GOOGLE SHEETS SYNC ---
 let pendingImportTasks = [];
 
