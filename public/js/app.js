@@ -2355,23 +2355,50 @@ function renderCalendar() {
     });
   }
 
-  if (calFilters.timeoff) {
-    getTimeOffEntries().forEach(to => {
-      if (!to.timeOffStart || !to.timeOffEnd) return;
-      // Apply assignee filter
-      if (to.assignee && calAssigneeFilters[to.assignee] === false) return;
-      const start = new Date(to.timeOffStart + 'T00:00:00');
-      const end = new Date(to.timeOffEnd + 'T00:00:00');
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const ds = d.toISOString().slice(0, 10);
-        if (!timeoffMap[ds]) timeoffMap[ds] = [];
-        const isStart = ds === to.timeOffStart;
-        const isEnd = ds === to.timeOffEnd;
-        const isSingle = to.timeOffStart === to.timeOffEnd;
-        timeoffMap[ds].push({ ...to, _pos: isSingle ? 'single' : isStart ? 'start' : isEnd ? 'end' : 'middle' });
+  // --- Time-off lane assignment for consistent vertical positioning ---
+  const visibleTimeoffs = calFilters.timeoff ? getTimeOffEntries().filter(to => {
+    if (!to.timeOffStart || !to.timeOffEnd) return false;
+    if (to.assignee && calAssigneeFilters[to.assignee] === false) return false;
+    return true;
+  }) : [];
+  // Sort: earliest start first, longer entries first for tie-breaking
+  visibleTimeoffs.sort((a, b) => {
+    const sd = (a.timeOffStart || '').localeCompare(b.timeOffStart || '');
+    if (sd !== 0) return sd;
+    return (b.timeOffEnd || '').localeCompare(a.timeOffEnd || '');
+  });
+  // Assign lanes (greedy: first available non-overlapping lane)
+  const timeoffLanes = [];
+  const entryLaneMap = {};
+  visibleTimeoffs.forEach(to => {
+    for (let i = 0; i < timeoffLanes.length; i++) {
+      const last = timeoffLanes[i][timeoffLanes[i].length - 1];
+      if (to.timeOffStart > last.timeOffEnd) {
+        timeoffLanes[i].push(to);
+        entryLaneMap[to.id] = i;
+        return;
       }
-    });
-  }
+    }
+    timeoffLanes.push([to]);
+    entryLaneMap[to.id] = timeoffLanes.length - 1;
+  });
+  // Build timeoffMap with lane info
+  visibleTimeoffs.forEach(to => {
+    const start = new Date(to.timeOffStart + 'T00:00:00');
+    const end = new Date(to.timeOffEnd + 'T00:00:00');
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const ds = d.toISOString().slice(0, 10);
+      if (!timeoffMap[ds]) timeoffMap[ds] = [];
+      const isStart = ds === to.timeOffStart;
+      const isEnd = ds === to.timeOffEnd;
+      const isSingle = to.timeOffStart === to.timeOffEnd;
+      timeoffMap[ds].push({
+        ...to,
+        _pos: isSingle ? 'single' : isStart ? 'start' : isEnd ? 'end' : 'middle',
+        _lane: entryLaneMap[to.id] || 0
+      });
+    }
+  });
 
   let html = '';
 
@@ -2411,12 +2438,28 @@ function renderCalendar() {
 
     let eventsHtml = '<div class="calendar-events">';
 
-    timeoffs.forEach(to => {
+    // Sort timeoffs by lane for consistent vertical positioning
+    const isMonday = i % 7 === 0;
+    const sortedTimeoffs = [...timeoffs].sort((a, b) => (a._lane || 0) - (b._lane || 0));
+    let nextLane = 0;
+    sortedTimeoffs.forEach(to => {
+      // Add invisible spacers for empty lanes above this entry
+      while (nextLane < (to._lane || 0)) {
+        eventsHtml += `<div class="calendar-event timeoff-spacer">\u00a0</div>`;
+        nextLane++;
+      }
       const memberObj = (settings.teamMembers || []).find(m => m.name === to.assignee);
       const color = memberObj?.color || getColorForName(to.assignee);
       const typeLabel = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
-      const pos = to._pos || 'single';
-      const showLabel = pos === 'start' || pos === 'single';
+      let pos = to._pos || 'single';
+      const isSunday = i % 7 === 6;
+      // Monday: continuing bar resumes with label
+      if (isMonday && pos === 'middle') pos = 'week-start';
+      if (isMonday && pos === 'end') pos = 'week-start-end';
+      // Sunday: continuing bar closes visually at end of row
+      if (isSunday && pos === 'middle') pos = 'week-end';
+      if (isSunday && pos === 'start') pos = 'week-start-end';
+      const showLabel = pos === 'start' || pos === 'single' || pos === 'week-start' || pos === 'week-start-end';
       // Clean title: strip "Assignee - " prefix from stale DB data
       let calTitle = to.timeOffTitle || '';
       if (calTitle.includes(' - ') && to.assignee) {
@@ -2427,6 +2470,7 @@ function renderCalendar() {
       eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="background:${color}" title="${escAttr(displayLabel)}" data-task-id="${to.id}" data-event-type="timeoff">
         ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(displayLabel)}` : '&nbsp;'}
       </div>`;
+      nextLane = (to._lane || 0) + 1;
     });
 
     deadlines.forEach(t => {
