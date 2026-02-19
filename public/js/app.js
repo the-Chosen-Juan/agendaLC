@@ -807,6 +807,7 @@ function renderGroupedTasks(container, filtered) {
 
     let contractHtml = '';
     if (memberContracts.length > 0) {
+      const seenContracts = new Set();
       memberContracts.forEach(ct => {
         // Extract date from project text if deadline missing (e.g. "Contrato hasta 27/2")
         let ctDeadline = ct.deadline;
@@ -819,6 +820,10 @@ function renderGroupedTasks(container, filtered) {
             ctDeadline = `${year}-${month}-${day}`;
           }
         }
+        // Deduplicate: only show one badge per deadline per assignee
+        const dedupKey = ctDeadline || ct.project || ct.id;
+        if (seenContracts.has(dedupKey)) return;
+        seenContracts.add(dedupKey);
         const deadlineClass = ctDeadline ? getDeadlineClass(ctDeadline) : '';
         const dateStr = ctDeadline ? formatDate(ctDeadline) : 'Sin fecha';
         contractHtml += `<span class="contrato-badge ${deadlineClass}" data-id="${ct.id}" title="Contrato hasta ${dateStr}">

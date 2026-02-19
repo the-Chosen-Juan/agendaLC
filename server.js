@@ -880,10 +880,12 @@ function parseCSVServer(csvText) {
 
   // Deduplicate — the sheet has multiple "group by" views (Asignado a, Marcas,
   // Supervisor, etc.) that repeat the same tasks. Keep only first occurrence.
+  // For contrato/time-off tasks, ignore client in dedup key since it varies by view.
   const seen = new Set();
   const unique = [];
   for (const task of parsed) {
-    const key = `${(task.client || '').toLowerCase()}|${(task.project || '').toLowerCase()}|${(task.assignee || '').toLowerCase()}`;
+    const clientPart = (task._isContrato || task._isTimeOff) ? '_special_' : (task.client || '').toLowerCase();
+    const key = `${clientPart}|${(task.project || '').toLowerCase()}|${(task.assignee || '').toLowerCase()}`;
     if (!seen.has(key)) {
       seen.add(key);
       unique.push(task);
