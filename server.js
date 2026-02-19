@@ -519,24 +519,40 @@ function parseCSVServer(csvText) {
 
   const headers = parseRow(lines[0]).map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
 
-  // Exact match map
+  // Exact match map — includes the actual Google Sheet column names
   const exactMap = {
-    '#': 'taskNumber', 'numero': 'taskNumber', 'number': 'taskNumber', 'nro': 'taskNumber', 'nº': 'taskNumber', 'n°': 'taskNumber', 'no.': 'taskNumber',
-    'cliente': 'client', 'client': 'client',
-    'proyecto': 'project', 'project': 'project', 'tema': 'project', 'tema / proyecto': 'project', 'proyecto / tema': 'project', 'tema/proyecto': 'project',
-    'asignado': 'assignee', 'assignee': 'assignee', 'assigned': 'assignee', 'asignado a': 'assignee', 'responsable': 'assignee',
+    // taskNumber
+    '#': 'taskNumber', 'numero': 'taskNumber', 'number': 'taskNumber', 'nro': 'taskNumber',
+    'nº': 'taskNumber', 'n°': 'taskNumber', 'no.': 'taskNumber', 'orden': 'taskNumber', 'tr': 'taskNumber',
+    // client — "Column 1" is the actual header in the sheet for the client/brand column
+    'column 1': 'client', 'cliente': 'client', 'client': 'client', 'marca': 'client', 'marcas': 'client',
+    // project
+    'proyecto': 'project', 'project': 'project', 'tema': 'project',
+    'tema / proyecto': 'project', 'proyecto / tema': 'project',
+    'tema/proyecto': 'project', 'tema/ proyecto': 'project',
+    // assignee — "Asignado ap" is the actual header in the sheet
+    'asignado': 'assignee', 'assignee': 'assignee', 'assigned': 'assignee',
+    'asignado a': 'assignee', 'asignado ap': 'assignee', 'responsable': 'assignee',
+    // other fields
     'supervisor': 'supervisor',
     'prioridad': 'priority', 'priority': 'priority',
-    'deadline': 'deadline', 'fecha': 'deadline', 'fecha limite': 'deadline', 'fecha límite': 'deadline', 'vencimiento': 'deadline', 'due date': 'deadline', 'due': 'deadline', 'fecha de entrega': 'deadline',
+    'deadline': 'deadline', 'fecha': 'deadline', 'fecha limite': 'deadline',
+    'fecha límite': 'deadline', 'vencimiento': 'deadline', 'due date': 'deadline',
+    'due': 'deadline', 'fecha de entrega': 'deadline',
     'status': 'status', 'estado': 'status', 'estatus': 'status',
     'owner': 'owner', 'dueño': 'owner',
-    'comentarios': 'comments', 'comments': 'comments', 'notas': 'comments', 'observaciones': 'comments', 'nota': 'comments', 'descripción': 'comments', 'descripcion': 'comments'
+    'comentarios': 'comments', 'comments': 'comments', 'notas': 'comments',
+    'observaciones': 'comments', 'nota': 'comments',
+    'descripción': 'comments', 'descripcion': 'comments'
   };
 
-  // Partial/contains match as fallback (order matters - first match wins)
+  // Partial/contains match as fallback (order matters — first match wins)
   const partialMap = [
     { pattern: 'numer', field: 'taskNumber' },
+    { pattern: 'orden', field: 'taskNumber' },
+    { pattern: 'column', field: 'client' },
     { pattern: 'client', field: 'client' },
+    { pattern: 'marca', field: 'client' },
     { pattern: 'proyect', field: 'project' },
     { pattern: 'tema', field: 'project' },
     { pattern: 'asignad', field: 'assignee' },
@@ -566,9 +582,23 @@ function parseCSVServer(csvText) {
     return null;
   });
 
+  console.log('CSV column mapping:', headers.map((h, i) => `"${h}" → ${colMapping[i] || '(unmapped)'}`).join(', '));
+
   const parsed = [];
   for (let i = 1; i < lines.length; i++) {
     const values = parseRow(lines[i]);
+    const cleanVals = values.map(v => v.replace(/^"|"$/g, '').trim());
+
+    // Skip section header rows (e.g. "Asignado ap: 1 | Whalys")
+    // These have at most 1-2 non-empty cells and contain grouping labels
+    const nonEmpty = cleanVals.filter(v => v).length;
+    if (nonEmpty <= 2) {
+      const joined = cleanVals.join(' ').toLowerCase();
+      if (joined.match(/asignado|supervisor\s*:|owner\s*:|marca\s*:|prioridad\s*:|status\s*:/i)) continue;
+    }
+    // Skip rows that are entirely empty
+    if (nonEmpty === 0) continue;
+
     const task = {
       client: '', project: '', assignee: '', supervisor: '',
       priority: 'TBD', deadline: '', status: 'sin empezar',
@@ -576,26 +606,50 @@ function parseCSVServer(csvText) {
     };
 
     colMapping.forEach((field, idx) => {
-      if (field && values[idx] !== undefined) {
-        let val = values[idx].replace(/^"|"$/g, '');
-        if (field === 'client' && val.toUpperCase() === 'TIME OFF') return;
-        if (field === 'deadline' && val) {
-          // Normalize DD/MM/YYYY → YYYY-MM-DD
-          const ddmm = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (field && cleanVals[idx] !== undefined) {
+        let val = cleanVals[idx];
+        if (!val) return;
+
+        if (field === 'deadline') {
+          // Normalize DD/MM/YYYY or DD/M/YY → YYYY-MM-DD
+          const ddmm = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
           if (ddmm) {
-            val = `${ddmm[3]}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`;
+            let year = ddmm[3];
+            if (year.length === 2) year = '20' + year;
+            val = `${year}-${ddmm[2].padStart(2, '0')}-${ddmm[1].padStart(2, '0')}`;
           }
         }
+
+        // Clean assignee: strip "N | " prefix (e.g. "1 | Whalys" → "Whalys")
+        if (field === 'assignee') {
+          const m = val.match(/^\d+\s*\|\s*(.+)$/);
+          if (m) val = m[1].trim();
+        }
+
         task[field] = val;
       }
     });
 
-    if (task.client || task.project || task.assignee) {
+    // Only include rows that have actual task data
+    if (task.project || (task.client && task.assignee)) {
       parsed.push(task);
     }
   }
 
-  return parsed;
+  // Deduplicate — the sheet has multiple "group by" views (Asignado a, Marcas,
+  // Supervisor, etc.) that repeat the same tasks. Keep only first occurrence.
+  const seen = new Set();
+  const unique = [];
+  for (const task of parsed) {
+    const key = `${(task.client || '').toLowerCase()}|${(task.project || '').toLowerCase()}|${(task.assignee || '').toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(task);
+    }
+  }
+
+  console.log(`CSV parsed: ${parsed.length} rows → ${unique.length} unique tasks (${parsed.length - unique.length} duplicates removed)`);
+  return unique;
 }
 
 // Fetch sheet CSV using existing fetchUrl helper
