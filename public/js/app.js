@@ -593,7 +593,7 @@ function renderEsperandoSection(container, esperandoTasks) {
   const section = document.createElement('div');
   section.className = 'esperando-section';
 
-  const isCollapsed = collapsedGroups['__esperando__'] === true;
+  const isCollapsed = collapsedGroups['__esperando__'] !== false; // collapsed by default
 
   const header = document.createElement('div');
   header.className = 'esperando-header';
@@ -750,12 +750,18 @@ function renderGroupedTasks(container, filtered) {
     if (memberTimeOffs.length > 0) {
       timeoffHtml = '<div class="group-timeoff">';
       memberTimeOffs.forEach(to => {
-        const start = formatDate(to.timeOffStart);
-        const end = formatDate(to.timeOffEnd);
-        const label = to.timeOffTitle || to.timeOffType || 'Time Off';
-        timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(to.timeOffTitle || to.timeOffType || 'Time Off')}">
+        // Use timeOffTitle directly (already contains name + dates from sheet)
+        // Format: "Marti PTO (20/2 - 6/3)" — no assignee prefix since it's next to the badge
+        const title = to.timeOffTitle || to.timeOffType || 'Time Off';
+        const startFmt = formatDate(to.timeOffStart);
+        const endFmt = formatDate(to.timeOffEnd);
+        // If the title already contains date info, just show it as-is
+        // Otherwise show title + date range
+        const hasDateInTitle = /\d{1,2}\/\d{1,2}/.test(title);
+        const badgeLabel = hasDateInTitle ? title : `${title} (${startFmt} - ${endFmt})`;
+        timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(badgeLabel)}">
           <span class="material-icons-round">beach_access</span>
-          ${escHtml(label)}: ${start} - ${end}
+          ${escHtml(badgeLabel)}
         </span>`;
       });
       timeoffHtml += '</div>';
@@ -1657,7 +1663,8 @@ function updateStats() {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  document.getElementById('stat-total').textContent = filtered.length;
+  // Exclude completed tasks from total count
+  document.getElementById('stat-total').textContent = filtered.filter(t => t.status !== 'completado').length;
   document.getElementById('stat-progress').textContent = filtered.filter(t =>
     t.status === 'en progreso' || t.status === 'on going'
   ).length;

@@ -636,10 +636,31 @@ function parseCSVServer(csvText) {
         continue;
       }
 
-      // Detect regular section headers (resets z-section context)
+      // Detect regular section headers — but check for z-patterns inside
+      // e.g. "Asignado ap: 7 | zz_lider agenda" should still trigger z-section skip
       if (joined.match(/asignado|supervisor\s*:|owner\s*:|marca\s*:|prioridad\s*:|status\s*:/i)) {
-        currentSectionStatus = '';
-        skipCurrentSection = false;
+        const afterPipe = joined.split('|').pop().trim();
+        if (/^z{1,3}[_\s]/.test(afterPipe)) {
+          const sectionName = afterPipe.replace(/^z{1,3}[_\s]+/, '');
+          skipCurrentSection = true; // default for unknown z-sections
+          currentSectionStatus = '';
+          for (const rule of zSectionRules) {
+            if (rule.pattern.test(sectionName)) {
+              currentSectionStatus = rule.status;
+              skipCurrentSection = rule.skip;
+              break;
+            }
+          }
+          console.log(`CSV section (embedded z): "${afterPipe}" → ${skipCurrentSection ? 'SKIP' : `status="${currentSectionStatus}"`}`);
+        } else if (/\b(sin\s*asignar|unassigned|abi)\b/i.test(afterPipe)) {
+          // Also skip "Sin asignar", "Abi" and similar non-team sections
+          skipCurrentSection = true;
+          currentSectionStatus = '';
+          console.log(`CSV section (ignored assignee): "${afterPipe}" → SKIP`);
+        } else {
+          currentSectionStatus = '';
+          skipCurrentSection = false;
+        }
         continue;
       }
     }
@@ -778,7 +799,7 @@ function parseCSVServer(csvText) {
     // Detect PTO / Vacaciones / OOO / Day Off rows → mark as time-off
     const allText = [task.client, task.project, task.comments].join(' ').toLowerCase();
     const timeOffPatterns = [
-      { pattern: /\bpto\b/i, type: 'Vacaciones' },
+      { pattern: /\bpto\b/i, type: 'PTO' },
       { pattern: /\bvacaciones\b/i, type: 'Vacaciones' },
       { pattern: /\bday\s*off\b/i, type: 'Day Off' },
       { pattern: /\booo\b/i, type: 'OOO' },
@@ -797,10 +818,43 @@ function parseCSVServer(csvText) {
     if (detectedTimeOff) {
       task._isTimeOff = true;
       task._timeOffType = detectedTimeOff;
-      // Build a descriptive title from the row data
-      task._timeOffTitle = [task.assignee, task.project || task.client].filter(Boolean).join(' - ');
-      task._timeOffDate = task.deadline || '';
+
+      // Use project text as the title (no assignee prefix — it's shown next to the badge)
+      const projectText = task.project || task.client || '';
+      task._timeOffTitle = projectText;
+
+      // Extract date range from project text (DD/MM or DD/MM/YYYY format)
+      // e.g. "Marti PTO 20/2 - 6/3" → start=20/2, end=6/3
+      const dateRangeMatch = projectText.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*[-–—]\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
+      const singleDateMatch = !dateRangeMatch && projectText.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
+
+      const parseDDMM = (str) => {
+        const parts = str.split('/');
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2] ? (parts[2].length === 2 ? '20' + parts[2] : parts[2]) : new Date().getFullYear().toString();
+        return `${year}-${month}-${day}`;
+      };
+
+      if (dateRangeMatch) {
+        task._timeOffStart = parseDDMM(dateRangeMatch[1]);
+        task._timeOffEnd = parseDDMM(dateRangeMatch[2]);
+      } else if (singleDateMatch) {
+        const d = parseDDMM(singleDateMatch[1]);
+        task._timeOffStart = d;
+        task._timeOffEnd = d;
+      } else {
+        // Fallback to deadline
+        task._timeOffStart = task.deadline || '';
+        task._timeOffEnd = task.deadline || '';
+      }
     }
+
+    // Skip tasks with z-prefixed assignees (organizational, not real people)
+    const assigneeLower = (task.assignee || '').toLowerCase().trim();
+    if (/^z{1,3}[_\s]/.test(assigneeLower)) continue;
+    // Skip known non-team / unassigned entries
+    if (['sin asignar', 'unassigned', 'abi'].includes(assigneeLower)) continue;
 
     // Only include rows that have actual task data
     if (task.project || (task.client && task.assignee)) {
@@ -908,11 +962,14 @@ async function performSheetSync() {
     const isTimeOff = st._isTimeOff || false;
     const timeOffType = st._timeOffType || '';
     const timeOffTitle = st._timeOffTitle || '';
-    const timeOffDate = st._timeOffDate || '';
+    const timeOffStart = st._timeOffStart || st._timeOffDate || '';
+    const timeOffEnd = st._timeOffEnd || st._timeOffDate || '';
     delete st._isTimeOff;
     delete st._timeOffType;
     delete st._timeOffTitle;
     delete st._timeOffDate;
+    delete st._timeOffStart;
+    delete st._timeOffEnd;
 
     if (existing && !usedIds.has(existing.id)) {
       usedIds.add(existing.id);
@@ -929,15 +986,16 @@ async function performSheetSync() {
       if (isTimeOff !== (existing.isTimeOff || false)) changed = true;
       if (changed) {
         // Update existing task with sheet data, preserve id and timestamps
+        // Use sheet's current time-off state (not OR with old) so removed OOO/PTO clears out
         const updatedTask = {
           ...existing,
           ...st,
           isSupervision: existing.isSupervision || false,
-          isTimeOff: isTimeOff || existing.isTimeOff || false,
-          timeOffType: timeOffType || existing.timeOffType || '',
-          timeOffTitle: timeOffTitle || existing.timeOffTitle || '',
-          timeOffStart: (isTimeOff ? timeOffDate : existing.timeOffStart) || '',
-          timeOffEnd: (isTimeOff ? timeOffDate : existing.timeOffEnd) || '',
+          isTimeOff,
+          timeOffType: isTimeOff ? timeOffType : '',
+          timeOffTitle: isTimeOff ? timeOffTitle : '',
+          timeOffStart: isTimeOff ? timeOffStart : '',
+          timeOffEnd: isTimeOff ? timeOffEnd : '',
           updatedAt: new Date().toISOString()
         };
         finalRegular.push(updatedTask);
@@ -953,8 +1011,8 @@ async function performSheetSync() {
         ...st,
         isSupervision: false,
         isTimeOff,
-        timeOffStart: timeOffDate,
-        timeOffEnd: timeOffDate,
+        timeOffStart,
+        timeOffEnd,
         timeOffType,
         timeOffTitle,
         createdAt: new Date().toISOString(),
