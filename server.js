@@ -1057,6 +1057,15 @@ async function performSheetSync() {
   const finalTasks = [...contractTasks, ...finalRegular];
   await saveTasks(finalTasks);
 
+  // Clean up assigneeOrder and teamMembers: remove names with no tasks
+  const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(Boolean));
+  if (settings.assigneeOrder) {
+    settings.assigneeOrder = settings.assigneeOrder.filter(name => activeAssignees.has(name));
+  }
+  if (settings.teamMembers) {
+    settings.teamMembers = settings.teamMembers.filter(m => activeAssignees.has(m.name));
+  }
+
   const result = {
     created,
     updated,
