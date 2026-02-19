@@ -324,6 +324,13 @@ function openModalDropdown(selectEl) {
   const currentValue = selectEl.dataset.value || '';
   const options = getModalOptions(field);
   const canAdd = ['client', 'assignee', 'supervisor', 'owner'].includes(field);
+  const isMultiSelect = field === 'supervisor';
+
+  // For multi-select, parse current comma-separated value into a Set
+  const selectedSet = new Set();
+  if (isMultiSelect && currentValue) {
+    currentValue.split(',').map(s => s.trim()).filter(Boolean).forEach(s => selectedSet.add(s));
+  }
 
   const dropdown = document.getElementById('modal-dropdown');
   const searchInput = document.getElementById('modal-dropdown-search');
@@ -346,8 +353,12 @@ function openModalDropdown(selectEl) {
   dropdown.style.maxWidth = Math.max(rect.width, 320) + 'px';
 
   searchInput.value = '';
-  searchInput.placeholder = 'Buscar...';
+  searchInput.placeholder = isMultiSelect ? 'Buscar supervisores...' : 'Buscar...';
   addBtn.classList.toggle('hidden', !canAdd);
+
+  // Remove existing done button if any
+  const existingDone = dropdown.querySelector('.multi-select-done');
+  if (existingDone) existingDone.remove();
 
   function renderOptions(filter) {
     const filtered = filter
@@ -355,15 +366,35 @@ function openModalDropdown(selectEl) {
       : options;
 
     optionsContainer.innerHTML = '';
-    filtered.forEach(opt => {
-      const div = document.createElement('div');
-      div.className = 'edit-dropdown-option' + (opt === currentValue ? ' active' : '');
-      div.innerHTML = '<span class="option-label">' + escHtml(opt) + '</span>';
-      div.addEventListener('click', () => {
-        selectModalValue(selectEl, opt);
+
+    if (isMultiSelect) {
+      filtered.forEach(opt => {
+        const div = document.createElement('div');
+        const isSelected = selectedSet.has(opt);
+        div.className = 'edit-dropdown-option' + (isSelected ? ' active' : '');
+        div.innerHTML = `<span class="multi-check">${isSelected ? '☑' : '☐'}</span> <span class="option-label">${escHtml(opt)}</span>`;
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (selectedSet.has(opt)) {
+            selectedSet.delete(opt);
+          } else {
+            selectedSet.add(opt);
+          }
+          renderOptions(filter);
+        });
+        optionsContainer.appendChild(div);
       });
-      optionsContainer.appendChild(div);
-    });
+    } else {
+      filtered.forEach(opt => {
+        const div = document.createElement('div');
+        div.className = 'edit-dropdown-option' + (opt === currentValue ? ' active' : '');
+        div.innerHTML = '<span class="option-label">' + escHtml(opt) + '</span>';
+        div.addEventListener('click', () => {
+          selectModalValue(selectEl, opt);
+        });
+        optionsContainer.appendChild(div);
+      });
+    }
 
     if (filtered.length === 0) {
       optionsContainer.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem;text-align:center">Sin resultados</div>';
@@ -371,6 +402,19 @@ function openModalDropdown(selectEl) {
   }
 
   renderOptions('');
+
+  // Add "Done" button for multi-select
+  if (isMultiSelect) {
+    const doneBtn = document.createElement('button');
+    doneBtn.className = 'multi-select-done';
+    doneBtn.textContent = 'Listo';
+    doneBtn.style.cssText = 'width:100%;padding:.5rem;background:var(--accent);color:#fff;border:none;border-radius:0 0 8px 8px;cursor:pointer;font-size:.85rem;font-weight:600;';
+    doneBtn.addEventListener('click', () => {
+      const newValue = [...selectedSet].join(', ');
+      selectModalValue(selectEl, newValue);
+    });
+    dropdown.appendChild(doneBtn);
+  }
 
   searchInput.oninput = () => renderOptions(searchInput.value);
 
@@ -380,7 +424,13 @@ function openModalDropdown(selectEl) {
       toast('Escribí un nombre en el buscador', 'error');
       return;
     }
-    selectModalValue(selectEl, newName);
+    if (isMultiSelect) {
+      selectedSet.add(newName);
+      searchInput.value = '';
+      renderOptions('');
+    } else {
+      selectModalValue(selectEl, newName);
+    }
     // Add to settings if appropriate
     if (field === 'client') {
       const color = getColorForName(newName);
@@ -412,7 +462,11 @@ function selectModalValue(selectEl, value) {
 
 function closeModalDropdown() {
   const dropdown = document.getElementById('modal-dropdown');
-  if (dropdown) dropdown.classList.add('hidden');
+  if (dropdown) {
+    const doneBtn = dropdown.querySelector('.multi-select-done');
+    if (doneBtn) doneBtn.remove();
+    dropdown.classList.add('hidden');
+  }
   if (activeModalDropdown) {
     activeModalDropdown.selectEl.classList.remove('open');
     activeModalDropdown = null;
@@ -439,10 +493,12 @@ document.addEventListener('click', (e) => {
 
 // --- GET OPTIONS FOR DROPDOWN FIELDS (role-filtered) ---
 function getOptionsForField(field) {
+  // Extract individual names from supervisor field (may be comma-separated)
+  const supervisorNames = tasks.flatMap(t => (t.supervisor || '').split(',').map(s => s.trim())).filter(Boolean);
   const allPeople = [...new Set([
     ...(settings.teamMembers || []).map(m => m.name),
     ...tasks.map(t => t.assignee).filter(Boolean),
-    ...tasks.map(t => t.supervisor).filter(Boolean),
+    ...supervisorNames,
     ...tasks.map(t => t.owner).filter(Boolean)
   ])].sort();
 
@@ -744,12 +800,13 @@ function renderGroupedTasks(container, filtered) {
     if (isCollapsed) cards.classList.add('hidden');
 
     // Supervisor linked tasks: tasks this person supervises from other assignees
-    const supervisedTasks = getRegularTasks().filter(t =>
-      t.supervisor === assignee &&
-      t.assignee !== assignee &&
-      t.status !== 'completado' &&
-      t.status !== 'esperando respuesta'
-    );
+    const supervisedTasks = getRegularTasks().filter(t => {
+      const supervisors = (t.supervisor || '').split(',').map(s => s.trim());
+      return supervisors.includes(assignee) &&
+        t.assignee !== assignee &&
+        t.status !== 'completado' &&
+        t.status !== 'esperando respuesta';
+    });
 
     let supervisedSection = null;
     if (supervisedTasks.length > 0) {
@@ -946,7 +1003,7 @@ function buildTaskTable(taskList, showAssignee = false, groupAssignee = '') {
         <td class="editable-cell" data-field="taskNumber" style="color:var(--text-muted);font-size:.8rem">${escHtml(t.taskNumber || '')}</td>
         <td class="editable-cell task-project-cell" data-field="project">${escHtml(t.project || '—')}${supervisionTag}</td>
         ${showAssignee ? `<td class="editable-cell" data-field="assignee" style="color:var(--text-secondary)">${escHtml(t.assignee || '—')}</td>` : ''}
-        <td class="editable-cell" data-field="supervisor" style="color:var(--text-secondary)">${escHtml(t.supervisor || '—')}</td>
+        <td class="editable-cell" data-field="supervisor" style="color:var(--text-secondary)">${formatSupervisors(t.supervisor)}</td>
         <td class="editable-cell" data-field="priority"><span class="priority-badge ${priorityClass}">${escHtml(t.priority || '—')}</span></td>
         <td class="editable-cell" data-field="deadline"><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></td>
         <td class="editable-cell" data-field="status"><span class="status-badge ${statusClass}">${escHtml(t.status || '—')}</span></td>
@@ -995,7 +1052,7 @@ function buildMobileCards(taskList, groupAssignee = '') {
       <div class="mobile-card-bottom">
         <span class="status-badge ${statusClass}" style="font-size:.65rem">${escHtml(t.status || '—')}</span>
         ${t.deadline ? `<span class="mobile-card-meta"><span class="material-icons-round">event</span><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></span>` : ''}
-        ${t.supervisor ? `<span class="mobile-card-meta"><span class="material-icons-round">person</span>${escHtml(t.supervisor)}</span>` : ''}
+        ${t.supervisor ? `<span class="mobile-card-meta"><span class="material-icons-round">person</span>${formatSupervisors(t.supervisor)}</span>` : ''}
         <div class="mobile-card-actions">
           <button class="task-action-btn copy" title="Copiar" data-task-id="${t.id}"><span class="material-icons-round">content_copy</span></button>
           <button class="task-action-btn delete" title="Eliminar" data-task-id="${t.id}"><span class="material-icons-round">delete</span></button>
@@ -1312,6 +1369,13 @@ function openEditDropdown(cell, task, field) {
   const options = getOptionsForField(field);
   const currentValue = task[field] || '';
   const canAdd = ['client', 'assignee', 'supervisor', 'owner'].includes(field);
+  const isMultiSelect = field === 'supervisor';
+
+  // For multi-select, parse current comma-separated value into a Set
+  const selectedSet = new Set();
+  if (isMultiSelect && currentValue) {
+    currentValue.split(',').map(s => s.trim()).filter(Boolean).forEach(s => selectedSet.add(s));
+  }
 
   // Position dropdown
   const rect = cell.getBoundingClientRect();
@@ -1336,8 +1400,12 @@ function openEditDropdown(cell, task, field) {
   }
 
   searchInput.value = '';
-  searchInput.placeholder = 'Buscar...';
+  searchInput.placeholder = isMultiSelect ? 'Buscar supervisores...' : 'Buscar...';
   addBtn.classList.toggle('hidden', !canAdd);
+
+  // Remove existing done button if any
+  const existingDone = dropdown.querySelector('.multi-select-done');
+  if (existingDone) existingDone.remove();
 
   function renderOptions(filter = '') {
     const filtered = filter
@@ -1345,15 +1413,37 @@ function openEditDropdown(cell, task, field) {
       : options;
 
     optionsContainer.innerHTML = '';
-    filtered.forEach(opt => {
-      const div = document.createElement('div');
-      div.className = `edit-dropdown-option ${opt === currentValue ? 'active' : ''}`;
-      div.innerHTML = `<span class="option-label">${escHtml(opt)}</span>`;
-      div.addEventListener('click', () => {
-        selectDropdownOption(task, field, opt, currentValue);
+
+    if (isMultiSelect) {
+      // Multi-select mode with checkboxes
+      filtered.forEach(opt => {
+        const div = document.createElement('div');
+        const isSelected = selectedSet.has(opt);
+        div.className = `edit-dropdown-option ${isSelected ? 'active' : ''}`;
+        div.innerHTML = `<span class="multi-check">${isSelected ? '☑' : '☐'}</span> <span class="option-label">${escHtml(opt)}</span>`;
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (selectedSet.has(opt)) {
+            selectedSet.delete(opt);
+          } else {
+            selectedSet.add(opt);
+          }
+          renderOptions(filter); // Re-render to update checkboxes
+        });
+        optionsContainer.appendChild(div);
       });
-      optionsContainer.appendChild(div);
-    });
+    } else {
+      // Single-select mode (original behavior)
+      filtered.forEach(opt => {
+        const div = document.createElement('div');
+        div.className = `edit-dropdown-option ${opt === currentValue ? 'active' : ''}`;
+        div.innerHTML = `<span class="option-label">${escHtml(opt)}</span>`;
+        div.addEventListener('click', () => {
+          selectDropdownOption(task, field, opt, currentValue);
+        });
+        optionsContainer.appendChild(div);
+      });
+    }
 
     if (filtered.length === 0) {
       optionsContainer.innerHTML = '<div style="padding:.75rem;color:var(--text-muted);font-size:.85rem;text-align:center">Sin resultados</div>';
@@ -1361,6 +1451,19 @@ function openEditDropdown(cell, task, field) {
   }
 
   renderOptions();
+
+  // Add "Done" button for multi-select
+  if (isMultiSelect) {
+    const doneBtn = document.createElement('button');
+    doneBtn.className = 'multi-select-done';
+    doneBtn.textContent = 'Listo';
+    doneBtn.style.cssText = 'width:100%;padding:.5rem;background:var(--accent);color:#fff;border:none;border-radius:0 0 8px 8px;cursor:pointer;font-size:.85rem;font-weight:600;';
+    doneBtn.addEventListener('click', () => {
+      const newValue = [...selectedSet].join(', ');
+      selectDropdownOption(task, field, newValue, currentValue);
+    });
+    dropdown.appendChild(doneBtn);
+  }
 
   searchInput.oninput = () => renderOptions(searchInput.value);
 
@@ -1370,7 +1473,14 @@ function openEditDropdown(cell, task, field) {
       toast('Escribí un nombre en el buscador', 'error');
       return;
     }
-    selectDropdownOption(task, field, newName, currentValue);
+    if (isMultiSelect) {
+      // Add to selection set and re-render
+      selectedSet.add(newName);
+      searchInput.value = '';
+      renderOptions();
+    } else {
+      selectDropdownOption(task, field, newName, currentValue);
+    }
     // Also add to settings if appropriate
     if (field === 'client') {
       const color = getColorForName(newName);
@@ -1438,6 +1548,9 @@ async function selectDropdownOption(task, field, value, oldValue) {
 
 function closeEditDropdown() {
   const dropdown = document.getElementById('edit-dropdown');
+  // Remove multi-select done button if present
+  const doneBtn = dropdown.querySelector('.multi-select-done');
+  if (doneBtn) doneBtn.remove();
   dropdown.classList.add('hidden');
   activeEditDropdown = null;
 }
@@ -2417,7 +2530,10 @@ function renderTeam() {
         tasks.forEach(t => {
           const updates = {};
           if (t.assignee === name) { updates.assignee = ''; t.assignee = ''; }
-          if (t.supervisor === name) { updates.supervisor = ''; t.supervisor = ''; }
+          if ((t.supervisor || '').split(',').map(s => s.trim()).includes(name)) {
+            const newSup = (t.supervisor || '').split(',').map(s => s.trim()).filter(s => s !== name).join(', ');
+            updates.supervisor = newSup; t.supervisor = newSup;
+          }
           if (t.owner === name) { updates.owner = ''; t.owner = ''; }
           if (Object.keys(updates).length > 0) {
             updatePromises.push(api('PUT', `/tasks/${t.id}`, updates));
@@ -2553,7 +2669,9 @@ function openEditMemberModal(member) {
         tasks.forEach(t => {
           const updates = {};
           if (t.assignee === oldName) updates.assignee = name;
-          if (t.supervisor === oldName) updates.supervisor = name;
+          if ((t.supervisor || '').split(',').map(s => s.trim()).includes(oldName)) {
+            updates.supervisor = (t.supervisor || '').split(',').map(s => s.trim()).map(s => s === oldName ? name : s).join(', ');
+          }
           if (t.owner === oldName) updates.owner = name;
           if (Object.keys(updates).length > 0) {
             updatePromises.push(api('PUT', `/tasks/${t.id}`, updates));
@@ -2770,6 +2888,14 @@ document.getElementById('save-auto-delete').addEventListener('click', async () =
 });
 
 // --- HELPERS ---
+function formatSupervisors(value) {
+  if (!value) return '—';
+  const names = value.split(',').map(s => s.trim()).filter(Boolean);
+  if (names.length === 0) return '—';
+  if (names.length === 1) return escHtml(names[0]);
+  return names.map(n => `<span class="supervisor-chip">${escHtml(n)}</span>`).join(' ');
+}
+
 function escHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -3140,9 +3266,23 @@ function parseCSV(csvText) {
 
     colMapping.forEach((field, idx) => {
       if (field && values[idx] !== undefined) {
-        let val = values[idx].replace(/^"|"$/g, '');
+        let val = values[idx].replace(/^"|"$/g, '').trim();
         // Skip TIME OFF rows
         if (field === 'client' && val === 'TIME OFF') return;
+        // Clean dash-only values
+        if (/^[-–—]+$/.test(val)) return;
+        // Normalize status translations
+        if (field === 'status') {
+          const lower = val.toLowerCase();
+          const statusMap = { 'hecho': 'completado', 'terminado': 'completado', 'finalizado': 'completado', 'done': 'completado', 'listo': 'completado', 'en proceso': 'en progreso', 'in progress': 'en progreso', 'wip': 'en progreso', 'pendiente': 'sin empezar', 'not started': 'sin empezar', 'waiting': 'esperando respuesta', 'esperando': 'esperando respuesta', 'en espera': 'esperando respuesta', 'on hold': 'esperando respuesta', 'ongoing': 'on going', 'on-going': 'on going', 'continuo': 'on going' };
+          if (statusMap[lower]) val = statusMap[lower];
+        }
+        // Normalize priority
+        if (field === 'priority') {
+          const lower = val.toLowerCase();
+          const prioMap = { 'high': 'alta', 'medium': 'media', 'mid': 'media', 'low': 'baja' };
+          if (prioMap[lower]) val = prioMap[lower];
+        }
         task[field] = val;
       }
     });

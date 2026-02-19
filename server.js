@@ -610,6 +610,9 @@ function parseCSVServer(csvText) {
         let val = cleanVals[idx];
         if (!val) return;
 
+        // Clean dash-only values ("--", "-", "—", "---") → treat as empty
+        if (/^[-–—]+$/.test(val.trim())) return;
+
         if (field === 'deadline') {
           // Normalize DD/MM/YYYY or DD/M/YY → YYYY-MM-DD
           const ddmm = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
@@ -626,9 +629,82 @@ function parseCSVServer(csvText) {
           if (m) val = m[1].trim();
         }
 
+        // Normalize status with common-sense translations
+        if (field === 'status') {
+          const lower = val.toLowerCase().trim();
+          const statusMap = {
+            'hecho': 'completado',
+            'terminado': 'completado',
+            'finalizado': 'completado',
+            'done': 'completado',
+            'completed': 'completado',
+            'complete': 'completado',
+            'listo': 'completado',
+            'en proceso': 'en progreso',
+            'in progress': 'en progreso',
+            'wip': 'en progreso',
+            'working': 'en progreso',
+            'pendiente': 'sin empezar',
+            'not started': 'sin empezar',
+            'nuevo': 'sin empezar',
+            'new': 'sin empezar',
+            'waiting': 'esperando respuesta',
+            'esperando': 'esperando respuesta',
+            'en espera': 'esperando respuesta',
+            'on hold': 'esperando respuesta',
+            'ongoing': 'on going',
+            'on-going': 'on going',
+            'continuo': 'on going',
+          };
+          if (statusMap[lower]) {
+            val = statusMap[lower];
+          }
+        }
+
+        // Normalize priority translations
+        if (field === 'priority') {
+          const lower = val.toLowerCase().trim();
+          const prioMap = {
+            'high': 'alta',
+            'medium': 'media',
+            'mid': 'media',
+            'low': 'baja',
+          };
+          if (prioMap[lower]) {
+            val = prioMap[lower];
+          }
+        }
+
         task[field] = val;
       }
     });
+
+    // Detect PTO / Vacaciones / OOO / Day Off rows → mark as time-off
+    const allText = [task.client, task.project, task.comments].join(' ').toLowerCase();
+    const timeOffPatterns = [
+      { pattern: /\bpto\b/i, type: 'Vacaciones' },
+      { pattern: /\bvacaciones\b/i, type: 'Vacaciones' },
+      { pattern: /\bday\s*off\b/i, type: 'Day Off' },
+      { pattern: /\booo\b/i, type: 'OOO' },
+      { pattern: /\bout\s*of\s*office\b/i, type: 'OOO' },
+      { pattern: /\btime\s*off\b/i, type: 'Day Off' },
+      { pattern: /\blicencia\b/i, type: 'Day Off' },
+      { pattern: /\bferiado\b/i, type: 'Day Off' },
+    ];
+    let detectedTimeOff = null;
+    for (const { pattern, type } of timeOffPatterns) {
+      if (pattern.test(allText)) {
+        detectedTimeOff = type;
+        break;
+      }
+    }
+    if (detectedTimeOff) {
+      task._isTimeOff = true;
+      task._timeOffType = detectedTimeOff;
+      // Build a descriptive title from the row data
+      task._timeOffTitle = [task.assignee, task.project || task.client].filter(Boolean).join(' - ');
+      task._timeOffDate = task.deadline || '';
+    }
 
     // Only include rows that have actual task data
     if (task.project || (task.client && task.assignee)) {
@@ -698,8 +774,9 @@ async function performSheetSync() {
   }
 
   const allTasks = await getTasks();
-  const regularTasks = allTasks.filter(t => !t.isTimeOff && (t.client || '').toLowerCase() !== 'contrato');
-  const otherTasks = allTasks.filter(t => t.isTimeOff || (t.client || '').toLowerCase() === 'contrato');
+  // Include time-off tasks from sheet sync in matchable pool (exclude only contratos and manually-added time-off without sheet origin)
+  const regularTasks = allTasks.filter(t => (t.client || '').toLowerCase() !== 'contrato');
+  const contractTasks = allTasks.filter(t => (t.client || '').toLowerCase() === 'contrato');
 
   // Build lookup of existing regular tasks by taskNumber
   const existingByNumber = {};
@@ -731,6 +808,16 @@ async function performSheetSync() {
       if (existing && usedIds.has(existing.id)) existing = null;
     }
 
+    // Extract and clean internal time-off flags before comparing
+    const isTimeOff = st._isTimeOff || false;
+    const timeOffType = st._timeOffType || '';
+    const timeOffTitle = st._timeOffTitle || '';
+    const timeOffDate = st._timeOffDate || '';
+    delete st._isTimeOff;
+    delete st._timeOffType;
+    delete st._timeOffTitle;
+    delete st._timeOffDate;
+
     if (existing && !usedIds.has(existing.id)) {
       usedIds.add(existing.id);
       // Check if anything changed
@@ -742,12 +829,19 @@ async function performSheetSync() {
           break;
         }
       }
+      // Also check if time-off status changed
+      if (isTimeOff !== (existing.isTimeOff || false)) changed = true;
       if (changed) {
         // Update existing task with sheet data, preserve id and timestamps
         const updatedTask = {
           ...existing,
           ...st,
           isSupervision: existing.isSupervision || false,
+          isTimeOff: isTimeOff || existing.isTimeOff || false,
+          timeOffType: timeOffType || existing.timeOffType || '',
+          timeOffTitle: timeOffTitle || existing.timeOffTitle || '',
+          timeOffStart: (isTimeOff ? timeOffDate : existing.timeOffStart) || '',
+          timeOffEnd: (isTimeOff ? timeOffDate : existing.timeOffEnd) || '',
           updatedAt: new Date().toISOString()
         };
         finalRegular.push(updatedTask);
@@ -757,16 +851,16 @@ async function performSheetSync() {
         unchanged++;
       }
     } else {
-      // New task from sheet
+      // New task from sheet (flags already extracted above)
       const newTask = {
         id: crypto.randomUUID(),
         ...st,
         isSupervision: false,
-        isTimeOff: false,
-        timeOffStart: '',
-        timeOffEnd: '',
-        timeOffType: '',
-        timeOffTitle: '',
+        isTimeOff,
+        timeOffStart: timeOffDate,
+        timeOffEnd: timeOffDate,
+        timeOffType,
+        timeOffTitle,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -776,7 +870,7 @@ async function performSheetSync() {
   }
 
   const deleted = regularTasks.length - (updated + unchanged);
-  const finalTasks = [...otherTasks, ...finalRegular];
+  const finalTasks = [...contractTasks, ...finalRegular];
   await saveTasks(finalTasks);
 
   const result = {
