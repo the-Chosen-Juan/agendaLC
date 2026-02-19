@@ -17,8 +17,12 @@ const settings = {
     { name: "Nacho", color: "#f59e0b", role: "Equipo" },
     { name: "Nia Freelo", color: "#ec4899", role: "Freelance" },
     { name: "Tomi", color: "#10b981", role: "Equipo" },
-    { name: "Agus y Pau", color: "#3b82f6", role: "Equipo" },
-    { name: "Chiari & Marti", color: "#a855f7", role: "Equipo" },
+    { name: "Agus P.", color: "#3b82f6", role: "Equipo", team: "Agus y Pau" },
+    { name: "Pau", color: "#60a5fa", role: "Equipo", team: "Agus y Pau" },
+    { name: "Chiari", color: "#a855f7", role: "Equipo", team: "Chiari & Marti" },
+    { name: "Marti", color: "#c084fc", role: "Equipo", team: "Chiari & Marti" },
+    { name: "Juli", color: "#06b6d4", role: "Equipo", team: "Juli y Sofi" },
+    { name: "Sofi", color: "#22d3ee", role: "Equipo", team: "Juli y Sofi" },
     { name: "Liso", color: "#06b6d4", role: "Supervisor" },
     { name: "Zeke", color: "#14b8a6", role: "Supervisor" },
     { name: "Agus", color: "#f97316", role: "Owner" },
@@ -40,6 +44,11 @@ const settings = {
     { name: "ClubNutri", color: "#10b98118", textColor: "#10b981" },
     { name: "TIME OFF", color: "#94a3b818", textColor: "#94a3b8" },
     { name: "Dadá", color: "#d946ef18", textColor: "#d946ef" }
+  ],
+  teamGroups: [
+    { name: "Agus y Pau", color: "#3b82f6", members: ["Agus P.", "Pau"] },
+    { name: "Chiari & Marti", color: "#a855f7", members: ["Chiari", "Marti"] },
+    { name: "Juli y Sofi", color: "#06b6d4", members: ["Juli", "Sofi"] }
   ],
   supervisors: [],
   owners: []

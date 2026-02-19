@@ -239,6 +239,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       supervisors: settings.supervisors || [],
       owners: settings.owners || [],
       assigneeOrder: settings.assigneeOrder || [],
+      teamGroups: settings.teamGroups || [],
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,
@@ -263,6 +264,7 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.supervisors) settings.supervisors = req.body.supervisors;
     if (req.body.owners) settings.owners = req.body.owners;
     if (req.body.assigneeOrder !== undefined) settings.assigneeOrder = req.body.assigneeOrder;
+    if (req.body.teamGroups !== undefined) settings.teamGroups = req.body.teamGroups;
     if (req.body.weeklyLeader !== undefined) settings.weeklyLeader = req.body.weeklyLeader;
     if (req.body.leaderPool !== undefined) settings.leaderPool = req.body.leaderPool;
     if (req.body.autoDeleteDays !== undefined) settings.autoDeleteDays = req.body.autoDeleteDays;
@@ -276,6 +278,7 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       supervisors: settings.supervisors,
       owners: settings.owners,
       assigneeOrder: settings.assigneeOrder || [],
+      teamGroups: settings.teamGroups || [],
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,

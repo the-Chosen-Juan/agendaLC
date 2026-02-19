@@ -5,7 +5,7 @@
 // --- STATE ---
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
-let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2 };
+let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2 };
 let currentFilter = { priority: 'all', assignee: '', status: '', client: '', search: '' };
 let grouped = true;
 let editingTaskId = null;
@@ -732,7 +732,6 @@ function renderGroupedTasks(container, filtered) {
   now.setHours(0, 0, 0, 0);
 
   // Add members who only have timeoff or contract entries (no regular tasks)
-  // Skip entries without a real assignee
   [...timeOffs, ...allContracts].forEach(t => {
     const key = t.assignee;
     if (!key || key.toLowerCase() === 'sin asignar') return;
@@ -741,7 +740,6 @@ function renderGroupedTasks(container, filtered) {
       sortedKeys.push(key);
     }
   });
-  // Re-sort after adding new keys
   sortedKeys.sort((a, b) => {
     const ia = order.indexOf(a);
     const ib = order.indexOf(b);
@@ -751,273 +749,627 @@ function renderGroupedTasks(container, filtered) {
     return ia - ib;
   });
 
+  // Build team group lookup: member name -> team group config
+  const teamGroups = settings.teamGroups || [];
+  const memberToTeam = {};
+  teamGroups.forEach(tg => {
+    (tg.members || []).forEach(m => { memberToTeam[m] = tg; });
+  });
+
+  // Track which teams have already been rendered
+  const renderedTeams = new Set();
+
   sortedKeys.forEach((assignee) => {
-    // Skip unassigned / blank groups
     if (!assignee || assignee.toLowerCase() === 'sin asignar') return;
 
-    // Filter out blank/dash-only tasks from this group
-    const groupTasks = sortTasksByNumber(groups[assignee]).filter(t => {
+    // Check if this assignee belongs to a team group
+    const teamGroup = memberToTeam[assignee];
+    if (teamGroup) {
+      // Only render the team once (when we hit the first member)
+      if (renderedTeams.has(teamGroup.name)) return;
+      renderedTeams.add(teamGroup.name);
+      renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, now);
+      return;
+    }
+
+    // Check if this assignee IS a legacy team name (old tasks still assigned to pair name)
+    const legacyTeam = teamGroups.find(tg => tg.name === assignee);
+    if (legacyTeam) {
+      // These tasks will be shown under the team group; skip standalone rendering
+      if (!renderedTeams.has(legacyTeam.name)) {
+        renderedTeams.add(legacyTeam.name);
+        renderTeamGroup(container, legacyTeam, groups, timeOffs, allContracts, now);
+      }
+      return;
+    }
+
+    // Regular individual assignee (not part of any team)
+    renderIndividualGroup(container, assignee, groups, timeOffs, now);
+  });
+}
+
+// --- Render a team group wrapper with individual member sub-sections ---
+function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, now) {
+  const teamName = teamGroup.name;
+  const teamColor = teamGroup.color || getColorForName(teamName);
+  const teamInitials = getInitials(teamName);
+  const memberNames = teamGroup.members || [];
+
+  // Collect ALL tasks for this team: individual members + legacy pair-assigned tasks
+  const allTeamAssignees = [...memberNames, teamName];
+  let allTeamTasks = [];
+  allTeamAssignees.forEach(name => {
+    if (groups[name]) {
+      allTeamTasks = allTeamTasks.concat(groups[name]);
+    }
+  });
+  // Filter out blank/dash tasks
+  allTeamTasks = allTeamTasks.filter(t => {
+    const proj = (t.project || '').trim();
+    return proj && !/^[-–—]+$/.test(proj);
+  });
+
+  // Team-level time offs and contracts (from legacy pair name)
+  const teamTimeOffs = timeOffs.filter(to => allTeamAssignees.includes(to.assignee));
+  const teamContracts = allContracts.filter(c => allTeamAssignees.includes(c.assignee));
+
+  const totalTasks = allTeamTasks.filter(t => !t.isTimeOff && !isContractTask(t)).length;
+  const overdueCount = allTeamTasks.filter(t => {
+    if (!t.deadline || t.status === 'completado' || t.isTimeOff || isContractTask(t)) return false;
+    return new Date(t.deadline + 'T00:00:00') < now;
+  }).length;
+
+  const teamKey = `__team_${teamName}`;
+  const isTeamCollapsed = collapsedGroups[teamKey] === true;
+
+  // --- Team header ---
+  const teamWrapper = document.createElement('div');
+  teamWrapper.className = 'team-group';
+
+  const teamHeader = document.createElement('div');
+  teamHeader.className = 'group-header team-header';
+  teamHeader.setAttribute('draggable', 'true');
+  teamHeader.dataset.assignee = memberNames[0]; // Use first member for drag ordering
+
+  let timeoffHtml = buildTimeoffHtml(teamTimeOffs);
+  let overdueHtml = '';
+  if (overdueCount > 0) {
+    overdueHtml = `<span class="group-overdue-icon" title="${overdueCount} vencida${overdueCount > 1 ? 's' : ''}">
+      <span class="material-icons-round">warning</span>
+    </span>`;
+  }
+  let contractHtml = buildContractHtml(teamContracts);
+
+  teamHeader.innerHTML = `
+    <span class="material-icons-round drag-handle">drag_indicator</span>
+    <div class="group-avatar" style="background:${teamColor}">${teamInitials}</div>
+    <span class="group-name">${escHtml(teamName)}</span>
+    <span class="group-count">${totalTasks} tarea${totalTasks !== 1 ? 's' : ''}</span>
+    ${overdueHtml}
+    ${timeoffHtml}
+    ${contractHtml}
+    <span class="material-icons-round group-toggle ${isTeamCollapsed ? 'collapsed' : ''}">expand_more</span>
+  `;
+
+  const teamContent = document.createElement('div');
+  teamContent.className = 'team-content';
+  if (isTeamCollapsed) teamContent.classList.add('hidden');
+
+  // --- Render each individual member inside the team ---
+  memberNames.forEach(memberName => {
+    const memberTasks = sortTasksByNumber(groups[memberName] || []).filter(t => {
       const proj = (t.project || '').trim();
-      if (!proj || /^[-–—]+$/.test(proj)) return false;
-      return true;
+      return proj && !/^[-–—]+$/.test(proj);
     });
-    const member = (settings.teamMembers || []).find(m => m.name === assignee);
-    const color = member?.color || getColorForName(assignee);
-    const initials = member?.initials || getInitials(assignee);
 
-    const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
-    const memberContracts = getContractTasks().filter(c => c.assignee === assignee);
-
-    // Count overdue tasks in this group
-    const overdueCount = groupTasks.filter(t => {
+    const member = (settings.teamMembers || []).find(m => m.name === memberName);
+    const mColor = member?.color || getColorForName(memberName);
+    const mInitials = member?.initials || getInitials(memberName);
+    const mTimeOffs = timeOffs.filter(to => to.assignee === memberName);
+    const mContracts = allContracts.filter(c => c.assignee === memberName);
+    const mOverdue = memberTasks.filter(t => {
       if (!t.deadline || t.status === 'completado') return false;
       return new Date(t.deadline + 'T00:00:00') < now;
     }).length;
 
-    const isCollapsed = collapsedGroups[assignee] === true;
+    const memberKey = memberName;
+    const isMemberCollapsed = collapsedGroups[memberKey] === true;
 
-    const header = document.createElement('div');
-    header.className = 'group-header';
-    header.setAttribute('draggable', 'true');
-    header.dataset.assignee = assignee;
+    const memberHeader = document.createElement('div');
+    memberHeader.className = 'group-header team-member-header';
+    memberHeader.dataset.assignee = memberName;
 
-    let timeoffHtml = '';
-    if (memberTimeOffs.length > 0) {
-      timeoffHtml = '<div class="group-timeoff">';
-      memberTimeOffs.forEach(to => {
-        // Clean the title: strip assignee prefix if present (old DB format: "Assignee - Title")
-        let title = to.timeOffTitle || to.timeOffType || 'Time Off';
-        // Remove "Assignee - " prefix pattern from stale DB data
-        if (title.includes(' - ') && to.assignee) {
-          const prefix = to.assignee + ' - ';
-          if (title.startsWith(prefix)) title = title.slice(prefix.length);
-        }
-        // Build the badge label with date range
-        const startFmt = formatDateShort(to.timeOffStart);
-        const endFmt = formatDateShort(to.timeOffEnd);
-        const hasDateInTitle = /\d{1,2}\/\d{1,2}/.test(title);
-        const badgeLabel = hasDateInTitle ? title : (startFmt && endFmt ? `${title} (${startFmt} - ${endFmt})` : title);
-        timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(badgeLabel)}">
-          <span class="material-icons-round">beach_access</span>
-          ${escHtml(badgeLabel)}
-        </span>`;
-      });
-      timeoffHtml += '</div>';
-    }
-
-    let overdueHtml = '';
-    if (overdueCount > 0) {
-      overdueHtml = `<span class="group-overdue-icon" title="${overdueCount} vencida${overdueCount > 1 ? 's' : ''}">
+    let mTimeoffHtml = buildTimeoffHtml(mTimeOffs);
+    let mOverdueHtml = '';
+    if (mOverdue > 0) {
+      mOverdueHtml = `<span class="group-overdue-icon" title="${mOverdue} vencida${mOverdue > 1 ? 's' : ''}">
         <span class="material-icons-round">warning</span>
       </span>`;
     }
+    let mContractHtml = buildContractHtml(mContracts);
 
-    let contractHtml = '';
-    memberContracts.forEach(ct => {
-      // Extract date from project text if deadline missing (e.g. "Contrato hasta 27/2")
-      let ctDeadline = ct.deadline;
-      if (!ctDeadline && ct.project) {
-        const dm = ct.project.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-        if (dm) {
-          const day = dm[1].padStart(2, '0');
-          const month = dm[2].padStart(2, '0');
-          const year = dm[3] ? (dm[3].length === 2 ? '20' + dm[3] : dm[3]) : new Date().getFullYear();
-          ctDeadline = `${year}-${month}-${day}`;
-        }
-      }
-      const deadlineClass = ctDeadline ? getDeadlineClass(ctDeadline) : '';
-      const dateStr = ctDeadline ? formatDate(ctDeadline) : 'Sin fecha';
-      contractHtml += `<span class="contrato-badge ${deadlineClass}" data-id="${ct.id}" title="Contrato hasta ${dateStr}">
-        <span class="material-icons-round">description</span>
-        Contrato: ${dateStr}
-      </span>`;
-    });
-
-    header.innerHTML = `
-      <span class="material-icons-round drag-handle">drag_indicator</span>
-      <div class="group-avatar" style="background:${color}">${initials}</div>
-      <span class="group-name">${escHtml(assignee)}</span>
-      <span class="group-count">${groupTasks.length} tarea${groupTasks.length !== 1 ? 's' : ''}</span>
-      ${overdueHtml}
-      ${timeoffHtml}
-      ${contractHtml}
-      <span class="material-icons-round group-toggle ${isCollapsed ? 'collapsed' : ''}">expand_more</span>
+    memberHeader.innerHTML = `
+      <div class="group-avatar" style="background:${mColor};width:26px;height:26px;font-size:.7rem">${mInitials}</div>
+      <span class="group-name" style="font-size:.9rem">${escHtml(memberName)}</span>
+      <span class="group-count">${memberTasks.length} tarea${memberTasks.length !== 1 ? 's' : ''}</span>
+      ${mOverdueHtml}
+      ${mTimeoffHtml}
+      ${mContractHtml}
+      <span class="material-icons-round group-toggle ${isMemberCollapsed ? 'collapsed' : ''}">expand_more</span>
     `;
 
-    const tableWrapper = document.createElement('div');
-    tableWrapper.className = 'table-wrapper';
-    if (isCollapsed) tableWrapper.classList.add('hidden');
-    tableWrapper.innerHTML = buildTaskTable(groupTasks, false, assignee);
+    const mTableWrapper = document.createElement('div');
+    mTableWrapper.className = 'table-wrapper';
+    if (isMemberCollapsed) mTableWrapper.classList.add('hidden');
+    mTableWrapper.innerHTML = buildTaskTable(memberTasks, false, memberName);
 
-    const cards = buildMobileCards(groupTasks, assignee);
-    if (isCollapsed) cards.classList.add('hidden');
+    const mCards = buildMobileCards(memberTasks, memberName);
+    if (isMemberCollapsed) mCards.classList.add('hidden');
 
-    // Supervisor linked tasks: tasks this person supervises from other assignees
+    // Supervised tasks for this member
     const supervisedTasks = getRegularTasks().filter(t => {
       const supervisors = (t.supervisor || '').split(',').map(s => s.trim());
-      return supervisors.includes(assignee) &&
-        t.assignee !== assignee &&
+      return supervisors.includes(memberName) &&
+        t.assignee !== memberName &&
         t.status !== 'completado' &&
         t.status !== 'esperando respuesta';
     });
 
     let supervisedSection = null;
     if (supervisedTasks.length > 0) {
-      supervisedSection = document.createElement('div');
-      supervisedSection.className = 'supervised-section';
-      if (isCollapsed) supervisedSection.classList.add('hidden');
-
-      const supKey = `__sup_${assignee}`;
-      const isSupCollapsed = collapsedGroups[supKey] === true; // visible by default
-
-      supervisedSection.innerHTML = `
-        <div class="supervised-header" data-sup-key="${escAttr(supKey)}">
-          <span class="material-icons-round supervised-eye">${isSupCollapsed ? 'visibility_off' : 'visibility'}</span>
-          Supervisando (${supervisedTasks.length} tarea${supervisedTasks.length !== 1 ? 's' : ''} de otros equipos)
-        </div>
-        <div class="supervised-items ${isSupCollapsed ? 'hidden' : ''}"></div>
-      `;
-
-      const itemsContainer = supervisedSection.querySelector('.supervised-items');
-      supervisedTasks.forEach(t => {
-        const clientColor = getClientColor(t.client);
-        const statusClass = (t.status || '').toLowerCase().replace(/ /g, '-');
-        const item = document.createElement('div');
-        item.className = 'supervised-item';
-        item.dataset.taskId = t.id;
-        item.innerHTML = `
-          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.7rem;padding:.1rem .35rem">${escHtml(t.client || '—')}</span>
-          <span>${escHtml(t.project || 'Sin proyecto')}</span>
-          <span class="status-badge ${statusClass}" style="font-size:.65rem">${escHtml(t.status || '—')}</span>
-          <span class="supervised-assignee">\u2192 ${escHtml(t.assignee)}</span>
-        `;
-        item.addEventListener('click', () => navigateToTask(t.id));
-        itemsContainer.appendChild(item);
-      });
-
-      // Toggle supervised items on eye icon click
-      const supHeader = supervisedSection.querySelector('.supervised-header');
-      supHeader.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const supItemsDiv = supervisedSection.querySelector('.supervised-items');
-        const eyeIcon = supHeader.querySelector('.supervised-eye');
-        supItemsDiv.classList.toggle('hidden');
-        const nowHidden = supItemsDiv.classList.contains('hidden');
-        eyeIcon.textContent = nowHidden ? 'visibility_off' : 'visibility';
-        collapsedGroups[supKey] = nowHidden;
-        localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
-      });
+      supervisedSection = buildSupervisedSection(memberName, supervisedTasks, isMemberCollapsed);
     }
 
-    // Toggle collapse
-    header.addEventListener('click', (e) => {
-      if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge') || e.target.closest('.contrato-badge')) return;
-      const toggle = header.querySelector('.group-toggle');
+    // Member header collapse toggle
+    memberHeader.addEventListener('click', (e) => {
+      if (e.target.closest('.timeoff-badge') || e.target.closest('.contrato-badge')) return;
+      const toggle = memberHeader.querySelector('.group-toggle');
       toggle.classList.toggle('collapsed');
-      tableWrapper.classList.toggle('hidden');
-      cards.classList.toggle('hidden');
+      mTableWrapper.classList.toggle('hidden');
+      mCards.classList.toggle('hidden');
       if (supervisedSection) supervisedSection.classList.toggle('hidden');
-      collapsedGroups[assignee] = tableWrapper.classList.contains('hidden');
+      collapsedGroups[memberKey] = mTableWrapper.classList.contains('hidden');
       localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
     });
 
-    // Time off badge click - open inline editor (same as contract)
-    header.querySelectorAll('.timeoff-badge').forEach(badge => {
-      badge.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const toTask = tasks.find(t => t.id === badge.dataset.id);
-        if (toTask) openTimeOffEditor(badge, toTask);
-      });
-    });
+    // Badge click handlers
+    bindBadgeClicks(memberHeader);
 
-    // Contract badge click - open inline editor
-    header.querySelectorAll('.contrato-badge').forEach(badge => {
-      badge.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const taskId = badge.dataset.id;
-        const ct = tasks.find(t => t.id === taskId);
-        if (!ct) return;
-        openContractEditor(badge, ct);
-      });
-    });
-
-    // Group drag and drop for reordering
-    header.addEventListener('dragstart', (e) => {
-      if (e.target.closest('tr[data-id]')) return;
-      draggedGroup = assignee;
-      header.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    header.addEventListener('dragend', () => {
-      header.classList.remove('dragging');
-      container.querySelectorAll('.group-header').forEach(h => {
-        h.classList.remove('drag-over');
-        h.classList.remove('drop-target');
-      });
-      draggedGroup = null;
-    });
-
-    header.addEventListener('dragover', (e) => {
+    // Drop target: allow dropping tasks onto individual member
+    memberHeader.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      if (draggedGroup && header.dataset.assignee !== draggedGroup) {
-        header.classList.add('drag-over');
-      } else if (!draggedGroup) {
-        header.classList.add('drop-target');
-      }
+      if (!draggedGroup) memberHeader.classList.add('drop-target');
     });
-
-    header.addEventListener('dragleave', () => {
-      header.classList.remove('drag-over');
-      header.classList.remove('drop-target');
+    memberHeader.addEventListener('dragleave', () => {
+      memberHeader.classList.remove('drop-target');
     });
-
-    header.addEventListener('drop', async (e) => {
+    memberHeader.addEventListener('drop', async (e) => {
       e.preventDefault();
-      header.classList.remove('drag-over');
-      header.classList.remove('drop-target');
-
+      memberHeader.classList.remove('drop-target');
       const taskId = e.dataTransfer.getData('text/plain');
-
       if (taskId && !draggedGroup) {
         const task = tasks.find(t => t.id === taskId);
         if (task) {
           try {
-            await api('PUT', `/tasks/${taskId}`, { assignee: assignee, status: 'en progreso' });
-            task.assignee = assignee;
+            await api('PUT', `/tasks/${taskId}`, { assignee: memberName, status: 'en progreso' });
+            task.assignee = memberName;
             task.status = 'en progreso';
             renderTasks();
             updateStats();
-            toast(`Tarea movida a ${assignee}`);
+            toast(`Tarea movida a ${memberName}`);
           } catch (err) {
             toast('Error al mover tarea', 'error');
           }
         }
-        return;
       }
-
-      if (!draggedGroup || draggedGroup === assignee) return;
-
-      const currentHeaders = [...container.querySelectorAll('.group-header')];
-      const names = currentHeaders.map(h => h.dataset.assignee);
-      const fromIdx = names.indexOf(draggedGroup);
-      const toIdx = names.indexOf(assignee);
-      if (fromIdx === -1 || toIdx === -1) return;
-
-      names.splice(fromIdx, 1);
-      names.splice(toIdx, 0, draggedGroup);
-
-      settings.assigneeOrder = names;
-      api('PUT', '/settings', { assigneeOrder: names }).catch(() => {});
-      renderTasks();
     });
 
-    container.appendChild(header);
-    container.appendChild(tableWrapper);
-    container.appendChild(cards);
-    if (supervisedSection) container.appendChild(supervisedSection);
-    bindTaskRows(tableWrapper);
+    teamContent.appendChild(memberHeader);
+    teamContent.appendChild(mTableWrapper);
+    teamContent.appendChild(mCards);
+    if (supervisedSection) teamContent.appendChild(supervisedSection);
+    bindTaskRows(mTableWrapper);
+  });
+
+  // --- Legacy tasks (still assigned to old pair name) ---
+  const legacyTasks = sortTasksByNumber(groups[teamName] || []).filter(t => {
+    const proj = (t.project || '').trim();
+    return proj && !/^[-–—]+$/.test(proj) && !t.isTimeOff && !isContractTask(t);
+  });
+
+  if (legacyTasks.length > 0) {
+    const legacyHeader = document.createElement('div');
+    legacyHeader.className = 'group-header team-member-header team-legacy-header';
+    legacyHeader.dataset.assignee = teamName;
+    const legacyKey = `__legacy_${teamName}`;
+    const isLegacyCollapsed = collapsedGroups[legacyKey] === true;
+
+    legacyHeader.innerHTML = `
+      <div class="group-avatar" style="background:${teamColor};width:26px;height:26px;font-size:.7rem;opacity:.7">${teamInitials}</div>
+      <span class="group-name" style="font-size:.85rem;opacity:.7">Sin reasignar</span>
+      <span class="group-count">${legacyTasks.length} tarea${legacyTasks.length !== 1 ? 's' : ''}</span>
+      <span class="material-icons-round group-toggle ${isLegacyCollapsed ? 'collapsed' : ''}">expand_more</span>
+    `;
+
+    const legacyTable = document.createElement('div');
+    legacyTable.className = 'table-wrapper';
+    if (isLegacyCollapsed) legacyTable.classList.add('hidden');
+    legacyTable.innerHTML = buildTaskTable(legacyTasks, false, teamName);
+
+    const legacyCards = buildMobileCards(legacyTasks, teamName);
+    if (isLegacyCollapsed) legacyCards.classList.add('hidden');
+
+    legacyHeader.addEventListener('click', (e) => {
+      if (e.target.closest('.timeoff-badge') || e.target.closest('.contrato-badge')) return;
+      const toggle = legacyHeader.querySelector('.group-toggle');
+      toggle.classList.toggle('collapsed');
+      legacyTable.classList.toggle('hidden');
+      legacyCards.classList.toggle('hidden');
+      collapsedGroups[legacyKey] = legacyTable.classList.contains('hidden');
+      localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+    });
+
+    teamContent.appendChild(legacyHeader);
+    teamContent.appendChild(legacyTable);
+    teamContent.appendChild(legacyCards);
+    bindTaskRows(legacyTable);
+  }
+
+  // --- Team header collapse toggle ---
+  teamHeader.addEventListener('click', (e) => {
+    if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge') || e.target.closest('.contrato-badge')) return;
+    const toggle = teamHeader.querySelector('.group-toggle');
+    toggle.classList.toggle('collapsed');
+    teamContent.classList.toggle('hidden');
+    collapsedGroups[teamKey] = teamContent.classList.contains('hidden');
+    localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+  });
+
+  // Badge click handlers on team header
+  bindBadgeClicks(teamHeader);
+
+  // Team-level drag & drop for reordering
+  teamHeader.addEventListener('dragstart', (e) => {
+    if (e.target.closest('tr[data-id]')) return;
+    draggedGroup = memberNames[0]; // Use first member as group identifier
+    teamHeader.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  teamHeader.addEventListener('dragend', () => {
+    teamHeader.classList.remove('dragging');
+    container.querySelectorAll('.group-header').forEach(h => {
+      h.classList.remove('drag-over');
+      h.classList.remove('drop-target');
+    });
+    draggedGroup = null;
+  });
+  teamHeader.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedGroup && teamHeader.dataset.assignee !== draggedGroup) {
+      teamHeader.classList.add('drag-over');
+    }
+  });
+  teamHeader.addEventListener('dragleave', () => {
+    teamHeader.classList.remove('drag-over');
+  });
+  teamHeader.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    teamHeader.classList.remove('drag-over');
+
+    if (!draggedGroup || draggedGroup === memberNames[0]) return;
+
+    const currentHeaders = [...container.querySelectorAll('.group-header:not(.team-member-header)')];
+    const names = currentHeaders.map(h => h.dataset.assignee);
+    const fromIdx = names.indexOf(draggedGroup);
+    const toIdx = names.indexOf(memberNames[0]);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    names.splice(fromIdx, 1);
+    names.splice(toIdx, 0, draggedGroup);
+
+    // Rebuild assigneeOrder expanding team groups back to member names
+    const tgList = settings.teamGroups || [];
+    const newOrder = [];
+    names.forEach(n => {
+      const tg = tgList.find(g => g.members && g.members[0] === n);
+      if (tg) {
+        tg.members.forEach(m => newOrder.push(m));
+      } else {
+        newOrder.push(n);
+      }
+    });
+
+    settings.assigneeOrder = newOrder;
+    api('PUT', '/settings', { assigneeOrder: newOrder }).catch(() => {});
+    renderTasks();
+  });
+
+  teamWrapper.appendChild(teamHeader);
+  teamWrapper.appendChild(teamContent);
+  container.appendChild(teamWrapper);
+}
+
+// --- Render an individual (non-team) assignee group ---
+function renderIndividualGroup(container, assignee, groups, timeOffs, now) {
+  const groupTasks = sortTasksByNumber(groups[assignee] || []).filter(t => {
+    const proj = (t.project || '').trim();
+    return proj && !/^[-–—]+$/.test(proj);
+  });
+  const member = (settings.teamMembers || []).find(m => m.name === assignee);
+  const color = member?.color || getColorForName(assignee);
+  const initials = member?.initials || getInitials(assignee);
+
+  const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
+  const memberContracts = getContractTasks().filter(c => c.assignee === assignee);
+
+  const overdueCount = groupTasks.filter(t => {
+    if (!t.deadline || t.status === 'completado') return false;
+    return new Date(t.deadline + 'T00:00:00') < now;
+  }).length;
+
+  const isCollapsed = collapsedGroups[assignee] === true;
+
+  const header = document.createElement('div');
+  header.className = 'group-header';
+  header.setAttribute('draggable', 'true');
+  header.dataset.assignee = assignee;
+
+  let timeoffHtml = buildTimeoffHtml(memberTimeOffs);
+  let overdueHtml = '';
+  if (overdueCount > 0) {
+    overdueHtml = `<span class="group-overdue-icon" title="${overdueCount} vencida${overdueCount > 1 ? 's' : ''}">
+      <span class="material-icons-round">warning</span>
+    </span>`;
+  }
+  let contractHtml = buildContractHtml(memberContracts);
+
+  header.innerHTML = `
+    <span class="material-icons-round drag-handle">drag_indicator</span>
+    <div class="group-avatar" style="background:${color}">${initials}</div>
+    <span class="group-name">${escHtml(assignee)}</span>
+    <span class="group-count">${groupTasks.length} tarea${groupTasks.length !== 1 ? 's' : ''}</span>
+    ${overdueHtml}
+    ${timeoffHtml}
+    ${contractHtml}
+    <span class="material-icons-round group-toggle ${isCollapsed ? 'collapsed' : ''}">expand_more</span>
+  `;
+
+  const tableWrapper = document.createElement('div');
+  tableWrapper.className = 'table-wrapper';
+  if (isCollapsed) tableWrapper.classList.add('hidden');
+  tableWrapper.innerHTML = buildTaskTable(groupTasks, false, assignee);
+
+  const cards = buildMobileCards(groupTasks, assignee);
+  if (isCollapsed) cards.classList.add('hidden');
+
+  const supervisedTasks = getRegularTasks().filter(t => {
+    const supervisors = (t.supervisor || '').split(',').map(s => s.trim());
+    return supervisors.includes(assignee) &&
+      t.assignee !== assignee &&
+      t.status !== 'completado' &&
+      t.status !== 'esperando respuesta';
+  });
+
+  let supervisedSection = null;
+  if (supervisedTasks.length > 0) {
+    supervisedSection = buildSupervisedSection(assignee, supervisedTasks, isCollapsed);
+  }
+
+  // Toggle collapse
+  header.addEventListener('click', (e) => {
+    if (e.target.closest('.drag-handle') || e.target.closest('.timeoff-badge') || e.target.closest('.contrato-badge')) return;
+    const toggle = header.querySelector('.group-toggle');
+    toggle.classList.toggle('collapsed');
+    tableWrapper.classList.toggle('hidden');
+    cards.classList.toggle('hidden');
+    if (supervisedSection) supervisedSection.classList.toggle('hidden');
+    collapsedGroups[assignee] = tableWrapper.classList.contains('hidden');
+    localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+  });
+
+  bindBadgeClicks(header);
+
+  // Group drag and drop
+  header.addEventListener('dragstart', (e) => {
+    if (e.target.closest('tr[data-id]')) return;
+    draggedGroup = assignee;
+    header.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  header.addEventListener('dragend', () => {
+    header.classList.remove('dragging');
+    container.querySelectorAll('.group-header').forEach(h => {
+      h.classList.remove('drag-over');
+      h.classList.remove('drop-target');
+    });
+    draggedGroup = null;
+  });
+  header.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedGroup && header.dataset.assignee !== draggedGroup) {
+      header.classList.add('drag-over');
+    } else if (!draggedGroup) {
+      header.classList.add('drop-target');
+    }
+  });
+  header.addEventListener('dragleave', () => {
+    header.classList.remove('drag-over');
+    header.classList.remove('drop-target');
+  });
+  header.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    header.classList.remove('drag-over');
+    header.classList.remove('drop-target');
+
+    const taskId = e.dataTransfer.getData('text/plain');
+    if (taskId && !draggedGroup) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        try {
+          await api('PUT', `/tasks/${taskId}`, { assignee: assignee, status: 'en progreso' });
+          task.assignee = assignee;
+          task.status = 'en progreso';
+          renderTasks();
+          updateStats();
+          toast(`Tarea movida a ${assignee}`);
+        } catch (err) {
+          toast('Error al mover tarea', 'error');
+        }
+      }
+      return;
+    }
+
+    if (!draggedGroup || draggedGroup === assignee) return;
+
+    const currentHeaders = [...container.querySelectorAll('.group-header:not(.team-member-header)')];
+    const names = currentHeaders.map(h => h.dataset.assignee);
+    const fromIdx = names.indexOf(draggedGroup);
+    const toIdx = names.indexOf(assignee);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    names.splice(fromIdx, 1);
+    names.splice(toIdx, 0, draggedGroup);
+
+    // Rebuild assigneeOrder expanding team groups back to member names
+    const teamGroups = settings.teamGroups || [];
+    const newOrder = [];
+    names.forEach(n => {
+      const tg = teamGroups.find(g => g.members && g.members[0] === n);
+      if (tg) {
+        tg.members.forEach(m => newOrder.push(m));
+      } else {
+        newOrder.push(n);
+      }
+    });
+
+    settings.assigneeOrder = newOrder;
+    api('PUT', '/settings', { assigneeOrder: newOrder }).catch(() => {});
+    renderTasks();
+  });
+
+  container.appendChild(header);
+  container.appendChild(tableWrapper);
+  container.appendChild(cards);
+  if (supervisedSection) container.appendChild(supervisedSection);
+  bindTaskRows(tableWrapper);
+}
+
+// --- Shared helper: build timeoff badge HTML ---
+function buildTimeoffHtml(timeOffList) {
+  if (!timeOffList || timeOffList.length === 0) return '';
+  let html = '<div class="group-timeoff">';
+  timeOffList.forEach(to => {
+    let title = to.timeOffTitle || to.timeOffType || 'Time Off';
+    if (title.includes(' - ') && to.assignee) {
+      const prefix = to.assignee + ' - ';
+      if (title.startsWith(prefix)) title = title.slice(prefix.length);
+    }
+    const startFmt = formatDateShort(to.timeOffStart);
+    const endFmt = formatDateShort(to.timeOffEnd);
+    const hasDateInTitle = /\d{1,2}\/\d{1,2}/.test(title);
+    const badgeLabel = hasDateInTitle ? title : (startFmt && endFmt ? `${title} (${startFmt} - ${endFmt})` : title);
+    html += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(badgeLabel)}">
+      <span class="material-icons-round">beach_access</span>
+      ${escHtml(badgeLabel)}
+    </span>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+// --- Shared helper: build contract badge HTML ---
+function buildContractHtml(contracts) {
+  let html = '';
+  contracts.forEach(ct => {
+    let ctDeadline = ct.deadline;
+    if (!ctDeadline && ct.project) {
+      const dm = ct.project.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+      if (dm) {
+        const day = dm[1].padStart(2, '0');
+        const month = dm[2].padStart(2, '0');
+        const year = dm[3] ? (dm[3].length === 2 ? '20' + dm[3] : dm[3]) : new Date().getFullYear();
+        ctDeadline = `${year}-${month}-${day}`;
+      }
+    }
+    const deadlineClass = ctDeadline ? getDeadlineClass(ctDeadline) : '';
+    const dateStr = ctDeadline ? formatDate(ctDeadline) : 'Sin fecha';
+    html += `<span class="contrato-badge ${deadlineClass}" data-id="${ct.id}" title="Contrato hasta ${dateStr}">
+      <span class="material-icons-round">description</span>
+      Contrato: ${dateStr}
+    </span>`;
+  });
+  return html;
+}
+
+// --- Shared helper: build supervised section ---
+function buildSupervisedSection(assignee, supervisedTasks, isParentCollapsed) {
+  const supervisedSection = document.createElement('div');
+  supervisedSection.className = 'supervised-section';
+  if (isParentCollapsed) supervisedSection.classList.add('hidden');
+
+  const supKey = `__sup_${assignee}`;
+  const isSupCollapsed = collapsedGroups[supKey] === true;
+
+  supervisedSection.innerHTML = `
+    <div class="supervised-header" data-sup-key="${escAttr(supKey)}">
+      <span class="material-icons-round supervised-eye">${isSupCollapsed ? 'visibility_off' : 'visibility'}</span>
+      Supervisando (${supervisedTasks.length} tarea${supervisedTasks.length !== 1 ? 's' : ''} de otros equipos)
+    </div>
+    <div class="supervised-items ${isSupCollapsed ? 'hidden' : ''}"></div>
+  `;
+
+  const itemsContainer = supervisedSection.querySelector('.supervised-items');
+  supervisedTasks.forEach(t => {
+    const clientColor = getClientColor(t.client);
+    const statusClass = (t.status || '').toLowerCase().replace(/ /g, '-');
+    const item = document.createElement('div');
+    item.className = 'supervised-item';
+    item.dataset.taskId = t.id;
+    item.innerHTML = `
+      <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.7rem;padding:.1rem .35rem">${escHtml(t.client || '—')}</span>
+      <span>${escHtml(t.project || 'Sin proyecto')}</span>
+      <span class="status-badge ${statusClass}" style="font-size:.65rem">${escHtml(t.status || '—')}</span>
+      <span class="supervised-assignee">\u2192 ${escHtml(t.assignee)}</span>
+    `;
+    item.addEventListener('click', () => navigateToTask(t.id));
+    itemsContainer.appendChild(item);
+  });
+
+  const supHeader = supervisedSection.querySelector('.supervised-header');
+  supHeader.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const supItemsDiv = supervisedSection.querySelector('.supervised-items');
+    const eyeIcon = supHeader.querySelector('.supervised-eye');
+    supItemsDiv.classList.toggle('hidden');
+    const nowHidden = supItemsDiv.classList.contains('hidden');
+    eyeIcon.textContent = nowHidden ? 'visibility_off' : 'visibility';
+    collapsedGroups[supKey] = nowHidden;
+    localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+  });
+
+  return supervisedSection;
+}
+
+// --- Shared helper: bind badge click handlers on a header element ---
+function bindBadgeClicks(header) {
+  header.querySelectorAll('.timeoff-badge').forEach(badge => {
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const toTask = tasks.find(t => t.id === badge.dataset.id);
+      if (toTask) openTimeOffEditor(badge, toTask);
+    });
+  });
+  header.querySelectorAll('.contrato-badge').forEach(badge => {
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const taskId = badge.dataset.id;
+      const ct = tasks.find(t => t.id === taskId);
+      if (!ct) return;
+      openContractEditor(badge, ct);
+    });
   });
 }
 
@@ -2571,7 +2923,28 @@ function renderTeam() {
   const timeOffs = getTimeOffEntries();
 
   grid.innerHTML = '';
-  (settings.teamMembers || []).forEach(member => {
+
+  // Group members by team for visual grouping
+  const renderedTeamNames = new Set();
+  const allMembers = settings.teamMembers || [];
+  const teamGroupsList = settings.teamGroups || [];
+
+  allMembers.forEach(member => {
+    // If this member belongs to a team, render the team label once before its first member
+    if (member.team) {
+      if (!renderedTeamNames.has(member.team)) {
+        renderedTeamNames.add(member.team);
+        const tg = teamGroupsList.find(g => g.name === member.team);
+        const teamLabel = document.createElement('div');
+        teamLabel.className = 'team-label-card';
+        teamLabel.innerHTML = `
+          <div class="team-label-avatar" style="background:${tg?.color || getColorForName(member.team)}">${getInitials(member.team)}</div>
+          <span class="team-label-name">${escHtml(member.team)}</span>
+        `;
+        grid.appendChild(teamLabel);
+      }
+    }
+
     const taskCount = getRegularTasks().filter(t => t.assignee === member.name).length;
     const memberTimeOffs = timeOffs.filter(to => to.assignee === member.name);
 
@@ -2579,7 +2952,6 @@ function renderTeam() {
     if (memberTimeOffs.length > 0) {
       const nextTo = memberTimeOffs[0];
       let toLabel = nextTo.timeOffTitle || nextTo.timeOffType || 'Time Off';
-      // Strip "Assignee - " prefix from stale DB data
       if (toLabel.includes(' - ') && nextTo.assignee) {
         const pfx = nextTo.assignee + ' - ';
         if (toLabel.startsWith(pfx)) toLabel = toLabel.slice(pfx.length);
@@ -2593,10 +2965,10 @@ function renderTeam() {
     }
 
     const initials = member.initials || getInitials(member.name);
-    const roleLabel = member.role || 'Equipo';
+    const roleLabel = member.team ? `${member.role || 'Equipo'} · ${member.team}` : (member.role || 'Equipo');
 
     const card = document.createElement('div');
-    card.className = 'member-card';
+    card.className = `member-card${member.team ? ' member-card-team' : ''}`;
     card.innerHTML = `
       <div class="member-avatar" style="background:${member.color || getColorForName(member.name)}">${initials}</div>
       <div class="member-info">
@@ -2770,7 +3142,9 @@ function openEditMemberModal(member) {
     const initialsVal = document.getElementById('prompt-modal-initials')?.value?.trim() || '';
 
     const oldName = member.name;
-    settings.teamMembers[idx] = { name, color, role, initials: initialsVal || getInitials(name) };
+    const updatedMember = { name, color, role, initials: initialsVal || getInitials(name) };
+    if (member.team) updatedMember.team = member.team;
+    settings.teamMembers[idx] = updatedMember;
 
     try {
       await api('PUT', '/settings', { teamMembers: settings.teamMembers });
