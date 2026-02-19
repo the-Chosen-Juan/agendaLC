@@ -3273,9 +3273,15 @@ function parseCSV(csvText) {
         if (/^[-–—]+$/.test(val)) return;
         // Normalize status translations
         if (field === 'status') {
-          const lower = val.toLowerCase();
-          const statusMap = { 'hecho': 'completado', 'terminado': 'completado', 'finalizado': 'completado', 'done': 'completado', 'listo': 'completado', 'en proceso': 'en progreso', 'in progress': 'en progreso', 'wip': 'en progreso', 'pendiente': 'sin empezar', 'not started': 'sin empezar', 'waiting': 'esperando respuesta', 'esperando': 'esperando respuesta', 'en espera': 'esperando respuesta', 'on hold': 'esperando respuesta', 'ongoing': 'on going', 'on-going': 'on going', 'continuo': 'on going' };
-          if (statusMap[lower]) val = statusMap[lower];
+          const lower = val.toLowerCase().replace(/[✓✔️☑✅!*]+/g, '').trim();
+          const statusMap = { 'hecho': 'completado', 'terminado': 'completado', 'finalizado': 'completado', 'done': 'completado', 'listo': 'completado', 'cerrado': 'completado', 'closed': 'completado', 'completed': 'completado', 'complete': 'completado', 'en proceso': 'en progreso', 'in progress': 'en progreso', 'wip': 'en progreso', 'pendiente': 'sin empezar', 'not started': 'sin empezar', 'por hacer': 'sin empezar', 'to do': 'sin empezar', 'waiting': 'esperando respuesta', 'esperando': 'esperando respuesta', 'en espera': 'esperando respuesta', 'on hold': 'esperando respuesta', 'ongoing': 'on going', 'on-going': 'on going', 'continuo': 'on going' };
+          if (statusMap[lower]) {
+            val = statusMap[lower];
+          } else {
+            if (/hecho|terminad|finalizad|completad|done|listo/i.test(lower)) val = 'completado';
+            else if (/progreso/i.test(lower)) val = 'en progreso';
+            else if (/esperando/i.test(lower)) val = 'esperando respuesta';
+          }
         }
         // Normalize priority
         if (field === 'priority') {

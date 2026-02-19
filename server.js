@@ -585,6 +585,26 @@ function parseCSVServer(csvText) {
   console.log('CSV column mapping:', headers.map((h, i) => `"${h}" → ${colMapping[i] || '(unmapped)'}`).join(', '));
 
   const parsed = [];
+
+  // Section context tracking — the Google Sheet uses z-prefixed section names
+  // to push groups to the bottom alphabetically:
+  //   "z_esperando respuesta" → tasks here have status "esperando respuesta"
+  //   "zz_lider agenda"      → informational section, skip entirely
+  //   "zzz_info"             → informational section, skip entirely
+  let currentSectionStatus = '';  // status to apply from section context
+  let skipCurrentSection = false; // whether to skip all rows in this section
+
+  // Known z-section patterns and what they mean
+  const zSectionRules = [
+    { pattern: /esperando\s*respuesta/i, status: 'esperando respuesta', skip: false },
+    { pattern: /en\s*progreso/i, status: 'en progreso', skip: false },
+    { pattern: /sin\s*empezar/i, status: 'sin empezar', skip: false },
+    { pattern: /on\s*going/i, status: 'on going', skip: false },
+    { pattern: /completado|hecho|terminado/i, status: 'completado', skip: false },
+    { pattern: /info/i, status: '', skip: true },
+    { pattern: /lider|líder|agenda/i, status: '', skip: true },
+  ];
+
   for (let i = 1; i < lines.length; i++) {
     const values = parseRow(lines[i]);
     const cleanVals = values.map(v => v.replace(/^"|"$/g, '').trim());
@@ -593,11 +613,41 @@ function parseCSVServer(csvText) {
     // These have at most 1-2 non-empty cells and contain grouping labels
     const nonEmpty = cleanVals.filter(v => v).length;
     if (nonEmpty <= 2) {
-      const joined = cleanVals.join(' ').toLowerCase();
-      if (joined.match(/asignado|supervisor\s*:|owner\s*:|marca\s*:|prioridad\s*:|status\s*:/i)) continue;
+      const joined = cleanVals.join(' ').toLowerCase().trim();
+
+      // Detect z-prefixed section headers (z_, zz_, zzz_)
+      if (/^z{1,3}[_\s]/.test(joined)) {
+        const sectionName = joined.replace(/^z{1,3}[_\s]+/, '');
+        let matched = false;
+        for (const rule of zSectionRules) {
+          if (rule.pattern.test(sectionName)) {
+            currentSectionStatus = rule.status;
+            skipCurrentSection = rule.skip;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          // Unknown z-section, skip it by default
+          currentSectionStatus = '';
+          skipCurrentSection = true;
+        }
+        console.log(`CSV section: "${joined}" → ${skipCurrentSection ? 'SKIP' : `status="${currentSectionStatus}"`}`);
+        continue;
+      }
+
+      // Detect regular section headers (resets z-section context)
+      if (joined.match(/asignado|supervisor\s*:|owner\s*:|marca\s*:|prioridad\s*:|status\s*:/i)) {
+        currentSectionStatus = '';
+        skipCurrentSection = false;
+        continue;
+      }
     }
     // Skip rows that are entirely empty
     if (nonEmpty === 0) continue;
+
+    // Skip all rows in ignored sections (zzz_info, zz_lider agenda, etc.)
+    if (skipCurrentSection) continue;
 
     const task = {
       client: '', project: '', assignee: '', supervisor: '',
@@ -631,7 +681,10 @@ function parseCSVServer(csvText) {
 
         // Normalize status with common-sense translations
         if (field === 'status') {
-          const lower = val.toLowerCase().trim();
+          // Strip special chars, emojis, checkmarks for matching
+          const lower = val.toLowerCase().trim().replace(/[✓✔️☑✅!*]+/g, '').trim();
+
+          // Exact match first
           const statusMap = {
             'hecho': 'completado',
             'terminado': 'completado',
@@ -640,6 +693,8 @@ function parseCSVServer(csvText) {
             'completed': 'completado',
             'complete': 'completado',
             'listo': 'completado',
+            'cerrado': 'completado',
+            'closed': 'completado',
             'en proceso': 'en progreso',
             'in progress': 'en progreso',
             'wip': 'en progreso',
@@ -648,6 +703,9 @@ function parseCSVServer(csvText) {
             'not started': 'sin empezar',
             'nuevo': 'sin empezar',
             'new': 'sin empezar',
+            'por hacer': 'sin empezar',
+            'to do': 'sin empezar',
+            'todo': 'sin empezar',
             'waiting': 'esperando respuesta',
             'esperando': 'esperando respuesta',
             'en espera': 'esperando respuesta',
@@ -658,6 +716,24 @@ function parseCSVServer(csvText) {
           };
           if (statusMap[lower]) {
             val = statusMap[lower];
+          } else {
+            // Partial/contains match as fallback
+            const partialStatus = [
+              { pattern: /hecho/i, status: 'completado' },
+              { pattern: /terminad/i, status: 'completado' },
+              { pattern: /finalizad/i, status: 'completado' },
+              { pattern: /completad/i, status: 'completado' },
+              { pattern: /done/i, status: 'completado' },
+              { pattern: /listo/i, status: 'completado' },
+              { pattern: /progreso/i, status: 'en progreso' },
+              { pattern: /esperando/i, status: 'esperando respuesta' },
+            ];
+            for (const { pattern, status } of partialStatus) {
+              if (pattern.test(lower)) {
+                val = status;
+                break;
+              }
+            }
           }
         }
 
@@ -678,6 +754,26 @@ function parseCSVServer(csvText) {
         task[field] = val;
       }
     });
+
+    // If client field itself is a z-section label, use it as context and clear it
+    const clientLower = (task.client || '').toLowerCase().trim();
+    if (/^z{1,3}[_\s]/.test(clientLower)) {
+      const sectionName = clientLower.replace(/^z{1,3}[_\s]+/, '');
+      for (const rule of zSectionRules) {
+        if (rule.pattern.test(sectionName)) {
+          if (rule.skip) continue; // skip this entire row
+          if (rule.status) task.status = rule.status;
+          break;
+        }
+      }
+      task.client = ''; // not a real client
+    }
+
+    // Apply section context status if the task has no explicit status set
+    // (still using the default "sin empezar")
+    if (currentSectionStatus && task.status === 'sin empezar') {
+      task.status = currentSectionStatus;
+    }
 
     // Detect PTO / Vacaciones / OOO / Day Off rows → mark as time-off
     const allText = [task.client, task.project, task.comments].join(' ').toLowerCase();
