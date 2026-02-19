@@ -525,10 +525,9 @@ function getOptionsForField(field) {
 // --- RENDER TASKS ---
 function isContractTask(t) {
   if (t.isTimeOff) return false;
-  if ((t.client || '').toLowerCase() === 'contrato') return true;
-  // Also detect "contrato" in project text (e.g. "Contrato hasta 27/2")
-  if (/\bcontrato\b/i.test(t.project || '')) return true;
-  return false;
+  // Only match explicit client="Contrato" — never match project text,
+  // as that creates phantom contract badges from regular tasks
+  return (t.client || '').toLowerCase() === 'contrato';
 }
 
 function getRegularTasks() {

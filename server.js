@@ -796,11 +796,11 @@ function parseCSVServer(csvText) {
       task.status = currentSectionStatus;
     }
 
-    // Detect "Contrato" rows — these are contract entries, not regular tasks
-    // Can appear as client="Contrato" OR project text containing "contrato"
+    // Detect "Contrato" rows — ONLY when the client field is explicitly "Contrato"
+    // Do NOT match "contrato" in project text — that creates phantom contract badges
+    // from regular tasks that happen to mention contracts
     const clientIsContrato = (task.client || '').toLowerCase() === 'contrato';
-    const projectHasContrato = /\bcontrato\b/i.test(task.project || '');
-    if (clientIsContrato || projectHasContrato) {
+    if (clientIsContrato) {
       task._isContrato = true;
       // Extract the deadline from the project text if present (e.g. "Contrato hasta 27/2")
       const contratoDateMatch = (task.project || '').match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
