@@ -523,16 +523,34 @@ function getOptionsForField(field) {
 }
 
 // --- RENDER TASKS ---
+function isContractTask(t) {
+  if (t.isTimeOff) return false;
+  if ((t.client || '').toLowerCase() === 'contrato') return true;
+  // Also detect "contrato" in project text (e.g. "Contrato hasta 27/2")
+  if (/\bcontrato\b/i.test(t.project || '')) return true;
+  return false;
+}
+
 function getRegularTasks() {
-  return tasks.filter(t => !t.isTimeOff && (t.client || '').toLowerCase() !== 'contrato');
+  return tasks.filter(t => !t.isTimeOff && !isContractTask(t));
 }
 
 function getContractTasks() {
-  return tasks.filter(t => !t.isTimeOff && (t.client || '').toLowerCase() === 'contrato');
+  return tasks.filter(t => isContractTask(t));
 }
 
 function getTimeOffEntries() {
-  return tasks.filter(t => t.isTimeOff);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return tasks.filter(t => {
+    if (!t.isTimeOff) return false;
+    // Filter out past time-off entries (end date before today)
+    if (t.timeOffEnd) {
+      const end = new Date(t.timeOffEnd + 'T23:59:59');
+      if (end < now) return false;
+    }
+    return true;
+  });
 }
 
 function sortTasksByNumber(taskList) {
@@ -707,8 +725,10 @@ function renderGroupedTasks(container, filtered) {
   now.setHours(0, 0, 0, 0);
 
   // Add members who only have timeoff or contract entries (no regular tasks)
+  // Skip entries without a real assignee
   [...timeOffs, ...allContracts].forEach(t => {
-    const key = t.assignee || 'Sin asignar';
+    const key = t.assignee;
+    if (!key || key.toLowerCase() === 'sin asignar') return;
     if (!groups[key]) {
       groups[key] = [];
       sortedKeys.push(key);
@@ -725,7 +745,15 @@ function renderGroupedTasks(container, filtered) {
   });
 
   sortedKeys.forEach((assignee) => {
-    const groupTasks = sortTasksByNumber(groups[assignee]);
+    // Skip unassigned / blank groups
+    if (!assignee || assignee.toLowerCase() === 'sin asignar') return;
+
+    // Filter out blank/dash-only tasks from this group
+    const groupTasks = sortTasksByNumber(groups[assignee]).filter(t => {
+      const proj = (t.project || '').trim();
+      if (!proj || /^[-–—]+$/.test(proj)) return false;
+      return true;
+    });
     const member = (settings.teamMembers || []).find(m => m.name === assignee);
     const color = member?.color || getColorForName(assignee);
     const initials = member?.initials || getInitials(assignee);
@@ -750,15 +778,18 @@ function renderGroupedTasks(container, filtered) {
     if (memberTimeOffs.length > 0) {
       timeoffHtml = '<div class="group-timeoff">';
       memberTimeOffs.forEach(to => {
-        // Use timeOffTitle directly (already contains name + dates from sheet)
-        // Format: "Marti PTO (20/2 - 6/3)" — no assignee prefix since it's next to the badge
-        const title = to.timeOffTitle || to.timeOffType || 'Time Off';
-        const startFmt = formatDate(to.timeOffStart);
-        const endFmt = formatDate(to.timeOffEnd);
-        // If the title already contains date info, just show it as-is
-        // Otherwise show title + date range
+        // Clean the title: strip assignee prefix if present (old DB format: "Assignee - Title")
+        let title = to.timeOffTitle || to.timeOffType || 'Time Off';
+        // Remove "Assignee - " prefix pattern from stale DB data
+        if (title.includes(' - ') && to.assignee) {
+          const prefix = to.assignee + ' - ';
+          if (title.startsWith(prefix)) title = title.slice(prefix.length);
+        }
+        // Build the badge label with date range
+        const startFmt = formatDateShort(to.timeOffStart);
+        const endFmt = formatDateShort(to.timeOffEnd);
         const hasDateInTitle = /\d{1,2}\/\d{1,2}/.test(title);
-        const badgeLabel = hasDateInTitle ? title : `${title} (${startFmt} - ${endFmt})`;
+        const badgeLabel = hasDateInTitle ? title : (startFmt && endFmt ? `${title} (${startFmt} - ${endFmt})` : title);
         timeoffHtml += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(badgeLabel)}">
           <span class="material-icons-round">beach_access</span>
           ${escHtml(badgeLabel)}
@@ -777,8 +808,19 @@ function renderGroupedTasks(container, filtered) {
     let contractHtml = '';
     if (memberContracts.length > 0) {
       memberContracts.forEach(ct => {
-        const deadlineClass = ct.deadline ? getDeadlineClass(ct.deadline) : '';
-        const dateStr = ct.deadline ? formatDate(ct.deadline) : 'Sin fecha';
+        // Extract date from project text if deadline missing (e.g. "Contrato hasta 27/2")
+        let ctDeadline = ct.deadline;
+        if (!ctDeadline && ct.project) {
+          const dm = ct.project.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+          if (dm) {
+            const day = dm[1].padStart(2, '0');
+            const month = dm[2].padStart(2, '0');
+            const year = dm[3] ? (dm[3].length === 2 ? '20' + dm[3] : dm[3]) : new Date().getFullYear();
+            ctDeadline = `${year}-${month}-${day}`;
+          }
+        }
+        const deadlineClass = ctDeadline ? getDeadlineClass(ctDeadline) : '';
+        const dateStr = ctDeadline ? formatDate(ctDeadline) : 'Sin fecha';
         contractHtml += `<span class="contrato-badge ${deadlineClass}" data-id="${ct.id}" title="Contrato hasta ${dateStr}">
           <span class="material-icons-round">description</span>
           Contrato: ${dateStr}
@@ -2369,7 +2411,13 @@ function renderCalendar() {
       const typeLabel = to.timeOffType === 'OOO' ? 'OOO' : to.timeOffType === 'Day Off' ? 'Day Off' : 'Vac';
       const pos = to._pos || 'single';
       const showLabel = pos === 'start' || pos === 'single';
-      const displayLabel = to.timeOffTitle || `${to.assignee} (${typeLabel})`;
+      // Clean title: strip "Assignee - " prefix from stale DB data
+      let calTitle = to.timeOffTitle || '';
+      if (calTitle.includes(' - ') && to.assignee) {
+        const prefix = to.assignee + ' - ';
+        if (calTitle.startsWith(prefix)) calTitle = calTitle.slice(prefix.length);
+      }
+      const displayLabel = calTitle || `${to.assignee} (${typeLabel})`;
       eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="background:${color}" title="${escAttr(displayLabel)}" data-task-id="${to.id}" data-event-type="timeoff">
         ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(displayLabel)}` : '&nbsp;'}
       </div>`;
@@ -2481,10 +2529,17 @@ function renderTeam() {
     let timeoffInfo = '';
     if (memberTimeOffs.length > 0) {
       const nextTo = memberTimeOffs[0];
-      const type = nextTo.timeOffTitle || nextTo.timeOffType || 'Time Off';
+      let toLabel = nextTo.timeOffTitle || nextTo.timeOffType || 'Time Off';
+      // Strip "Assignee - " prefix from stale DB data
+      if (toLabel.includes(' - ') && nextTo.assignee) {
+        const pfx = nextTo.assignee + ' - ';
+        if (toLabel.startsWith(pfx)) toLabel = toLabel.slice(pfx.length);
+      }
+      const hasDateInLabel = /\d{1,2}\/\d{1,2}/.test(toLabel);
+      const dateRange = hasDateInLabel ? '' : `: ${formatDateShort(nextTo.timeOffStart)} - ${formatDateShort(nextTo.timeOffEnd)}`;
       timeoffInfo = `<div class="member-timeoff-info">
         <span class="material-icons-round">beach_access</span>
-        ${escHtml(type)}: ${formatDate(nextTo.timeOffStart)} - ${formatDate(nextTo.timeOffEnd)}
+        ${escHtml(toLabel)}${dateRange}
       </div>`;
     }
 
@@ -2951,6 +3006,14 @@ function formatDate(dateStr) {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
+}
+
+// Short format: D/M (no year, no zero-padding) for compact badges
+function formatDateShort(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
 // Parse DD/MM/YYYY to YYYY-MM-DD (ISO), returns '' if invalid

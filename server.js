@@ -796,6 +796,22 @@ function parseCSVServer(csvText) {
       task.status = currentSectionStatus;
     }
 
+    // Detect "Contrato" rows — these are contract entries, not regular tasks
+    // Can appear as client="Contrato" OR project text containing "contrato hasta"
+    const projectLower = (task.project || '').toLowerCase();
+    if (projectLower.match(/\bcontrato\b/)) {
+      task._isContrato = true;
+      // Extract the deadline from the project text if present (e.g. "Contrato hasta 27/2")
+      const contratoDateMatch = projectLower.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
+      if (contratoDateMatch && !task.deadline) {
+        const parts = contratoDateMatch[1].split('/');
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2] ? (parts[2].length === 2 ? '20' + parts[2] : parts[2]) : new Date().getFullYear().toString();
+        task.deadline = `${year}-${month}-${day}`;
+      }
+    }
+
     // Detect PTO / Vacaciones / OOO / Day Off rows → mark as time-off
     const allText = [task.client, task.project, task.comments].join(' ').toLowerCase();
     const timeOffPatterns = [
@@ -958,7 +974,10 @@ async function performSheetSync() {
       if (existing && usedIds.has(existing.id)) existing = null;
     }
 
-    // Extract and clean internal time-off flags before comparing
+    // Extract and clean internal flags before comparing
+    const isContrato = st._isContrato || false;
+    delete st._isContrato;
+
     const isTimeOff = st._isTimeOff || false;
     const timeOffType = st._timeOffType || '';
     const timeOffTitle = st._timeOffTitle || '';
@@ -970,6 +989,14 @@ async function performSheetSync() {
     delete st._timeOffDate;
     delete st._timeOffStart;
     delete st._timeOffEnd;
+
+    // If detected as contrato from project text, mark the client as 'Contrato'
+    // so the front-end treats it as a contract badge, not a regular task
+    if (isContrato) {
+      st._originalClient = st.client; // preserve for matching
+      // Store the original assignee for the contract badge
+      st.client = 'Contrato';
+    }
 
     if (existing && !usedIds.has(existing.id)) {
       usedIds.add(existing.id);
