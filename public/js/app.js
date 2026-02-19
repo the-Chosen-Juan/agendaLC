@@ -536,7 +536,15 @@ function getRegularTasks() {
 }
 
 function getContractTasks() {
-  return tasks.filter(t => isContractTask(t));
+  // Deduplicate contracts: keep only one per assignee+deadline
+  const all = tasks.filter(t => isContractTask(t));
+  const seen = new Set();
+  return all.filter(ct => {
+    const key = `${(ct.assignee || '').toLowerCase()}|${ct.deadline || ct.project || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function getTimeOffEntries() {
@@ -806,32 +814,25 @@ function renderGroupedTasks(container, filtered) {
     }
 
     let contractHtml = '';
-    if (memberContracts.length > 0) {
-      const seenContracts = new Set();
-      memberContracts.forEach(ct => {
-        // Extract date from project text if deadline missing (e.g. "Contrato hasta 27/2")
-        let ctDeadline = ct.deadline;
-        if (!ctDeadline && ct.project) {
-          const dm = ct.project.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-          if (dm) {
-            const day = dm[1].padStart(2, '0');
-            const month = dm[2].padStart(2, '0');
-            const year = dm[3] ? (dm[3].length === 2 ? '20' + dm[3] : dm[3]) : new Date().getFullYear();
-            ctDeadline = `${year}-${month}-${day}`;
-          }
+    memberContracts.forEach(ct => {
+      // Extract date from project text if deadline missing (e.g. "Contrato hasta 27/2")
+      let ctDeadline = ct.deadline;
+      if (!ctDeadline && ct.project) {
+        const dm = ct.project.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+        if (dm) {
+          const day = dm[1].padStart(2, '0');
+          const month = dm[2].padStart(2, '0');
+          const year = dm[3] ? (dm[3].length === 2 ? '20' + dm[3] : dm[3]) : new Date().getFullYear();
+          ctDeadline = `${year}-${month}-${day}`;
         }
-        // Deduplicate: only show one badge per deadline per assignee
-        const dedupKey = ctDeadline || ct.project || ct.id;
-        if (seenContracts.has(dedupKey)) return;
-        seenContracts.add(dedupKey);
-        const deadlineClass = ctDeadline ? getDeadlineClass(ctDeadline) : '';
-        const dateStr = ctDeadline ? formatDate(ctDeadline) : 'Sin fecha';
-        contractHtml += `<span class="contrato-badge ${deadlineClass}" data-id="${ct.id}" title="Contrato hasta ${dateStr}">
-          <span class="material-icons-round">description</span>
-          Contrato: ${dateStr}
-        </span>`;
-      });
-    }
+      }
+      const deadlineClass = ctDeadline ? getDeadlineClass(ctDeadline) : '';
+      const dateStr = ctDeadline ? formatDate(ctDeadline) : 'Sin fecha';
+      contractHtml += `<span class="contrato-badge ${deadlineClass}" data-id="${ct.id}" title="Contrato hasta ${dateStr}">
+        <span class="material-icons-round">description</span>
+        Contrato: ${dateStr}
+      </span>`;
+    });
 
     header.innerHTML = `
       <span class="material-icons-round drag-handle">drag_indicator</span>

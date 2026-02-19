@@ -797,19 +797,21 @@ function parseCSVServer(csvText) {
     }
 
     // Detect "Contrato" rows — these are contract entries, not regular tasks
-    // Can appear as client="Contrato" OR project text containing "contrato hasta"
-    const projectLower = (task.project || '').toLowerCase();
-    if (projectLower.match(/\bcontrato\b/)) {
+    // Can appear as client="Contrato" OR project text containing "contrato"
+    const clientIsContrato = (task.client || '').toLowerCase() === 'contrato';
+    const projectHasContrato = /\bcontrato\b/i.test(task.project || '');
+    if (clientIsContrato || projectHasContrato) {
       task._isContrato = true;
       // Extract the deadline from the project text if present (e.g. "Contrato hasta 27/2")
-      const contratoDateMatch = projectLower.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
+      const contratoDateMatch = (task.project || '').match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
       if (contratoDateMatch && !task.deadline) {
-        const parts = contratoDateMatch[1].split('/');
-        const day = parts[0].padStart(2, '0');
-        const month = parts[1].padStart(2, '0');
-        const year = parts[2] ? (parts[2].length === 2 ? '20' + parts[2] : parts[2]) : new Date().getFullYear().toString();
+        const day = contratoDateMatch[1].padStart(2, '0');
+        const month = contratoDateMatch[2].padStart(2, '0');
+        const year = contratoDateMatch[3] ? (contratoDateMatch[3].length === 2 ? '20' + contratoDateMatch[3] : contratoDateMatch[3]) : new Date().getFullYear().toString();
         task.deadline = `${year}-${month}-${day}`;
       }
+      // Normalize client to 'Contrato' for consistent dedup
+      task.client = 'Contrato';
     }
 
     // Detect PTO / Vacaciones / OOO / Day Off rows → mark as time-off
@@ -992,13 +994,7 @@ async function performSheetSync() {
     delete st._timeOffStart;
     delete st._timeOffEnd;
 
-    // If detected as contrato from project text, mark the client as 'Contrato'
-    // so the front-end treats it as a contract badge, not a regular task
-    if (isContrato) {
-      st._originalClient = st.client; // preserve for matching
-      // Store the original assignee for the contract badge
-      st.client = 'Contrato';
-    }
+    // client already normalized to 'Contrato' in parser if detected
 
     if (existing && !usedIds.has(existing.id)) {
       usedIds.add(existing.id);
