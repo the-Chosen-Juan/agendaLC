@@ -1011,8 +1011,11 @@ async function performSheetSync() {
           break;
         }
       }
-      // Also check if time-off status changed
+      // Also check if time-off data changed
       if (isTimeOff !== (existing.isTimeOff || false)) changed = true;
+      if (timeOffStart && timeOffStart !== (existing.timeOffStart || '')) changed = true;
+      if (timeOffEnd && timeOffEnd !== (existing.timeOffEnd || '')) changed = true;
+      if (timeOffTitle && timeOffTitle !== (existing.timeOffTitle || '')) changed = true;
       if (changed) {
         // Update existing task with sheet data, preserve id and timestamps
         // Use sheet's current time-off state (not OR with old) so removed OOO/PTO clears out
