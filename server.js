@@ -944,9 +944,11 @@ async function performSheetSync() {
   }
 
   const allTasks = await getTasks();
-  // Include time-off tasks from sheet sync in matchable pool (exclude only contratos and manually-added time-off without sheet origin)
-  const regularTasks = allTasks.filter(t => (t.client || '').toLowerCase() !== 'contrato');
-  const contractTasks = allTasks.filter(t => (t.client || '').toLowerCase() === 'contrato');
+  // ALL tasks participate in the sync cycle — the sheet is the source of truth.
+  // Contracts and time-off entries from the sheet get recreated on each sync;
+  // stale entries (removed from sheet) get properly cleaned up.
+  const regularTasks = allTasks;
+  const contractTasks = []; // nothing preserved outside the sync cycle
 
   // Build lookup of existing regular tasks by taskNumber
   const existingByNumber = {};
