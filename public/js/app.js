@@ -549,9 +549,11 @@ function getOptionsForField(field) {
 // --- RENDER TASKS ---
 function isContractTask(t) {
   if (t.isTimeOff) return false;
-  // Only match explicit client="Contrato" — never match project text,
-  // as that creates phantom contract badges from regular tasks
-  return (t.client || '').toLowerCase() === 'contrato';
+  if ((t.client || '').toLowerCase() === 'contrato') return true;
+  // Match projects that START with "Contrato" (e.g. "Contrato 31/03")
+  // but not tasks that merely mention it (e.g. "Revisión contrato")
+  if (/^contrato\b/i.test(t.project || '')) return true;
+  return false;
 }
 
 function getRegularTasks() {
@@ -865,6 +867,9 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
     return new Date(t.deadline + 'T00:00:00') < now;
   }).length;
 
+  // Hide team if no tasks, time-offs, or contracts across all members
+  if (totalTasks === 0 && teamTimeOffs.length === 0 && teamContracts.length === 0) return;
+
   const teamKey = `__team_${teamName}`;
   const isTeamCollapsed = collapsedGroups[teamKey] === true;
 
@@ -913,6 +918,9 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
     const mInitials = member?.initials || getInitials(memberName);
     const mTimeOffs = timeOffs.filter(to => to.assignee === memberName);
     const mContracts = allContracts.filter(c => c.assignee === memberName);
+
+    // Hide members with nothing to show
+    if (memberTasks.length === 0 && mTimeOffs.length === 0 && mContracts.length === 0) return;
     const mOverdue = memberTasks.filter(t => {
       if (!t.deadline || t.status === 'completado') return false;
       return new Date(t.deadline + 'T00:00:00') < now;
@@ -1149,6 +1157,9 @@ function renderIndividualGroup(container, assignee, groups, timeOffs, now) {
 
   const memberTimeOffs = timeOffs.filter(to => to.assignee === assignee);
   const memberContracts = getContractTasks().filter(c => c.assignee === assignee);
+
+  // Hide members with nothing to show
+  if (groupTasks.length === 0 && memberTimeOffs.length === 0 && memberContracts.length === 0) return;
 
   const overdueCount = groupTasks.filter(t => {
     if (!t.deadline || t.status === 'completado') return false;
