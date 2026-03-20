@@ -731,6 +731,17 @@ function renderGroupedTasks(container, filtered) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
+  // Build team group lookup: member name -> team group config
+  const teamGroups = settings.teamGroups || [];
+  const memberToTeam = {};
+  const teamNameToFirstMember = {};
+  teamGroups.forEach(tg => {
+    if (tg.members && tg.members.length > 0) {
+      teamNameToFirstMember[tg.name] = tg.members[0];
+    }
+    (tg.members || []).forEach(m => { memberToTeam[m] = tg; });
+  });
+
   // Add members who only have timeoff or contract entries (no regular tasks)
   [...timeOffs, ...allContracts].forEach(t => {
     const key = t.assignee;
@@ -740,20 +751,31 @@ function renderGroupedTasks(container, filtered) {
       sortedKeys.push(key);
     }
   });
+
+  // Add all assigneeOrder members so teams always show even with 0 tasks
+  order.forEach(name => {
+    if (!groups[name]) {
+      groups[name] = [];
+      sortedKeys.push(name);
+    }
+  });
+
+  // Sort with team-aware ordering: legacy team names use their first member's position
+  const getOrderIndex = (name) => {
+    let idx = order.indexOf(name);
+    if (idx !== -1) return idx;
+    // Legacy team name (e.g., "Agus y Pau") → use first member's position
+    const firstMember = teamNameToFirstMember[name];
+    if (firstMember) return order.indexOf(firstMember);
+    return -1;
+  };
   sortedKeys.sort((a, b) => {
-    const ia = order.indexOf(a);
-    const ib = order.indexOf(b);
+    const ia = getOrderIndex(a);
+    const ib = getOrderIndex(b);
     if (ia === -1 && ib === -1) return a.localeCompare(b);
     if (ia === -1) return 1;
     if (ib === -1) return -1;
     return ia - ib;
-  });
-
-  // Build team group lookup: member name -> team group config
-  const teamGroups = settings.teamGroups || [];
-  const memberToTeam = {};
-  teamGroups.forEach(tg => {
-    (tg.members || []).forEach(m => { memberToTeam[m] = tg; });
   });
 
   // Track which teams have already been rendered
@@ -1707,19 +1729,30 @@ function openDateInput(cell, task) {
   const currentValue = task.deadline || '';
   const originalHtml = cell.innerHTML;
 
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;align-items:center;gap:4px';
+
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'cell-edit-input';
   input.value = isoToDDMMYYYY(currentValue);
   input.placeholder = 'DD/MM/YYYY';
 
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'date-clear-btn';
+  clearBtn.title = 'Borrar fecha';
+  clearBtn.innerHTML = '<span class="material-icons-round" style="font-size:16px">close</span>';
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(clearBtn);
   cell.innerHTML = '';
-  cell.appendChild(input);
+  cell.appendChild(wrapper);
 
   activeInlineInput = { cell, originalHtml, input };
 
-  const save = async () => {
-    const raw = input.value.trim();
+  const save = async (forceValue) => {
+    const raw = forceValue !== undefined ? forceValue : input.value.trim();
     const newValue = raw ? parseDDMMYYYY(raw) : '';
     if (raw && !newValue) {
       toast('Formato inválido, usá DD/MM/YYYY', 'error');
@@ -1757,6 +1790,12 @@ function openDateInput(cell, task) {
     }
   });
   fp.open();
+
+  clearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fp.close();
+    save('');
+  });
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { fp.close(); save(); }
@@ -2641,10 +2680,15 @@ document.getElementById('cal-all-off').addEventListener('click', () => {
 
 function renderCalendarAssigneeFilters() {
   const container = document.getElementById('cal-assignee-filters');
+  // Only show assignees who are current team members OR have active (non-completed) tasks
+  const activeTaskAssignees = new Set(
+    tasks.filter(t => t.assignee && t.status !== 'completado').map(t => t.assignee)
+  );
+  const currentMembers = new Set((settings.teamMembers || []).map(m => m.name));
   const allAssignees = [...new Set([
-    ...(settings.teamMembers || []).map(m => m.name),
-    ...tasks.map(t => t.assignee).filter(Boolean)
-  ])].sort();
+    ...currentMembers,
+    ...activeTaskAssignees
+  ])].filter(name => currentMembers.has(name) || activeTaskAssignees.has(name)).sort();
 
   container.innerHTML = '';
   allAssignees.forEach(name => {
@@ -2697,8 +2741,10 @@ function renderCalendar() {
 
   if (calFilters.deadlines) {
     // Include both regular tasks and contract tasks on calendar
+    // Exclude "esperando respuesta" tasks — they're on hold and shouldn't clutter the calendar
     [...getRegularTasks(), ...getContractTasks()].forEach(t => {
       if (!t.deadline) return;
+      if (t.status === 'esperando respuesta') return;
       // Apply assignee filter
       if (t.assignee && calAssigneeFilters[t.assignee] === false) return;
       if (!deadlineMap[t.deadline]) deadlineMap[t.deadline] = [];

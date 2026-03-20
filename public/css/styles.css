@@ -1151,6 +1151,24 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   box-shadow: 0 0 0 3px rgba(99,102,241,.15);
 }
 
+.date-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--danger, #ef4444);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  opacity: .7;
+  transition: opacity .15s;
+}
+.date-clear-btn:hover { opacity: 1; }
+
 /* ===========================
    EDIT DROPDOWN
    =========================== */
