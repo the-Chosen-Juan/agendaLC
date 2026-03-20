@@ -27,6 +27,7 @@
         <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span><span class="nav-badge hidden" id="nav-overdue-badge">0</span></a>
         <a href="#" class="nav-item" data-view="timeline"><span class="material-icons-round">view_timeline</span><span>Timeline</span></a>
         <a href="#" class="nav-item" data-view="calendar"><span class="material-icons-round">calendar_month</span><span>Calendario</span></a>
+        <a href="#" class="nav-item" data-view="clients"><span class="material-icons-round">business</span><span>Clientes</span></a>
         <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
         <a href="#" class="nav-item" data-view="activity"><span class="material-icons-round">history</span><span>Actividad</span></a>
         <a href="#" class="nav-item" data-view="settings"><span class="material-icons-round">settings</span><span>Configuración</span></a>
@@ -117,6 +118,18 @@
           <button class="btn btn-ghost btn-xs" id="cal-all-off"><span class="material-icons-round" style="font-size:.9rem">check_box_outline_blank</span> Desactivar todos</button>
         </div>
         <div id="calendar-grid" class="calendar-grid"></div>
+      </div>
+
+      <!-- CLIENTS DASHBOARD VIEW -->
+      <div id="view-clients" class="view hidden">
+        <div class="clients-toolbar">
+          <div class="clients-stats-row">
+            <div class="stat-card"><div class="stat-icon stat-total"><span class="material-icons-round">business</span></div><div class="stat-info"><span class="stat-number" id="clients-stat-total">0</span><span class="stat-label">Clientes activos</span></div></div>
+            <div class="stat-card"><div class="stat-icon stat-progress"><span class="material-icons-round">assignment</span></div><div class="stat-info"><span class="stat-number" id="clients-stat-tasks">0</span><span class="stat-label">Tareas activas</span></div></div>
+            <div class="stat-card"><div class="stat-icon stat-overdue"><span class="material-icons-round">warning</span></div><div class="stat-info"><span class="stat-number" id="clients-stat-overdue">0</span><span class="stat-label">Vencidas</span></div></div>
+          </div>
+        </div>
+        <div id="clients-dashboard" class="clients-dashboard"></div>
       </div>
 
       <!-- TEAM VIEW -->

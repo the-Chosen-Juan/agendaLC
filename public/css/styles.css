@@ -3177,3 +3177,149 @@ span.flatpickr-weekday {
     font-size: 0.65rem;
   }
 }
+
+/* ===========================
+   CLIENTS DASHBOARD
+   =========================== */
+.clients-toolbar {
+  padding: 0 1.75rem;
+}
+.clients-stats-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.clients-dashboard {
+  padding: 0 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.client-card {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.client-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .85rem 1.25rem;
+  cursor: pointer;
+  gap: 1rem;
+}
+.client-card-header:hover {
+  background: var(--surface-hover);
+}
+.client-card-title {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+.client-health {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .8rem;
+  font-weight: 500;
+}
+.client-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.client-next-deadline {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .75rem;
+  color: var(--text-muted);
+}
+.client-next-deadline .material-icons-round {
+  font-size: .85rem;
+  color: var(--primary);
+}
+.client-assignees {
+  display: flex;
+  align-items: center;
+}
+.client-assignee-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .65rem;
+  font-weight: 600;
+  color: #fff;
+  margin-left: -4px;
+  border: 2px solid var(--surface);
+  flex-shrink: 0;
+}
+.client-assignee-avatar:first-child { margin-left: 0; }
+.client-more-assignees {
+  font-size: .7rem;
+  color: var(--text-muted);
+  margin-left: .35rem;
+}
+.client-card-progress {
+  padding: 0 1.25rem .65rem;
+}
+.client-progress-bar {
+  height: 4px;
+  background: var(--surface-hover);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: .35rem;
+}
+.client-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: width .3s;
+}
+.client-progress-labels {
+  display: flex;
+  gap: 1rem;
+  font-size: .7rem;
+  color: var(--text-muted);
+}
+.client-card-tasks {
+  border-top: 1px solid var(--border-light);
+}
+.client-card-tasks .table-wrapper {
+  margin: 0;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+}
+.client-task-row { cursor: pointer; }
+.client-task-row:hover { background: var(--surface-hover); }
+
+@media (max-width: 768px) {
+  .clients-dashboard { padding: 0 .75rem 2rem; }
+  .clients-toolbar { padding: 0 .75rem; }
+  .clients-stats-row { flex-wrap: wrap; }
+  .client-card-header { flex-direction: column; align-items: flex-start; gap: .5rem; }
+  .client-card-meta { width: 100%; justify-content: flex-end; }
+}
+
+/* ===========================
+   CALENDAR DRAG & DROP
+   =========================== */
+.calendar-day.drag-over {
+  background: var(--primary-bg);
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+}
+.calendar-event.deadline[draggable="true"] {
+  cursor: grab;
+}
+.calendar-event.deadline[draggable="true"]:active {
+  cursor: grabbing;
+}
+.calendar-event.deadline.dragging {
+  opacity: .4;
+}

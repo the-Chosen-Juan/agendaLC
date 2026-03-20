@@ -157,7 +157,7 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
 
-  const titles = { agenda: 'Agenda', timeline: 'Timeline', calendar: 'Calendario', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
+  const titles = { agenda: 'Agenda', timeline: 'Timeline', calendar: 'Calendario', clients: 'Clientes', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
   const searchBox = document.getElementById('search-box');
@@ -172,6 +172,7 @@ function switchView(view) {
 
   if (view === 'timeline') renderTimeline();
   if (view === 'calendar') renderCalendar();
+  if (view === 'clients') renderClientsDashboard();
   if (view === 'activity') loadActivityLog();
   if (view === 'settings') renderSettingsPage();
 }
@@ -3036,14 +3037,14 @@ function renderCalendar() {
     deadlines.forEach(t => {
       const isOverdue = new Date(dateStr + 'T00:00:00') < today && t.status !== 'completado';
       const cls = isOverdue ? 'deadline-overdue' : 'deadline';
-      eventsHtml += `<div class="calendar-event ${cls}" title="${escAttr(t.project)} - ${escAttr(t.assignee)}" data-task-id="${t.id}" data-event-type="deadline">
+      eventsHtml += `<div class="calendar-event ${cls}" draggable="true" title="${escAttr(t.project)} - ${escAttr(t.assignee)}" data-task-id="${t.id}" data-event-type="deadline">
         <span class="material-icons-round">flag</span>${escHtml(t.project || t.client)}
       </div>`;
     });
 
     eventsHtml += '</div>';
 
-    html += `<div class="${classes.join(' ')}">
+    html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
       <div class="calendar-day-number">${dayNum}</div>
       ${eventsHtml}
     </div>`;
@@ -3062,6 +3063,54 @@ function renderCalendar() {
         if (toTask) openTimeOffModal(toTask);
       } else {
         openCalEventModal(taskId);
+      }
+    });
+  });
+
+  // --- Drag & drop to reschedule deadlines ---
+  grid.querySelectorAll('.calendar-event.deadline[draggable="true"], .calendar-event.deadline-overdue[draggable="true"]').forEach(el => {
+    el.addEventListener('dragstart', (e) => {
+      e.stopPropagation();
+      e.dataTransfer.setData('text/plain', el.dataset.taskId);
+      e.dataTransfer.effectAllowed = 'move';
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      grid.querySelectorAll('.calendar-day.drag-over').forEach(d => d.classList.remove('drag-over'));
+    });
+  });
+
+  grid.querySelectorAll('.calendar-day[data-date]').forEach(dayEl => {
+    dayEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      dayEl.classList.add('drag-over');
+    });
+    dayEl.addEventListener('dragleave', (e) => {
+      if (!dayEl.contains(e.relatedTarget)) {
+        dayEl.classList.remove('drag-over');
+      }
+    });
+    dayEl.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dayEl.classList.remove('drag-over');
+      const taskId = e.dataTransfer.getData('text/plain');
+      const newDate = dayEl.dataset.date;
+      if (!taskId || !newDate) return;
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+      if (task.deadline === newDate) return; // same date, no-op
+      try {
+        await api('PUT', `/tasks/${taskId}`, { deadline: newDate });
+        task.deadline = newDate;
+        toast(`Deadline movido a ${formatDate(newDate)}`);
+        renderCalendar();
+        renderTasks();
+        updateStats();
+        updateOverdueBadge();
+      } catch (err) {
+        toast('Error al mover deadline', 'error');
       }
     });
   });
@@ -3124,6 +3173,209 @@ document.getElementById('cal-event-delete').addEventListener('click', async () =
     toast('Error: ' + err.message, 'error');
   }
 });
+
+// --- CLIENTS DASHBOARD VIEW ---
+function renderClientsDashboard() {
+  const container = document.getElementById('clients-dashboard');
+  if (!container) return;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado');
+  const contractTasks = getContractTasks();
+
+  // Group tasks by client
+  const clientGroups = {};
+  regularTasks.forEach(t => {
+    const client = t.client || 'Sin cliente';
+    if (!clientGroups[client]) clientGroups[client] = [];
+    clientGroups[client].push(t);
+  });
+
+  // Ensure configured clients without tasks still show up
+  (settings.clients || []).forEach(c => {
+    if (!clientGroups[c.name]) clientGroups[c.name] = [];
+  });
+
+  const clientNames = Object.keys(clientGroups).sort((a, b) => {
+    // Sort by task count descending, then alphabetical
+    const diff = (clientGroups[b] || []).length - (clientGroups[a] || []).length;
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+
+  // Update stats
+  const activeClients = clientNames.filter(c => clientGroups[c].length > 0);
+  const totalTasks = regularTasks.length;
+  const totalOverdue = regularTasks.filter(t => {
+    if (!t.deadline || t.status === 'completado') return false;
+    return new Date(t.deadline + 'T00:00:00') < now;
+  }).length;
+
+  document.getElementById('clients-stat-total').textContent = activeClients.length;
+  document.getElementById('clients-stat-tasks').textContent = totalTasks;
+  document.getElementById('clients-stat-overdue').textContent = totalOverdue;
+
+  if (clientNames.length === 0) {
+    container.innerHTML = '<div class="empty-state"><span class="material-icons-round">business</span><p>No hay clientes con tareas activas</p></div>';
+    return;
+  }
+
+  let html = '';
+  clientNames.forEach(clientName => {
+    const tasks = clientGroups[clientName];
+    const clientColor = getClientColor(clientName);
+    const overdue = tasks.filter(t => t.deadline && t.status !== 'completado' && new Date(t.deadline + 'T00:00:00') < now);
+    const inProgress = tasks.filter(t => t.status === 'en progreso' || t.status === 'on going');
+    const notStarted = tasks.filter(t => t.status === 'sin empezar');
+    const contracts = contractTasks.filter(c => {
+      // Match contracts to this client - contracts may have original client stored
+      return c.assignee && tasks.some(t => t.assignee === c.assignee);
+    });
+
+    // Get unique assignees for this client
+    const assignees = [...new Set(tasks.map(t => t.assignee).filter(Boolean))];
+
+    // Calculate health: green (no overdue), yellow (some overdue), red (>50% overdue)
+    let healthColor = '#22c55e';
+    let healthLabel = 'Al día';
+    let healthIcon = 'check_circle';
+    if (overdue.length > 0 && overdue.length <= tasks.length * 0.5) {
+      healthColor = '#f59e0b';
+      healthLabel = `${overdue.length} vencida${overdue.length > 1 ? 's' : ''}`;
+      healthIcon = 'warning';
+    } else if (overdue.length > tasks.length * 0.5 && tasks.length > 0) {
+      healthColor = '#ef4444';
+      healthLabel = `${overdue.length} vencida${overdue.length > 1 ? 's' : ''}`;
+      healthIcon = 'error';
+    }
+    if (tasks.length === 0) {
+      healthColor = 'var(--text-muted)';
+      healthLabel = 'Sin tareas';
+      healthIcon = 'remove_circle_outline';
+    }
+
+    // Progress bar
+    const completed = 0; // only active tasks here
+    const progressPct = tasks.length > 0 ? Math.round((inProgress.length / tasks.length) * 100) : 0;
+
+    // Nearest deadline
+    const upcoming = tasks.filter(t => t.deadline && t.status !== 'completado')
+      .sort((a, b) => a.deadline.localeCompare(b.deadline));
+    const nearestDeadline = upcoming.length > 0 ? upcoming[0] : null;
+
+    const isCollapsed = collapsedGroups[`__client_${clientName}`] === true;
+
+    html += `<div class="client-card">
+      <div class="client-card-header" data-client="${escAttr(clientName)}">
+        <div class="client-card-title">
+          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.85rem;padding:.35rem .75rem">${escHtml(clientName)}</span>
+          <span class="group-count">${tasks.length} tarea${tasks.length !== 1 ? 's' : ''}</span>
+          <span class="client-health" style="color:${healthColor}">
+            <span class="material-icons-round" style="font-size:.85rem">${healthIcon}</span>
+            ${healthLabel}
+          </span>
+        </div>
+        <div class="client-card-meta">
+          ${nearestDeadline ? `<span class="client-next-deadline" title="Próximo deadline">
+            <span class="material-icons-round">flag</span>
+            ${formatDate(nearestDeadline.deadline)}
+          </span>` : ''}
+          <div class="client-assignees">
+            ${assignees.slice(0, 5).map(a => {
+              const m = (settings.teamMembers || []).find(m => m.name === a);
+              const c = m?.color || getColorForName(a);
+              const ini = m?.initials || getInitials(a);
+              return `<div class="client-assignee-avatar" style="background:${c}" title="${escAttr(a)}">${ini}</div>`;
+            }).join('')}
+            ${assignees.length > 5 ? `<span class="client-more-assignees">+${assignees.length - 5}</span>` : ''}
+          </div>
+          <span class="material-icons-round group-toggle ${isCollapsed ? 'collapsed' : ''}">expand_more</span>
+        </div>
+      </div>
+      <div class="client-card-progress">
+        <div class="client-progress-bar">
+          <div class="client-progress-fill" style="width:${progressPct}%"></div>
+        </div>
+        <div class="client-progress-labels">
+          <span>${inProgress.length} en progreso</span>
+          <span>${notStarted.length} sin empezar</span>
+          ${overdue.length > 0 ? `<span style="color:#ef4444">${overdue.length} vencida${overdue.length > 1 ? 's' : ''}</span>` : ''}
+        </div>
+      </div>
+      <div class="client-card-tasks ${isCollapsed ? 'hidden' : ''}">
+        ${buildClientTaskTable(tasks, now)}
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+
+  // Bind collapse toggles
+  container.querySelectorAll('.client-card-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const clientName = header.dataset.client;
+      const key = `__client_${clientName}`;
+      const tasksDiv = header.closest('.client-card').querySelector('.client-card-tasks');
+      const toggle = header.querySelector('.group-toggle');
+      tasksDiv.classList.toggle('hidden');
+      toggle.classList.toggle('collapsed');
+      collapsedGroups[key] = tasksDiv.classList.contains('hidden');
+      localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+    });
+  });
+
+  // Bind inline editing on task rows
+  container.querySelectorAll('.table-wrapper').forEach(w => bindTaskRows(w));
+
+  // Bind click on task rows to navigate to agenda
+  container.querySelectorAll('.client-task-row[data-id]').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.editable-cell')) return;
+      switchView('agenda');
+      setTimeout(() => navigateToTask(row.dataset.id), 200);
+    });
+  });
+}
+
+function buildClientTaskTable(taskList, now) {
+  if (taskList.length === 0) return '<p style="color:var(--text-muted);font-size:.85rem;padding:.5rem 1rem">Sin tareas activas</p>';
+
+  let html = `<div class="table-wrapper"><table class="task-table">
+    <thead><tr>
+      <th>#</th>
+      <th>Tema / Proyecto</th>
+      <th>Asignado</th>
+      <th>Prioridad</th>
+      <th>Deadline</th>
+      <th>Status</th>
+    </tr></thead><tbody>`;
+
+  taskList.forEach(t => {
+    const priorityClass = (t.priority || '').toLowerCase().replace(' ', '');
+    const statusClass = (t.status || '').toLowerCase().replace(/ /g, '-');
+    const deadlineClass = getDeadlineClass(t.deadline);
+    const member = (settings.teamMembers || []).find(m => m.name === t.assignee);
+    const color = member?.color || getColorForName(t.assignee);
+    const initials = member?.initials || getInitials(t.assignee);
+
+    html += `<tr class="client-task-row" data-id="${t.id}">
+      <td style="color:var(--text-muted);font-size:.8rem">${escHtml(t.taskNumber || '')}</td>
+      <td class="editable-cell" data-field="project">${escHtml(t.project || '—')}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:.35rem">
+          <div class="client-assignee-avatar" style="background:${color};width:22px;height:22px;font-size:.6rem">${initials}</div>
+          <span style="font-size:.8rem;color:var(--text-secondary)">${escHtml(t.assignee || '—')}</span>
+        </div>
+      </td>
+      <td><span class="priority-badge ${priorityClass}">${escHtml(t.priority || '—')}</span></td>
+      <td><span class="deadline-text ${deadlineClass}">${formatDate(t.deadline)}</span></td>
+      <td><span class="status-badge ${statusClass}">${escHtml(t.status || '—')}</span></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  return html;
+}
 
 // --- TEAM VIEW ---
 function renderTeam() {
