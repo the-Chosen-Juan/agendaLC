@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -25,6 +25,7 @@
       </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span><span class="nav-badge hidden" id="nav-overdue-badge">0</span></a>
+        <a href="#" class="nav-item" data-view="timeline"><span class="material-icons-round">view_timeline</span><span>Timeline</span></a>
         <a href="#" class="nav-item" data-view="calendar"><span class="material-icons-round">calendar_month</span><span>Calendario</span></a>
         <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
         <a href="#" class="nav-item" data-view="activity"><span class="material-icons-round">history</span><span>Actividad</span></a>
@@ -86,6 +87,14 @@
           <div class="stat-card"><div class="stat-icon stat-overdue"><span class="material-icons-round">warning</span></div><div class="stat-info"><span class="stat-number" id="stat-overdue">0</span><span class="stat-label">Vencidas</span></div></div>
         </div>
         <div id="tasks-container" class="tasks-container"></div>
+      </div>
+
+      <!-- TIMELINE VIEW -->
+      <div id="view-timeline" class="view hidden">
+        <div class="timeline-toolbar">
+          <h2>Deadlines - Próximas 2 semanas</h2>
+        </div>
+        <div id="timeline-container" class="timeline-container"></div>
       </div>
 
       <!-- CALENDAR VIEW -->
@@ -354,8 +363,8 @@
   <!-- TOAST -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

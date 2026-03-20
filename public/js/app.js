@@ -6,7 +6,23 @@
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
 let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2 };
-let currentFilter = { priority: 'all', assignee: '', status: '', client: '', search: '' };
+let currentFilter = JSON.parse(localStorage.getItem('agenda_filters') || 'null') || { priority: 'all', assignee: '', status: '', client: '', search: '' };
+function saveFilters() { localStorage.setItem('agenda_filters', JSON.stringify(currentFilter)); }
+function restoreFilters() {
+  // Restore priority chip
+  document.querySelectorAll('.chip[data-filter]').forEach(c => {
+    c.classList.toggle('active', c.dataset.filter === currentFilter.priority);
+  });
+  // Restore dropdowns
+  const assigneeEl = document.getElementById('filter-assignee');
+  const statusEl = document.getElementById('filter-status');
+  const clientEl = document.getElementById('filter-client');
+  const searchEl = document.getElementById('search-input');
+  if (assigneeEl) assigneeEl.value = currentFilter.assignee || '';
+  if (statusEl) statusEl.value = currentFilter.status || '';
+  if (clientEl) clientEl.value = currentFilter.client || '';
+  if (searchEl) searchEl.value = currentFilter.search || '';
+}
 let grouped = true;
 let editingTaskId = null;
 let editingTimeOffId = null;
@@ -141,7 +157,7 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
 
-  const titles = { agenda: 'Agenda', calendar: 'Calendario', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
+  const titles = { agenda: 'Agenda', timeline: 'Timeline', calendar: 'Calendario', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
   const searchBox = document.getElementById('search-box');
@@ -154,6 +170,7 @@ function switchView(view) {
     addBtn.classList.add('hidden');
   }
 
+  if (view === 'timeline') renderTimeline();
   if (view === 'calendar') renderCalendar();
   if (view === 'activity') loadActivityLog();
   if (view === 'settings') renderSettingsPage();
@@ -236,6 +253,7 @@ async function loadData() {
     await autoDeleteCompletedTasks();
 
     populateFilterDropdowns();
+    restoreFilters();
     renderTasks();
     renderTeam();
     updateStats();
@@ -269,8 +287,14 @@ async function softRefresh() {
 
 async function autoDeleteCompletedTasks() {
   const days = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
+  if (days <= 0) return; // 0 = disabled
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  const toDelete = tasks.filter(t => t.completedAt && new Date(t.completedAt).getTime() < cutoff);
+  const toDelete = tasks.filter(t => {
+    if (t.status !== 'completado') return false;
+    // Use updatedAt as proxy for completion time (completedAt doesn't exist)
+    const ts = t.updatedAt || t.createdAt;
+    return ts && new Date(ts).getTime() < cutoff;
+  });
   if (toDelete.length > 0) {
     await Promise.all(toDelete.map(t => api('DELETE', `/tasks/${t.id}`)));
     tasks = tasks.filter(t => !toDelete.some(d => d.id === t.id));
@@ -2035,6 +2059,7 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     currentFilter.priority = chip.dataset.filter;
+    saveFilters();
     renderTasks();
     updateStats();
   });
@@ -2042,24 +2067,28 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
 
 document.getElementById('filter-assignee').addEventListener('change', (e) => {
   currentFilter.assignee = e.target.value;
+  saveFilters();
   renderTasks();
   updateStats();
 });
 
 document.getElementById('filter-status').addEventListener('change', (e) => {
   currentFilter.status = e.target.value;
+  saveFilters();
   renderTasks();
   updateStats();
 });
 
 document.getElementById('filter-client').addEventListener('change', (e) => {
   currentFilter.client = e.target.value;
+  saveFilters();
   renderTasks();
   updateStats();
 });
 
 document.getElementById('search-input').addEventListener('input', (e) => {
   currentFilter.search = e.target.value.toLowerCase();
+  saveFilters();
   renderTasks();
   updateStats();
 });
@@ -2083,7 +2112,7 @@ function getFilteredTasks() {
     if (currentFilter.client && t.client !== currentFilter.client) return false;
     if (currentFilter._overdue) {
       if (!t.deadline || t.status === 'completado') return false;
-      if (!(new Date(t.deadline) < now)) return false;
+      if (!(new Date(t.deadline + 'T00:00:00') < now)) return false;
     }
     if (currentFilter.search) {
       const s = currentFilter.search;
@@ -2112,7 +2141,7 @@ function updateStats() {
 
   const overdueCount = filtered.filter(t => {
     if (!t.deadline || t.status === 'completado') return false;
-    return new Date(t.deadline) < now;
+    return new Date(t.deadline + 'T00:00:00') < now;
   }).length;
   document.getElementById('stat-overdue').textContent = overdueCount;
 }
@@ -2398,6 +2427,15 @@ document.getElementById('leader-randomize').addEventListener('click', async () =
     return;
   }
 
+  // Round-robin: pick from people who haven't been leader recently
+  const history = settings.leaderHistory || [];
+  let eligible = pool.filter(p => !history.includes(p));
+  // If everyone has been leader, reset the cycle
+  if (eligible.length === 0) {
+    eligible = [...pool];
+    history.length = 0;
+  }
+
   const nameEl = document.getElementById('leader-name');
   let count = 0;
   const interval = setInterval(() => {
@@ -2405,11 +2443,17 @@ document.getElementById('leader-randomize').addEventListener('click', async () =
     count++;
     if (count >= 15) {
       clearInterval(interval);
-      const winner = pool[Math.floor(Math.random() * pool.length)];
+      const winner = eligible[Math.floor(Math.random() * eligible.length)];
       nameEl.textContent = winner;
+      history.push(winner);
       settings.weeklyLeader = winner;
-      api('PUT', '/settings', { weeklyLeader: winner }).catch(() => {});
-      toast(`${winner} es el lider de la semana!`);
+      settings.leaderHistory = history;
+      api('PUT', '/settings', { weeklyLeader: winner, leaderHistory: history }).catch(() => {});
+      const remaining = pool.filter(p => !history.includes(p));
+      const msg = remaining.length > 0
+        ? `${winner} es el líder de la semana! (faltan ${remaining.length} para completar la ronda)`
+        : `${winner} es el líder de la semana! (ronda completa, se reinicia)`;
+      toast(msg);
     }
   }, 100);
 });
@@ -2631,6 +2675,114 @@ document.getElementById('new-task-save').addEventListener('click', async () => {
     toast('Error: ' + err.message, 'error');
   }
 });
+
+// --- TIMELINE VIEW (upcoming deadlines grouped by day) ---
+function renderTimeline() {
+  const container = document.getElementById('timeline-container');
+  if (!container) return;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const endDate = new Date(now);
+  endDate.setDate(endDate.getDate() + 14); // 2 weeks ahead
+
+  // Collect tasks with deadlines in the next 2 weeks (+ overdue)
+  const relevantTasks = getRegularTasks().filter(t => {
+    if (!t.deadline || t.status === 'completado' || t.status === 'esperando respuesta') return false;
+    return true;
+  });
+
+  // Group by date
+  const byDate = {};
+  const overdueTasks = [];
+  relevantTasks.forEach(t => {
+    const d = new Date(t.deadline + 'T00:00:00');
+    if (d < now) {
+      overdueTasks.push(t);
+    } else if (d <= endDate) {
+      const key = t.deadline;
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push(t);
+    }
+  });
+
+  const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+  let html = '';
+
+  // Overdue section
+  if (overdueTasks.length > 0) {
+    html += `<div class="timeline-day timeline-overdue">
+      <div class="timeline-day-header">
+        <span class="timeline-day-label">Vencidas</span>
+        <span class="timeline-day-count">${overdueTasks.length} tarea${overdueTasks.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="timeline-tasks">`;
+    overdueTasks.sort((a, b) => a.deadline.localeCompare(b.deadline)).forEach(t => {
+      html += buildTimelineTask(t, true);
+    });
+    html += '</div></div>';
+  }
+
+  // Future days
+  const sortedDates = Object.keys(byDate).sort();
+  if (sortedDates.length === 0 && overdueTasks.length === 0) {
+    container.innerHTML = '<div class="empty-state"><span class="material-icons-round">event_available</span><p>No hay deadlines en las próximas 2 semanas</p></div>';
+    return;
+  }
+
+  sortedDates.forEach(dateStr => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const isToday = dateStr === now.toISOString().slice(0, 10);
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = dateStr === tomorrow.toISOString().slice(0, 10);
+
+    let label = `${dayNames[d.getDay()]} ${d.getDate()} ${monthNames[d.getMonth()]}`;
+    if (isToday) label = `Hoy - ${label}`;
+    else if (isTomorrow) label = `Mañana - ${label}`;
+
+    const tasks = byDate[dateStr];
+    html += `<div class="timeline-day ${isToday ? 'timeline-today' : ''} ${isTomorrow ? 'timeline-tomorrow' : ''}">
+      <div class="timeline-day-header">
+        <span class="timeline-day-label">${label}</span>
+        <span class="timeline-day-count">${tasks.length} tarea${tasks.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="timeline-tasks">`;
+    tasks.forEach(t => { html += buildTimelineTask(t, false); });
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html;
+
+  // Bind clicks to navigate to task
+  container.querySelectorAll('.timeline-task[data-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      switchView('agenda');
+      setTimeout(() => navigateToTask(el.dataset.id), 200);
+    });
+  });
+}
+
+function buildTimelineTask(t, isOverdue) {
+  const clientColor = getClientColor(t.client);
+  const priorityClass = (t.priority || '').toLowerCase().replace(' ', '');
+  const member = (settings.teamMembers || []).find(m => m.name === t.assignee);
+  const color = member?.color || getColorForName(t.assignee);
+  const initials = member?.initials || getInitials(t.assignee);
+
+  return `<div class="timeline-task ${isOverdue ? 'timeline-task-overdue' : ''}" data-id="${t.id}">
+    <div class="timeline-task-avatar" style="background:${color}">${initials}</div>
+    <div class="timeline-task-info">
+      <span class="timeline-task-project">${escHtml(t.project || 'Sin proyecto')}</span>
+      <span class="timeline-task-assignee">${escHtml(t.assignee || '—')}</span>
+    </div>
+    <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.7rem">${escHtml(t.client || '—')}</span>
+    <span class="priority-badge ${priorityClass}" style="font-size:.65rem">${escHtml(t.priority || 'TBD')}</span>
+    ${isOverdue ? `<span class="timeline-overdue-date">${formatDate(t.deadline)}</span>` : ''}
+  </div>`;
+}
 
 // --- CALENDAR VIEW (with assignee filters and clickable events) ---
 document.getElementById('cal-prev').addEventListener('click', () => {
@@ -3494,8 +3646,14 @@ function parseDDMMYYYY(str) {
   const mm = parts[1].padStart(2, '0');
   const yyyy = parts[2];
   if (!dd || !mm || !yyyy || yyyy.length !== 4) return '';
+  const day = parseInt(dd, 10);
+  const month = parseInt(mm, 10);
+  const year = parseInt(yyyy, 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return '';
   const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
   if (isNaN(d)) return '';
+  // Verify the date components didn't overflow (e.g., Feb 30 → Mar 2)
+  if (d.getDate() !== day || d.getMonth() + 1 !== month) return '';
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -3557,11 +3715,17 @@ async function performUndo() {
   }
   const entry = undoStack.pop();
   try {
+    // Verify the task still has the value we expect before reverting
+    const task = tasks.find(t => t.id === entry.taskId);
+    if (!task) { toast('Tarea eliminada, no se puede deshacer', 'error'); return; }
+    if (task[entry.field] !== entry.newValue) {
+      toast('La tarea fue modificada por otro usuario, no se puede deshacer', 'error');
+      return;
+    }
     const update = {};
     update[entry.field] = entry.oldValue;
     await api('PUT', `/tasks/${entry.taskId}`, update);
-    const task = tasks.find(t => t.id === entry.taskId);
-    if (task) task[entry.field] = entry.oldValue;
+    task[entry.field] = entry.oldValue;
     renderTasks();
     updateStats();
     updateOverdueBadge();
