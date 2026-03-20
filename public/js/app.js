@@ -157,7 +157,7 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
 
-  const titles = { agenda: 'Agenda', timeline: 'Timeline', calendar: 'Calendario', clients: 'Clientes', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
+  const titles = { agenda: 'Agenda', timeline: 'Timeline', heatmap: 'Carga', kanban: 'Pipeline', calendar: 'Calendario', clients: 'Clientes', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
   const searchBox = document.getElementById('search-box');
@@ -171,6 +171,8 @@ function switchView(view) {
   }
 
   if (view === 'timeline') renderTimeline();
+  if (view === 'heatmap') renderHeatmap();
+  if (view === 'kanban') renderKanban();
   if (view === 'calendar') renderCalendar();
   if (view === 'clients') renderClientsDashboard();
   if (view === 'activity') loadActivityLog();
@@ -3173,6 +3175,316 @@ document.getElementById('cal-event-delete').addEventListener('click', async () =
     toast('Error: ' + err.message, 'error');
   }
 });
+
+// --- WORKLOAD HEATMAP VIEW ---
+function renderHeatmap() {
+  const container = document.getElementById('heatmap-container');
+  if (!container) return;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta');
+  const timeOffs = getTimeOffEntries();
+
+  // Get all team members + anyone with tasks
+  const memberSet = new Set();
+  (settings.teamMembers || []).forEach(m => memberSet.add(m.name));
+  regularTasks.forEach(t => { if (t.assignee) memberSet.add(t.assignee); });
+  const members = [...memberSet].sort((a, b) => {
+    const order = settings.assigneeOrder || [];
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
+  // Build 14 days
+  const days = [];
+  const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    days.push({
+      date: d.toISOString().slice(0, 10),
+      label: i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : `${dayLabels[d.getDay()]} ${d.getDate()}`,
+      isWeekend: d.getDay() === 0 || d.getDay() === 6
+    });
+  }
+
+  // Count tasks per member per day (deadline falls on that day)
+  // Also count tasks with no deadline as spread across all days
+  const heatData = {};
+  let globalMax = 0;
+
+  members.forEach(member => {
+    heatData[member] = {};
+    const memberTasks = regularTasks.filter(t => t.assignee === member);
+    const withDeadline = memberTasks.filter(t => t.deadline);
+    const noDeadline = memberTasks.filter(t => !t.deadline);
+
+    days.forEach(day => {
+      // Tasks due on this day
+      let count = withDeadline.filter(t => t.deadline === day.date).length;
+      // Spread no-deadline tasks as a baseline
+      count += noDeadline.length > 0 ? Math.ceil(noDeadline.length / 14) : 0;
+      // Overdue tasks pile up on today
+      if (day.date === days[0].date) {
+        count += withDeadline.filter(t => t.deadline < day.date).length;
+      }
+      heatData[member][day.date] = count;
+      if (count > globalMax) globalMax = count;
+    });
+  });
+
+  // Build time-off lookup: member -> set of dates
+  const timeOffDates = {};
+  timeOffs.forEach(to => {
+    if (!to.assignee || !to.timeOffStart || !to.timeOffEnd) return;
+    if (!timeOffDates[to.assignee]) timeOffDates[to.assignee] = new Set();
+    const start = new Date(to.timeOffStart + 'T00:00:00');
+    const end = new Date(to.timeOffEnd + 'T00:00:00');
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      timeOffDates[to.assignee].add(d.toISOString().slice(0, 10));
+    }
+  });
+
+  function getHeatLevel(count) {
+    if (count === 0) return 0;
+    if (globalMax <= 1) return count > 0 ? 2 : 0;
+    const ratio = count / globalMax;
+    if (ratio <= 0.25) return 1;
+    if (ratio <= 0.5) return 2;
+    if (ratio <= 0.75) return 3;
+    return 4;
+  }
+
+  // Render
+  let html = '<div class="heatmap-grid">';
+
+  // Header row with day labels
+  html += '<div class="heatmap-row heatmap-header-row">';
+  html += '<div class="heatmap-label"></div>';
+  days.forEach(day => {
+    html += `<div class="heatmap-day-label ${day.isWeekend ? 'weekend' : ''}">${day.label}</div>`;
+  });
+  // Total column header
+  html += '<div class="heatmap-day-label" style="font-weight:700">Total</div>';
+  html += '</div>';
+
+  members.forEach(member => {
+    const m = (settings.teamMembers || []).find(tm => tm.name === member);
+    const color = m?.color || getColorForName(member);
+    const initials = m?.initials || getInitials(member);
+    const memberTotal = regularTasks.filter(t => t.assignee === member).length;
+    const memberOverdue = regularTasks.filter(t => t.assignee === member && t.deadline && new Date(t.deadline + 'T00:00:00') < now).length;
+
+    html += '<div class="heatmap-row">';
+    html += `<div class="heatmap-label">
+      <div class="heatmap-avatar" style="background:${color}">${initials}</div>
+      <span class="heatmap-name">${escHtml(member)}</span>
+      ${memberOverdue > 0 ? `<span class="heatmap-overdue" title="${memberOverdue} vencida${memberOverdue > 1 ? 's' : ''}"><span class="material-icons-round">warning</span>${memberOverdue}</span>` : ''}
+    </div>`;
+
+    days.forEach(day => {
+      const count = heatData[member][day.date] || 0;
+      const isOff = timeOffDates[member]?.has(day.date);
+      const level = isOff ? 'off' : getHeatLevel(count);
+
+      html += `<div class="heatmap-cell heatmap-level-${level} ${day.isWeekend ? 'weekend' : ''}" title="${escAttr(member)}: ${isOff ? 'Time Off' : count + ' tarea' + (count !== 1 ? 's' : '')} — ${day.label}">
+        ${isOff ? '<span class="material-icons-round" style="font-size:.65rem">beach_access</span>' : (count > 0 ? count : '')}
+      </div>`;
+    });
+
+    // Total cell
+    const totalLevel = memberTotal === 0 ? 0 : memberTotal <= 2 ? 1 : memberTotal <= 4 ? 2 : memberTotal <= 6 ? 3 : 4;
+    html += `<div class="heatmap-cell heatmap-total heatmap-level-${totalLevel}">${memberTotal}</div>`;
+    html += '</div>';
+  });
+
+  html += '</div>';
+
+  // Summary row
+  const totalActive = regularTasks.length;
+  const totalOverdue = regularTasks.filter(t => t.deadline && new Date(t.deadline + 'T00:00:00') < now).length;
+  const avgPerPerson = members.length > 0 ? (totalActive / members.length).toFixed(1) : 0;
+  const busiestMember = members.reduce((best, m) => {
+    const c = regularTasks.filter(t => t.assignee === m).length;
+    return c > best.count ? { name: m, count: c } : best;
+  }, { name: '—', count: 0 });
+  const freestMember = members.reduce((best, m) => {
+    const c = regularTasks.filter(t => t.assignee === m).length;
+    return c < best.count ? { name: m, count: c } : best;
+  }, { name: '—', count: Infinity });
+  if (freestMember.count === Infinity) freestMember.count = 0;
+
+  html += `<div class="heatmap-summary">
+    <div class="heatmap-summary-card">
+      <span class="material-icons-round">assignment</span>
+      <div><strong>${totalActive}</strong><span>tareas activas</span></div>
+    </div>
+    <div class="heatmap-summary-card">
+      <span class="material-icons-round" style="color:#ef4444">warning</span>
+      <div><strong>${totalOverdue}</strong><span>vencidas</span></div>
+    </div>
+    <div class="heatmap-summary-card">
+      <span class="material-icons-round" style="color:var(--primary)">person</span>
+      <div><strong>${avgPerPerson}</strong><span>promedio / persona</span></div>
+    </div>
+    <div class="heatmap-summary-card">
+      <span class="material-icons-round" style="color:#ef4444">local_fire_department</span>
+      <div><strong>${escHtml(busiestMember.name)}</strong><span>${busiestMember.count} tareas (más cargado)</span></div>
+    </div>
+    <div class="heatmap-summary-card">
+      <span class="material-icons-round" style="color:#22c55e">spa</span>
+      <div><strong>${escHtml(freestMember.name)}</strong><span>${freestMember.count} tareas (más libre)</span></div>
+    </div>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+// --- KANBAN PIPELINE VIEW ---
+function renderKanban() {
+  const board = document.getElementById('kanban-board');
+  if (!board) return;
+
+  const allTasks = getRegularTasks();
+
+  // Populate filter dropdowns
+  const clientSelect = document.getElementById('kanban-filter-client');
+  const assigneeSelect = document.getElementById('kanban-filter-assignee');
+  const currentClient = clientSelect.value;
+  const currentAssignee = assigneeSelect.value;
+
+  // Rebuild options preserving selection
+  const clients = [...new Set(allTasks.map(t => t.client).filter(Boolean))].sort();
+  clientSelect.innerHTML = '<option value="">Todos los clientes</option>' + clients.map(c => `<option value="${escAttr(c)}" ${c === currentClient ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+
+  const assignees = [...new Set(allTasks.map(t => t.assignee).filter(Boolean))].sort();
+  assigneeSelect.innerHTML = '<option value="">Todos los asignados</option>' + assignees.map(a => `<option value="${escAttr(a)}" ${a === currentAssignee ? 'selected' : ''}>${escHtml(a)}</option>`).join('');
+
+  // Apply filters
+  let filtered = allTasks;
+  if (currentClient) filtered = filtered.filter(t => t.client === currentClient);
+  if (currentAssignee) filtered = filtered.filter(t => t.assignee === currentAssignee);
+
+  const columns = [
+    { status: 'sin empezar', label: 'Sin empezar', icon: 'schedule', color: 'var(--status-sin-empezar)' },
+    { status: 'en progreso', label: 'En progreso', icon: 'pending', color: 'var(--status-en-progreso)' },
+    { status: 'on going', label: 'On Going', icon: 'autorenew', color: 'var(--status-on-going)' },
+    { status: 'esperando respuesta', label: 'Esperando', icon: 'hourglass_empty', color: 'var(--status-esperando)' },
+    { status: 'completado', label: 'Completado', icon: 'check_circle', color: 'var(--status-completado)' },
+  ];
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  let html = '';
+  columns.forEach(col => {
+    const colTasks = filtered.filter(t => t.status === col.status);
+    html += `<div class="kanban-column" data-status="${escAttr(col.status)}">
+      <div class="kanban-column-header" style="border-top: 3px solid ${col.color}">
+        <span class="material-icons-round" style="color:${col.color};font-size:1.1rem">${col.icon}</span>
+        <span class="kanban-column-title">${col.label}</span>
+        <span class="kanban-column-count">${colTasks.length}</span>
+      </div>
+      <div class="kanban-column-body" data-status="${escAttr(col.status)}">`;
+
+    colTasks.forEach(t => {
+      const clientColor = getClientColor(t.client);
+      const priorityClass = (t.priority || '').toLowerCase().replace(' ', '');
+      const isOverdue = t.deadline && t.status !== 'completado' && new Date(t.deadline + 'T00:00:00') < now;
+      const member = (settings.teamMembers || []).find(m => m.name === t.assignee);
+      const avatarColor = member?.color || getColorForName(t.assignee);
+      const initials = member?.initials || getInitials(t.assignee);
+      const deadlineClass = getDeadlineClass(t.deadline);
+
+      html += `<div class="kanban-card ${isOverdue ? 'kanban-card-overdue' : ''}" draggable="true" data-task-id="${t.id}">
+        <div class="kanban-card-top">
+          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.65rem;padding:.15rem .4rem">${escHtml(t.client || '—')}</span>
+          <span class="priority-badge ${priorityClass}" style="font-size:.6rem;padding:.1rem .35rem">${escHtml(t.priority || 'TBD')}</span>
+        </div>
+        <div class="kanban-card-title">${escHtml(t.project || '—')}</div>
+        <div class="kanban-card-bottom">
+          <div class="kanban-card-assignee" title="${escAttr(t.assignee || 'Sin asignar')}">
+            <div class="kanban-card-avatar" style="background:${avatarColor}">${initials}</div>
+            <span>${escHtml(t.assignee || '—')}</span>
+          </div>
+          ${t.deadline ? `<span class="kanban-card-deadline ${deadlineClass}" title="Deadline: ${formatDate(t.deadline)}">
+            <span class="material-icons-round">flag</span>${formatDate(t.deadline)}
+          </span>` : ''}
+        </div>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  board.innerHTML = html;
+
+  // --- Drag & drop between columns ---
+  board.querySelectorAll('.kanban-card[draggable="true"]').forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', card.dataset.taskId);
+      e.dataTransfer.effectAllowed = 'move';
+      card.classList.add('kanban-card-dragging');
+      // Small delay so the card visually fades after pickup
+      setTimeout(() => card.style.opacity = '.4', 0);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('kanban-card-dragging');
+      card.style.opacity = '';
+      board.querySelectorAll('.kanban-column-body.drag-over').forEach(c => c.classList.remove('drag-over'));
+    });
+  });
+
+  board.querySelectorAll('.kanban-column-body').forEach(colBody => {
+    colBody.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      colBody.classList.add('drag-over');
+    });
+    colBody.addEventListener('dragleave', (e) => {
+      if (!colBody.contains(e.relatedTarget)) {
+        colBody.classList.remove('drag-over');
+      }
+    });
+    colBody.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      colBody.classList.remove('drag-over');
+      const taskId = e.dataTransfer.getData('text/plain');
+      const newStatus = colBody.dataset.status;
+      if (!taskId || !newStatus) return;
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || task.status === newStatus) return;
+      try {
+        await api('PUT', `/tasks/${taskId}`, { status: newStatus });
+        task.status = newStatus;
+        toast(`Tarea movida a "${newStatus}"`);
+        renderKanban();
+        renderTasks();
+        updateStats();
+        updateOverdueBadge();
+      } catch (err) {
+        toast('Error al mover tarea', 'error');
+      }
+    });
+  });
+
+  // Click card to navigate to agenda
+  board.querySelectorAll('.kanban-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.defaultPrevented) return;
+      switchView('agenda');
+      setTimeout(() => navigateToTask(card.dataset.taskId), 200);
+    });
+  });
+}
+
+// Kanban filter change handlers
+document.getElementById('kanban-filter-client')?.addEventListener('change', renderKanban);
+document.getElementById('kanban-filter-assignee')?.addEventListener('change', renderKanban);
 
 // --- CLIENTS DASHBOARD VIEW ---
 function renderClientsDashboard() {
