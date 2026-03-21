@@ -100,12 +100,26 @@
   --priority-tbd-bg: rgba(148,163,184,.15);
 
   --heatmap-0: rgba(148,163,184,.1);
-  --heatmap-1: rgba(34,197,94,.25);
-  --heatmap-2: rgba(245,158,11,.3);
-  --heatmap-3: rgba(249,115,22,.4);
-  --heatmap-4: rgba(239,68,68,.45);
-  --heatmap-off: rgba(139,92,246,.3);
+  --heatmap-0: rgba(148,163,184,.1);
+  --heatmap-1: rgba(34,197,94,.3);
+  --heatmap-2: rgba(245,158,11,.35);
+  --heatmap-3: rgba(249,115,22,.45);
+  --heatmap-4: rgba(239,68,68,.5);
+  --heatmap-off: rgba(139,92,246,.35);
 }
+
+/* Dark mode text contrast for heatmap cells */
+[data-theme="dark"] .heatmap-level-1 { color: #86efac; }
+[data-theme="dark"] .heatmap-level-2 { color: #fde68a; }
+[data-theme="dark"] .heatmap-level-3 { color: #fdba74; }
+[data-theme="dark"] .heatmap-level-4 { color: #fca5a5; font-weight: 700; }
+[data-theme="dark"] .heatmap-level-off { color: #c4b5fd; }
+
+/* Dark mode timeline fixes */
+[data-theme="dark"] .timeline-overdue .timeline-day-label { color: #fca5a5; }
+[data-theme="dark"] .timeline-today .timeline-day-label { color: var(--primary-light); }
+[data-theme="dark"] .timeline-task-overdue .timeline-task-project { color: #fca5a5; }
+[data-theme="dark"] .timeline-overdue-date { color: #fca5a5; }
 
 [data-theme="dark"] .login-card {
   background: rgba(30,41,59,.95);
@@ -2536,6 +2550,34 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .settings-leader-item:hover .leader-delete-btn { opacity: 1; }
 .leader-delete-btn:hover { background: #fef2f2; color: #ef4444; }
 
+/* Tab visibility settings */
+.tab-visibility-list {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+.tab-visibility-item {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .45rem .6rem;
+  border-radius: var(--radius-sm);
+  font-size: .9rem;
+  cursor: pointer;
+  transition: background 100ms;
+}
+.tab-visibility-item:hover { background: var(--surface-hover); }
+.tab-visibility-item.locked {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.tab-visibility-item input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.tab-visibility-item.locked input[type="checkbox"] { cursor: not-allowed; }
+
 .settings-number-input {
   width: 60px;
   padding: .4rem .5rem;
@@ -3069,7 +3111,7 @@ span.flatpickr-weekday {
   padding-bottom: 2rem;
 }
 .timeline-day {
-  background: white;
+  background: var(--surface);
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-light);
@@ -3077,11 +3119,11 @@ span.flatpickr-weekday {
 }
 .timeline-day.timeline-overdue {
   border-color: #fca5a5;
-  background: #fff5f5;
+  background: var(--priority-alta-bg);
 }
 .timeline-day.timeline-today {
   border-color: var(--primary-light);
-  background: #fafbff;
+  background: var(--primary-bg);
 }
 .timeline-day.timeline-tomorrow {
   border-color: #fcd34d;
@@ -3094,8 +3136,8 @@ span.flatpickr-weekday {
   border-bottom: 1px solid var(--border-light);
 }
 .timeline-overdue .timeline-day-header {
-  background: #fef2f2;
-  border-bottom-color: #fca5a5;
+  background: var(--priority-alta-bg);
+  border-bottom-color: rgba(239,68,68,.2);
 }
 .timeline-today .timeline-day-header {
   background: var(--primary-bg);
@@ -3454,9 +3496,9 @@ span.flatpickr-weekday {
 }
 .heatmap-cell.weekend { opacity: .6; }
 .heatmap-level-0 { background: var(--heatmap-0); color: var(--text-muted); }
-.heatmap-level-1 { background: var(--heatmap-1); }
-.heatmap-level-2 { background: var(--heatmap-2); }
-.heatmap-level-3 { background: var(--heatmap-3); }
+.heatmap-level-1 { background: var(--heatmap-1); color: #166534; }
+.heatmap-level-2 { background: var(--heatmap-2); color: #92400e; }
+.heatmap-level-3 { background: var(--heatmap-3); color: #9a3412; }
 .heatmap-level-4 { background: var(--heatmap-4); color: #991b1b; font-weight: 700; }
 .heatmap-level-off { background: var(--heatmap-off); color: #7c3aed; }
 .heatmap-total {

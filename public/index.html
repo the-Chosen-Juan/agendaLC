@@ -23,13 +23,13 @@
         <h2>Agenda <span class="accent">LC</span></h2>
         <button class="btn-icon sidebar-close" id="sidebar-close"><span class="material-icons-round">close</span></button>
       </div>
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" id="sidebar-nav">
         <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span><span class="nav-badge hidden" id="nav-overdue-badge">0</span></a>
-        <a href="#" class="nav-item" data-view="timeline"><span class="material-icons-round">view_timeline</span><span>Timeline</span></a>
-        <a href="#" class="nav-item" data-view="heatmap"><span class="material-icons-round">grid_on</span><span>Carga</span></a>
-        <a href="#" class="nav-item" data-view="kanban"><span class="material-icons-round">view_kanban</span><span>Pipeline</span></a>
         <a href="#" class="nav-item" data-view="calendar"><span class="material-icons-round">calendar_month</span><span>Calendario</span></a>
+        <a href="#" class="nav-item" data-view="heatmap"><span class="material-icons-round">grid_on</span><span>Carga</span></a>
         <a href="#" class="nav-item" data-view="clients"><span class="material-icons-round">business</span><span>Clientes</span></a>
+        <a href="#" class="nav-item" data-view="timeline"><span class="material-icons-round">view_timeline</span><span>Timeline</span></a>
+        <a href="#" class="nav-item" data-view="kanban"><span class="material-icons-round">view_kanban</span><span>Pipeline</span></a>
         <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
         <a href="#" class="nav-item" data-view="activity"><span class="material-icons-round">history</span><span>Actividad</span></a>
         <a href="#" class="nav-item" data-view="settings"><span class="material-icons-round">settings</span><span>Configuración</span></a>
@@ -191,6 +191,11 @@
             <span style="font-size:.9rem;color:var(--text-secondary)">días</span>
           </div>
           <button class="btn btn-ghost btn-sm" id="save-auto-delete" style="margin-top:.75rem"><span class="material-icons-round">save</span> Guardar</button>
+        </div>
+        <div class="settings-card">
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">tab</span>Pestañas visibles</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Elegí qué pestañas mostrar en el menú lateral.</p>
+          <div id="tab-visibility-list" class="tab-visibility-list"></div>
         </div>
         <div class="settings-card">
           <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">sync</span>Google Sheets Auto-Sync</h2>

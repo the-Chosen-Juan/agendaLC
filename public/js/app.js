@@ -262,6 +262,7 @@ async function loadData() {
     updateStats();
     renderLeader();
     updateOverdueBadge();
+    applyTabVisibility();
     startPresencePolling();
     startSheetSyncPolling();
   } catch (err) {
@@ -4048,7 +4049,73 @@ document.getElementById('add-client-btn').addEventListener('click', () => {
 function renderSettingsPage() {
   renderLeaderPool();
   document.getElementById('auto-delete-days').value = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
+  renderTabVisibility();
   renderSyncSettings();
+}
+
+// --- TAB VISIBILITY SETTINGS ---
+const TAB_DEFINITIONS = [
+  { view: 'agenda', label: 'Agenda', icon: 'dashboard', locked: true },
+  { view: 'calendar', label: 'Calendario', icon: 'calendar_month' },
+  { view: 'heatmap', label: 'Carga', icon: 'grid_on' },
+  { view: 'clients', label: 'Clientes', icon: 'business' },
+  { view: 'timeline', label: 'Timeline', icon: 'view_timeline' },
+  { view: 'kanban', label: 'Pipeline', icon: 'view_kanban' },
+  { view: 'team', label: 'Equipo', icon: 'group' },
+  { view: 'activity', label: 'Actividad', icon: 'history' },
+  { view: 'settings', label: 'Configuración', icon: 'settings', locked: true },
+];
+
+function getHiddenTabs() {
+  try { return JSON.parse(localStorage.getItem('agenda_hidden_tabs') || '[]'); }
+  catch { return []; }
+}
+
+function setHiddenTabs(hidden) {
+  localStorage.setItem('agenda_hidden_tabs', JSON.stringify(hidden));
+  applyTabVisibility();
+}
+
+function applyTabVisibility() {
+  const hidden = getHiddenTabs();
+  document.querySelectorAll('#sidebar-nav .nav-item').forEach(item => {
+    const view = item.dataset.view;
+    if (hidden.includes(view)) {
+      item.style.display = 'none';
+    } else {
+      item.style.display = '';
+    }
+  });
+}
+
+function renderTabVisibility() {
+  const container = document.getElementById('tab-visibility-list');
+  if (!container) return;
+  const hidden = getHiddenTabs();
+
+  container.innerHTML = TAB_DEFINITIONS.map(tab => {
+    const isVisible = !hidden.includes(tab.view);
+    const isLocked = tab.locked;
+    return `<label class="tab-visibility-item ${isLocked ? 'locked' : ''}">
+      <input type="checkbox" ${isVisible ? 'checked' : ''} ${isLocked ? 'disabled' : ''} data-view="${tab.view}">
+      <span class="material-icons-round" style="font-size:1rem;color:var(--text-muted)">${tab.icon}</span>
+      <span>${tab.label}</span>
+    </label>`;
+  }).join('');
+
+  container.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const view = cb.dataset.view;
+      let hidden = getHiddenTabs();
+      if (cb.checked) {
+        hidden = hidden.filter(v => v !== view);
+      } else {
+        if (!hidden.includes(view)) hidden.push(view);
+      }
+      setHiddenTabs(hidden);
+      toast(cb.checked ? `Pestaña "${view}" visible` : `Pestaña "${view}" oculta`);
+    });
+  });
 }
 
 function renderLeaderPool() {
