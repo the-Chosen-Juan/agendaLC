@@ -182,7 +182,6 @@ function switchView(view) {
 
   if (view === 'timeline') renderTimeline();
   if (view === 'heatmap') renderHeatmap();
-  if (view === 'kanban') renderKanban();
   if (view === 'calendar') renderCalendar();
   if (view === 'clients') renderClientsDashboard();
   if (view === 'activity') loadActivityLog();
@@ -301,7 +300,6 @@ async function softRefresh() {
     if (visibleView) {
       const viewId = visibleView.id.replace('view-', '');
       if (viewId === 'heatmap') renderHeatmap();
-      if (viewId === 'kanban') renderKanban();
       if (viewId === 'calendar') renderCalendar();
       if (viewId === 'clients') renderClientsDashboard();
       if (viewId === 'timeline') renderTimeline();
@@ -3709,148 +3707,6 @@ function navigateToTasksForMemberOnDate(member, date) {
   }, 50);
 }
 
-// --- KANBAN PIPELINE VIEW ---
-function renderKanban() {
-  const board = document.getElementById('kanban-board');
-  if (!board) return;
-
-  const allTasks = getRegularTasks();
-
-  // Populate filter dropdowns
-  const clientSelect = document.getElementById('kanban-filter-client');
-  const assigneeSelect = document.getElementById('kanban-filter-assignee');
-  const currentClient = clientSelect.value;
-  const currentAssignee = assigneeSelect.value;
-
-  // Rebuild options preserving selection
-  const clients = [...new Set(allTasks.map(t => t.client).filter(Boolean))].sort();
-  clientSelect.innerHTML = '<option value="">Todos los clientes</option>' + clients.map(c => `<option value="${escAttr(c)}" ${c === currentClient ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
-
-  const assignees = [...new Set(allTasks.map(t => t.assignee).filter(Boolean))].sort();
-  assigneeSelect.innerHTML = '<option value="">Todos los asignados</option>' + assignees.map(a => `<option value="${escAttr(a)}" ${a === currentAssignee ? 'selected' : ''}>${escHtml(a)}</option>`).join('');
-
-  // Apply filters
-  let filtered = allTasks;
-  if (currentClient) filtered = filtered.filter(t => t.client === currentClient);
-  if (currentAssignee) filtered = filtered.filter(t => t.assignee === currentAssignee);
-
-  const columns = [
-    { status: 'sin empezar', label: 'Sin empezar', icon: 'schedule', color: 'var(--status-sin-empezar)' },
-    { status: 'en progreso', label: 'En progreso', icon: 'pending', color: 'var(--status-en-progreso)' },
-    { status: 'on going', label: 'On Going', icon: 'autorenew', color: 'var(--status-on-going)' },
-    { status: 'esperando respuesta', label: 'Esperando', icon: 'hourglass_empty', color: 'var(--status-esperando)' },
-    { status: 'completado', label: 'Completado', icon: 'check_circle', color: 'var(--status-completado)' },
-  ];
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  let html = '';
-  columns.forEach(col => {
-    const colTasks = filtered.filter(t => t.status === col.status);
-    html += `<div class="kanban-column" data-status="${escAttr(col.status)}">
-      <div class="kanban-column-header" style="border-top: 3px solid ${col.color}">
-        <span class="material-icons-round" style="color:${col.color};font-size:1.1rem">${col.icon}</span>
-        <span class="kanban-column-title">${col.label}</span>
-        <span class="kanban-column-count">${colTasks.length}</span>
-      </div>
-      <div class="kanban-column-body" data-status="${escAttr(col.status)}">`;
-
-    colTasks.forEach(t => {
-      const clientColor = getClientColor(t.client);
-      const priorityClass = (t.priority || '').toLowerCase().replace(' ', '');
-      const isOverdue = t.deadline && t.status !== 'completado' && new Date(t.deadline + 'T00:00:00') < now;
-      const member = (settings.teamMembers || []).find(m => m.name === t.assignee);
-      const avatarColor = member?.color || getColorForName(t.assignee);
-      const initials = member?.initials || getInitials(t.assignee);
-      const deadlineClass = getDeadlineClass(t.deadline);
-
-      html += `<div class="kanban-card ${isOverdue ? 'kanban-card-overdue' : ''}" draggable="true" data-task-id="${t.id}">
-        <div class="kanban-card-top">
-          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.65rem;padding:.15rem .4rem">${escHtml(t.client || '—')}</span>
-          <span class="priority-badge ${priorityClass}" style="font-size:.6rem;padding:.1rem .35rem">${escHtml(t.priority || 'TBD')}</span>
-        </div>
-        <div class="kanban-card-title">${escHtml(t.project || '—')}</div>
-        <div class="kanban-card-bottom">
-          <div class="kanban-card-assignee" title="${escAttr(t.assignee || 'Sin asignar')}">
-            <div class="kanban-card-avatar" style="background:${avatarColor}">${initials}</div>
-            <span>${escHtml(t.assignee || '—')}</span>
-          </div>
-          ${t.deadline ? `<span class="kanban-card-deadline ${deadlineClass}" title="Deadline: ${formatDate(t.deadline)}">
-            <span class="material-icons-round">flag</span>${formatDate(t.deadline)}
-          </span>` : ''}
-        </div>
-      </div>`;
-    });
-
-    html += `</div></div>`;
-  });
-
-  board.innerHTML = html;
-
-  // --- Drag & drop between columns ---
-  board.querySelectorAll('.kanban-card[draggable="true"]').forEach(card => {
-    card.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', card.dataset.taskId);
-      e.dataTransfer.effectAllowed = 'move';
-      card.classList.add('kanban-card-dragging');
-      // Small delay so the card visually fades after pickup
-      setTimeout(() => card.style.opacity = '.4', 0);
-    });
-    card.addEventListener('dragend', () => {
-      card.classList.remove('kanban-card-dragging');
-      card.style.opacity = '';
-      board.querySelectorAll('.kanban-column-body.drag-over').forEach(c => c.classList.remove('drag-over'));
-    });
-  });
-
-  board.querySelectorAll('.kanban-column-body').forEach(colBody => {
-    colBody.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      colBody.classList.add('drag-over');
-    });
-    colBody.addEventListener('dragleave', (e) => {
-      if (!colBody.contains(e.relatedTarget)) {
-        colBody.classList.remove('drag-over');
-      }
-    });
-    colBody.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      colBody.classList.remove('drag-over');
-      const taskId = e.dataTransfer.getData('text/plain');
-      const newStatus = colBody.dataset.status;
-      if (!taskId || !newStatus) return;
-      const task = tasks.find(t => t.id === taskId);
-      if (!task || task.status === newStatus) return;
-      try {
-        await api('PUT', `/tasks/${taskId}`, { status: newStatus });
-        task.status = newStatus;
-        toast(`Tarea movida a "${newStatus}"`);
-        renderKanban();
-        renderTasks();
-        updateStats();
-        updateOverdueBadge();
-      } catch (err) {
-        toast('Error al mover tarea', 'error');
-      }
-    });
-  });
-
-  // Click card to navigate to agenda
-  board.querySelectorAll('.kanban-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (e.defaultPrevented) return;
-      switchView('agenda');
-      setTimeout(() => navigateToTask(card.dataset.taskId), 200);
-    });
-  });
-}
-
-// Kanban filter change handlers
-document.getElementById('kanban-filter-client')?.addEventListener('change', renderKanban);
-document.getElementById('kanban-filter-assignee')?.addEventListener('change', renderKanban);
-
 // --- CLIENTS DASHBOARD VIEW ---
 function renderClientsDashboard() {
   const container = document.getElementById('clients-dashboard');
@@ -4125,10 +3981,10 @@ function renderTeam() {
         ${timeoffInfo}
       </div>
       <span class="member-tasks-count">${taskCount} tarea${taskCount !== 1 ? 's' : ''}</span>
-      <button class="member-edit" data-name="${escAttr(member.name)}" title="Editar">
+      <button class="member-edit" data-name="${escAttr(member.name)}" title="Editar" aria-label="Editar ${escAttr(member.name)}">
         <span class="material-icons-round">edit</span>
       </button>
-      <button class="member-delete" data-name="${escAttr(member.name)}" title="Eliminar">
+      <button class="member-delete" data-name="${escAttr(member.name)}" title="Eliminar" aria-label="Eliminar ${escAttr(member.name)}">
         <span class="material-icons-round">close</span>
       </button>
     `;
@@ -4192,10 +4048,10 @@ function renderTeam() {
     tag.className = 'tag';
     tag.innerHTML = `
       <span class="client-badge" style="background:${client.color || '#f1f5f9'};color:${client.textColor || '#64748b'}">${escHtml(client.name)}</span>
-      <button class="tag-edit" data-name="${escAttr(client.name)}" title="Editar">
+      <button class="tag-edit" data-name="${escAttr(client.name)}" title="Editar" aria-label="Editar ${escAttr(client.name)}">
         <span class="material-icons-round">edit</span>
       </button>
-      <button class="tag-delete" data-name="${escAttr(client.name)}" title="Eliminar">
+      <button class="tag-delete" data-name="${escAttr(client.name)}" title="Eliminar" aria-label="Eliminar ${escAttr(client.name)}">
         <span class="material-icons-round">close</span>
       </button>
     `;
@@ -4512,7 +4368,7 @@ function renderLeaderPool() {
     item.innerHTML = `
       <div class="leader-avatar-mini" style="background:${color}">${getInitials(name)}</div>
       <span>${escHtml(name)}</span>
-      <button class="leader-delete-btn" data-name="${escAttr(name)}" title="Quitar del sorteo">
+      <button class="leader-delete-btn" data-name="${escAttr(name)}" title="Quitar del sorteo" aria-label="Quitar ${escAttr(name)} del sorteo">
         <span class="material-icons-round">close</span>
       </button>
     `;

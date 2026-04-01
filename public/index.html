@@ -21,14 +21,16 @@
       <div class="sidebar-header">
         <span class="material-icons-round logo-icon-sm">event_note</span>
         <h2>Agenda <span class="accent">LC</span></h2>
-        <button class="btn-icon sidebar-close" id="sidebar-close"><span class="material-icons-round">close</span></button>
+        <button class="btn-icon sidebar-close" id="sidebar-close" aria-label="Cerrar menú"><span class="material-icons-round">close</span></button>
       </div>
       <nav class="sidebar-nav" id="sidebar-nav">
         <a href="#" class="nav-item active" data-view="agenda"><span class="material-icons-round">dashboard</span><span>Agenda</span><span class="nav-badge hidden" id="nav-overdue-badge">0</span></a>
         <a href="#" class="nav-item" data-view="calendar"><span class="material-icons-round">calendar_month</span><span>Calendario</span></a>
         <a href="#" class="nav-item" data-view="heatmap"><span class="material-icons-round">grid_on</span><span>Carga</span></a>
+        <div class="nav-separator"></div>
         <a href="#" class="nav-item" data-view="clients"><span class="material-icons-round">business</span><span>Clientes</span></a>
         <a href="#" class="nav-item" data-view="timeline"><span class="material-icons-round">view_timeline</span><span>Timeline</span></a>
+        <div class="nav-separator"></div>
         <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
         <a href="#" class="nav-item" data-view="activity"><span class="material-icons-round">history</span><span>Actividad</span></a>
         <a href="#" class="nav-item" data-view="settings"><span class="material-icons-round">settings</span><span>Configuración</span></a>
@@ -38,7 +40,7 @@
     <main class="main-content">
       <header class="topbar">
         <div class="topbar-left">
-          <button class="btn-icon" id="sidebar-toggle"><span class="material-icons-round">menu</span></button>
+          <button class="btn-icon" id="sidebar-toggle" aria-label="Abrir menú"><span class="material-icons-round">menu</span></button>
           <h1 class="page-title" id="page-title">Agenda</h1>
         </div>
         <div class="topbar-right">
@@ -46,7 +48,7 @@
             <span class="material-icons-round sync-indicator-icon">sync</span>
             <span class="sync-indicator-dot"></span>
           </div>
-          <button class="btn-icon" id="dark-mode-toggle" title="Modo oscuro"><span class="material-icons-round">dark_mode</span></button>
+          <button class="btn-icon" id="dark-mode-toggle" title="Modo oscuro" aria-label="Modo oscuro"><span class="material-icons-round">dark_mode</span></button>
           <div class="search-box" id="search-box"><span class="material-icons-round">search</span><input type="text" id="search-input" placeholder="Buscar tareas..."></div>
           <div class="dropdown" id="add-task-dropdown">
             <button class="btn btn-primary" id="add-task-btn"><span class="material-icons-round">add</span><span class="btn-label">Nueva tarea</span><span class="material-icons-round btn-label dropdown-arrow">arrow_drop_down</span></button>
@@ -121,9 +123,9 @@
       <div id="view-calendar" class="view hidden">
         <div class="calendar-toolbar">
           <div class="calendar-nav">
-            <button class="btn-icon" id="cal-prev"><span class="material-icons-round">chevron_left</span></button>
+            <button class="btn-icon" id="cal-prev" aria-label="Mes anterior"><span class="material-icons-round">chevron_left</span></button>
             <h2 id="cal-month-title"></h2>
-            <button class="btn-icon" id="cal-next"><span class="material-icons-round">chevron_right</span></button>
+            <button class="btn-icon" id="cal-next" aria-label="Mes siguiente"><span class="material-icons-round">chevron_right</span></button>
             <button class="btn btn-ghost btn-sm" id="cal-today">Hoy</button>
           </div>
           <div class="calendar-filters">
@@ -250,7 +252,7 @@
   <div id="new-task-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
-      <div class="modal-header"><h2>Nueva tarea</h2><button class="btn-icon modal-close" id="new-task-modal-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2>Nueva tarea</h2><button class="btn-icon modal-close" id="new-task-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group"><label>Cliente</label><div class="modal-select" id="new-task-client" data-field="client" data-value="" tabindex="0"><span class="modal-select-text">Seleccionar cliente...</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
@@ -285,7 +287,7 @@
   <div id="timeoff-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header"><h2 id="timeoff-modal-title">Time Off</h2><button class="btn-icon modal-close" id="timeoff-modal-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2 id="timeoff-modal-title">Time Off</h2><button class="btn-icon modal-close" id="timeoff-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <div class="form-group"><label>Miembro</label><div class="modal-select" id="timeoff-member" data-field="assignee" data-value="" tabindex="0"><span class="modal-select-text">Seleccioná...</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
         <div class="form-group"><label>Título / Descripción</label><input type="text" id="timeoff-title" placeholder="Ej: Vacaciones Juan, Licencia María..."></div>
@@ -304,7 +306,7 @@
   <div id="copy-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header"><h2>Copiar tarea a otro asignado</h2><button class="btn-icon modal-close" id="copy-modal-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2>Copiar tarea a otro asignado</h2><button class="btn-icon modal-close" id="copy-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <div class="form-group"><label>Nuevo asignado</label><div class="modal-select" id="copy-assignee" data-field="assignee" data-value="" tabindex="0"><span class="modal-select-text">Seleccioná...</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
         <div class="modal-footer">
@@ -319,7 +321,7 @@
   <div id="cal-event-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header"><h2 id="cal-event-title">Editar evento</h2><button class="btn-icon modal-close" id="cal-event-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2 id="cal-event-title">Editar evento</h2><button class="btn-icon modal-close" id="cal-event-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <p id="cal-event-info" style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem"></p>
         <div class="form-group"><label id="cal-event-label">Fecha</label><input type="text" id="cal-event-date" placeholder="DD/MM/YYYY"></div>
@@ -336,7 +338,7 @@
   <div id="import-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header"><h2>Importar tareas</h2><button class="btn-icon modal-close" id="import-modal-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2>Importar tareas</h2><button class="btn-icon modal-close" id="import-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <p id="import-preview" style="margin-bottom:1rem;color:var(--text-secondary);font-size:.9rem"></p>
         <div id="import-column-info" style="margin-bottom:1rem;font-size:.8rem;color:var(--text-muted)"></div>
@@ -353,7 +355,7 @@
   <div id="prompt-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header"><h2 id="prompt-modal-title">Agregar</h2><button class="btn-icon modal-close" id="prompt-modal-close"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2 id="prompt-modal-title">Agregar</h2><button class="btn-icon modal-close" id="prompt-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <div class="form-group"><label id="prompt-modal-label">Nombre</label><input type="text" id="prompt-modal-input" required></div>
         <div class="form-group hidden" id="prompt-modal-color-group"><label>Color</label><div class="color-picker" id="prompt-modal-colors"></div></div>
