@@ -1181,6 +1181,33 @@ async function performSheetSync() {
     }
   }
 
+  // Auto-discover team members from the sheet: any assignee with a priority number
+  // (from "N | Name" format) is a real team member and should be in teamMembers.
+  // This ensures members are auto-added when they appear in the sheet and removed
+  // when they disappear — no manual settings management needed.
+  const existingMemberNames = new Set((settings.teamMembers || []).map(m => m.name));
+  const TEAM_COLORS = [
+    '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#60a5fa',
+    '#c084fc', '#06b6d4', '#22d3ee', '#ef4444', '#d946ef', '#f97316',
+    '#14b8a6', '#0ea5e9', '#84cc16', '#e11d48', '#8b5cf6', '#a855f7'
+  ];
+
+  for (const [name, prio] of Object.entries(assigneePriorities)) {
+    if (existingMemberNames.has(name)) continue;
+    // Don't add team group names as individual members
+    if (detectedGroups.some(g => g.name === name)) continue;
+    // Auto-add with a color based on their position
+    const colorIdx = (settings.teamMembers || []).length % TEAM_COLORS.length;
+    if (!settings.teamMembers) settings.teamMembers = [];
+    settings.teamMembers.push({
+      name,
+      color: TEAM_COLORS[colorIdx],
+      role: 'Equipo'
+    });
+    existingMemberNames.add(name);
+  }
+
+  // Remove members who no longer have active tasks in the sheet
   if (settings.teamMembers) {
     settings.teamMembers = settings.teamMembers.filter(m => activeAssignees.has(m.name));
   }
