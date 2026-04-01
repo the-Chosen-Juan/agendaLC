@@ -1100,14 +1100,19 @@ async function performSheetSync() {
   const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(Boolean));
 
   // If we extracted priority numbers from the sheet, use them for ordering
+  // Only include assignees that are registered as team members
+  const knownMembers = new Set((settings.teamMembers || []).map(m => m.name));
+  const knownTeamGroupNames = new Set((settings.teamGroups || []).map(tg => tg.name));
+  (settings.teamGroups || []).forEach(tg => (tg.members || []).forEach(m => knownMembers.add(m)));
+
   if (Object.keys(assigneePriorities).length > 0) {
     const orderedBySheet = Object.entries(assigneePriorities)
-      .filter(([name]) => activeAssignees.has(name))
+      .filter(([name]) => activeAssignees.has(name) && (knownMembers.has(name) || knownTeamGroupNames.has(name)))
       .sort((a, b) => a[1] - b[1])
       .map(([name]) => name);
-    // Add any active assignees that didn't have a priority number at the end
+    // Add any known active assignees that didn't have a priority number at the end
     activeAssignees.forEach(name => {
-      if (!orderedBySheet.includes(name)) orderedBySheet.push(name);
+      if (!orderedBySheet.includes(name) && (knownMembers.has(name) || knownTeamGroupNames.has(name))) orderedBySheet.push(name);
     });
     settings.assigneeOrder = orderedBySheet;
   } else {

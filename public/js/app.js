@@ -8,6 +8,16 @@ let tasks = [];
 let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2 };
 let currentFilter = JSON.parse(localStorage.getItem('agenda_filters') || 'null') || { priority: 'all', assignee: '', status: '', client: '', search: '' };
 function saveFilters() { localStorage.setItem('agenda_filters', JSON.stringify(currentFilter)); }
+
+// Set of known team member names (from settings) — used to filter out unknown assignees
+// Only includes explicitly registered team members and team groups, NOT random
+// assignee names that appear in synced tasks or assigneeOrder.
+function getKnownAssignees() {
+  const known = new Set();
+  (settings.teamMembers || []).forEach(m => known.add(m.name));
+  (settings.teamGroups || []).forEach(tg => { known.add(tg.name); (tg.members || []).forEach(m => known.add(m)); });
+  return known;
+}
 function restoreFilters() {
   // Restore priority chip
   document.querySelectorAll('.chip[data-filter]').forEach(c => {
@@ -157,7 +167,7 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
 
-  const titles = { agenda: 'Agenda', timeline: 'Timeline', heatmap: 'Carga', kanban: 'Pipeline', calendar: 'Calendario', clients: 'Clientes', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
+  const titles = { agenda: 'Agenda', timeline: 'Timeline', heatmap: 'Carga', calendar: 'Calendario', clients: 'Clientes', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
   const searchBox = document.getElementById('search-box');
@@ -319,20 +329,21 @@ async function autoDeleteCompletedTasks() {
 
 // --- POPULATE DROPDOWNS ---
 function populateFilterDropdowns() {
-  // For team groups, show the group name instead of individual member names
+  // Only show known team members and team group names — never random assignees from synced tasks
   const teamGroups = settings.teamGroups || [];
   const memberInGroup = new Set();
   teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
 
-  const assignees = [...new Set([
-    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name)).map(m => m.name),
+  // Known assignees: team members (excluding individual group members) + team group names
+  const knownMembers = new Set([
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
     ...teamGroups.map(tg => tg.name),
-    ...tasks.map(t => t.assignee).filter(a => a && !memberInGroup.has(a))
-  ])];
+  ]);
+  const assignees = [...knownMembers];
   const clients = [...new Set([
     ...(settings.clients || []).map(c => c.name),
     ...tasks.map(t => t.client).filter(Boolean)
-  ])];
+  ])].filter(c => c.toLowerCase() !== 'contrato' && c.toLowerCase() !== 'time off');
 
   const assigneeSelect = document.getElementById('filter-assignee');
   const clientSelect = document.getElementById('filter-client');
@@ -880,9 +891,12 @@ function renderGroupedTasks(container, filtered) {
 
   // Track which teams have already been rendered
   const renderedTeams = new Set();
+  const knownAssignees = getKnownAssignees();
 
   sortedKeys.forEach((assignee) => {
     if (!assignee || assignee.toLowerCase() === 'sin asignar') return;
+    // Skip unknown assignees (e.g. stale names from synced sheets)
+    if (!knownAssignees.has(assignee)) return;
 
     // Check if this assignee belongs to a team group
     const teamGroup = memberToTeam[assignee];
@@ -2967,15 +2981,16 @@ document.getElementById('cal-all-off').addEventListener('click', () => {
 
 function renderCalendarAssigneeFilters() {
   const container = document.getElementById('cal-assignee-filters');
-  // Only show assignees who are current team members OR have active (non-completed) tasks
-  const activeTaskAssignees = new Set(
-    tasks.filter(t => t.assignee && t.status !== 'completado').map(t => t.assignee)
-  );
-  const currentMembers = new Set((settings.teamMembers || []).map(m => m.name));
+  // Only show known team members — never random assignees from synced tasks
+  const knownAssignees = getKnownAssignees();
+  const teamGroups = settings.teamGroups || [];
+  const memberInGroup = new Set();
+  teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
+
   const allAssignees = [...new Set([
-    ...currentMembers,
-    ...activeTaskAssignees
-  ])].filter(name => currentMembers.has(name) || activeTaskAssignees.has(name)).sort();
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
+    ...teamGroups.map(tg => tg.name),
+  ])].sort();
 
   container.innerHTML = '';
   allAssignees.forEach(name => {
@@ -3316,15 +3331,14 @@ function renderHeatmap() {
   const memberInGroup = new Set();
   teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
 
+  // Only show known team members — never random/stale assignees from synced tasks
+  const knownAssignees = getKnownAssignees();
   const memberSet = new Set();
   (settings.teamMembers || []).forEach(m => {
-    if (!memberInGroup.has(m.name)) memberSet.add(m.name);
+    if (!memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')) memberSet.add(m.name);
   });
-  // Add team group names and any task assignee that isn't an individual in a group
+  // Add team group names (not individual members of groups)
   teamGroups.forEach(tg => memberSet.add(tg.name));
-  regularTasks.forEach(t => {
-    if (t.assignee && !memberInGroup.has(t.assignee)) memberSet.add(t.assignee);
-  });
   const members = [...memberSet].sort((a, b) => {
     const order = settings.assigneeOrder || [];
     // For team group names, use first member's position in assigneeOrder
@@ -4357,7 +4371,6 @@ const TAB_DEFINITIONS = [
   { view: 'heatmap', label: 'Carga', icon: 'grid_on' },
   { view: 'clients', label: 'Clientes', icon: 'business' },
   { view: 'timeline', label: 'Timeline', icon: 'view_timeline' },
-  { view: 'kanban', label: 'Pipeline', icon: 'view_kanban' },
   { view: 'team', label: 'Equipo', icon: 'group' },
   { view: 'activity', label: 'Actividad', icon: 'history' },
   { view: 'settings', label: 'Configuración', icon: 'settings', locked: true },
