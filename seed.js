@@ -44,6 +44,9 @@ const settings = {
     { name: "TIME OFF", color: "#94a3b818", textColor: "#94a3b8" },
     { name: "Dadá", color: "#d946ef18", textColor: "#d946ef" }
   ],
+  // teamGroups are auto-detected during Google Sheets sync from assignee names
+  // containing " y " or " & " (e.g. "Agus y Pau" → members: ["Agus P.", "Pau"]).
+  // These seed values are only used for local development without sync.
   teamGroups: [
     { name: "Agus y Pau", color: "#3b82f6", members: ["Agus P.", "Pau"] },
     { name: "Juli y Sofi", color: "#06b6d4", members: ["Juli", "Sofi"] }

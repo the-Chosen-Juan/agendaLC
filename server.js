@@ -1095,15 +1095,74 @@ async function performSheetSync() {
   const finalTasks = [...contractTasks, ...finalRegular];
   await saveTasks(finalTasks);
 
+  // Auto-detect team groups from assignee names in the sheet.
+  // Names like "Agus y Pau" or "Juli & Sofi" are split by " y " / " & "
+  // and matched against known teamMembers to build teamGroups automatically.
+  const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(Boolean));
+  const teamMemberNames = (settings.teamMembers || []).map(m => m.name);
+
+  // Find the best matching team member for a partial name (e.g. "Agus" → "Agus P.")
+  function findMemberMatch(part) {
+    const lower = part.toLowerCase();
+    // Exact match
+    const exact = teamMemberNames.find(n => n.toLowerCase() === lower);
+    if (exact) return exact;
+    // Starts-with match (e.g. "Agus" matches "Agus P.")
+    const startsWith = teamMemberNames.find(n => n.toLowerCase().startsWith(lower));
+    if (startsWith) return startsWith;
+    // Reverse: member name starts with the part (e.g. "Pau" matches "Pau")
+    const reverseMatch = teamMemberNames.find(n => lower.startsWith(n.toLowerCase()));
+    if (reverseMatch) return reverseMatch;
+    return null;
+  }
+
+  const detectedGroups = [];
+  for (const assigneeName of activeAssignees) {
+    // Check if name contains " y " or " & " (team separator)
+    const separatorMatch = assigneeName.match(/^(.+?)\s+(?:y|&)\s+(.+)$/i);
+    if (!separatorMatch) continue;
+
+    const parts = [separatorMatch[1].trim(), separatorMatch[2].trim()];
+    const matchedMembers = parts.map(p => findMemberMatch(p)).filter(Boolean);
+
+    // Only create a group if ALL parts matched known members
+    if (matchedMembers.length === parts.length && matchedMembers.length >= 2) {
+      // Use color from the first matched member
+      const firstMember = (settings.teamMembers || []).find(m => m.name === matchedMembers[0]);
+      // Check if there's an existing group with this name to preserve its color
+      const existingGroup = (settings.teamGroups || []).find(g => g.name === assigneeName);
+      detectedGroups.push({
+        name: assigneeName,
+        color: existingGroup?.color || firstMember?.color || '#6366f1',
+        members: matchedMembers
+      });
+    }
+  }
+
+  // Replace teamGroups with auto-detected ones
+  settings.teamGroups = detectedGroups;
+
+  // Update team property on members: set for grouped members, clear for ungrouped
+  const memberToGroup = new Map();
+  for (const group of detectedGroups) {
+    for (const memberName of group.members) {
+      memberToGroup.set(memberName, group.name);
+    }
+  }
+  for (const member of (settings.teamMembers || [])) {
+    if (memberToGroup.has(member.name)) {
+      member.team = memberToGroup.get(member.name);
+    } else {
+      delete member.team;
+    }
+  }
+
   // Build assigneeOrder from Google Sheet priority numbers (the "N | Name" format)
   // This respects the exact order defined in the sheet
-  const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(Boolean));
-
-  // If we extracted priority numbers from the sheet, use them for ordering
   // Only include assignees that are registered as team members
-  const knownMembers = new Set((settings.teamMembers || []).map(m => m.name));
-  const knownTeamGroupNames = new Set((settings.teamGroups || []).map(tg => tg.name));
-  (settings.teamGroups || []).forEach(tg => (tg.members || []).forEach(m => knownMembers.add(m)));
+  const knownMembers = new Set(teamMemberNames);
+  const knownTeamGroupNames = new Set(detectedGroups.map(tg => tg.name));
+  detectedGroups.forEach(tg => (tg.members || []).forEach(m => knownMembers.add(m)));
 
   if (Object.keys(assigneePriorities).length > 0) {
     const orderedBySheet = Object.entries(assigneePriorities)
