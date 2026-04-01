@@ -969,6 +969,32 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
     currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
   if (hasActiveFilter && totalTasks === 0) return;
 
+  // Count visible members: if only 1 member has content, skip the team wrapper and render flat
+  const legacyTasksForCheck = memberNames.includes(teamName) ? [] : (groups[teamName] || []).filter(t => {
+    const proj = (t.project || '').trim();
+    return proj && !/^[-–—]+$/.test(proj) && !t.isTimeOff && !isContractTask(t);
+  });
+  const visibleMembers = memberNames.filter(mName => {
+    const mTasks = (groups[mName] || []).filter(t => {
+      const proj = (t.project || '').trim();
+      return proj && !/^[-–—]+$/.test(proj);
+    });
+    const mTimeOffsCount = timeOffs.filter(to => {
+      if (to.assignee === mName) return true;
+      if (to.assignee === teamName) return (to.timeOffTitle || to.project || '').toLowerCase().includes(mName.toLowerCase());
+      return false;
+    }).length;
+    const mContractsCount = allContracts.filter(c => c.assignee === mName).length;
+    if (hasActiveFilter) return mTasks.length > 0;
+    return mTasks.length > 0 || mTimeOffsCount > 0 || mContractsCount > 0;
+  });
+  if (visibleMembers.length <= 1 && legacyTasksForCheck.length === 0) {
+    // Only 1 (or 0) member visible and no legacy tasks — render flat, no nesting
+    const flatName = visibleMembers[0] || memberNames[0];
+    renderIndividualGroup(container, flatName, groups, timeOffs, now);
+    return;
+  }
+
   const teamKey = `__team_${teamName}`;
   const isTeamCollapsed = collapsedGroups[teamKey] === true;
 
