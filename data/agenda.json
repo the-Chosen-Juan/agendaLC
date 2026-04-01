@@ -1,7 +1,7 @@
 {
   "tasks": [
     {
-      "id": "028dde6d-13cb-485d-9a53-ff0cd35191ca",
+      "id": "2d6a02d4-d1da-445d-8dc7-c817d5c16627",
       "client": "Red",
       "taskNumber": 1,
       "project": "Supervisión WC26",
@@ -18,11 +18,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.756Z",
+      "updatedAt": "2026-04-01T01:23:50.756Z"
     },
     {
-      "id": "38edd766-ccfb-4bd0-a8d7-bdc67f740302",
+      "id": "5b5fbc1a-c430-4e21-a57c-5216e9e1786b",
       "client": "Alma Mora",
       "taskNumber": 2,
       "project": "Supervision flores",
@@ -39,11 +39,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "ffa94b47-85f8-4858-9455-dd8688134dc1",
+      "id": "8fddcfe0-05ae-4fc1-b89e-c7ff23282277",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Great Work - 15:30 a 18:30hs",
@@ -60,11 +60,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "94d9c403-0bb3-40fa-9229-ded2e66bcc3f",
+      "id": "048d6ed2-000f-437f-81f6-cc77f92bb8c9",
       "client": "DIAGEO",
       "taskNumber": 1,
       "project": "WC26 Responsible - stunt",
@@ -81,11 +81,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "008e7c46-e4d8-44d6-a7ba-d969e19c8c1a",
+      "id": "822b1e81-3494-49de-85c4-3f3c71b52026",
       "client": "LA COMU",
       "taskNumber": 2,
       "project": "Great Work - 15:30 a 18:30hs",
@@ -102,11 +102,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "c9237814-bd31-413b-a9ea-7c74294e2068",
+      "id": "5eebcda7-6cd0-4581-9c34-6fbc0c5ae743",
       "client": "ClubNutri",
       "taskNumber": 3,
       "project": "Supervision Campaña Leads",
@@ -123,11 +123,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "305e0e1d-8193-44ac-be28-025187a07aed",
+      "id": "646e104e-d5d7-4781-8392-abd905752032",
       "client": "PORSCHE",
       "taskNumber": 4,
       "project": "Supervision Caja azul (activaciones)",
@@ -144,11 +144,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "957c9adc-dba0-4819-8ede-c281c1992982",
+      "id": "e4103c04-a7a3-4cf5-b72d-08a6da556edc",
       "client": "ClubNutri",
       "taskNumber": 1,
       "project": "Campaña Leads",
@@ -165,11 +165,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "2a3b3508-1eec-422b-9078-fb961d1165be",
+      "id": "a6c18518-af18-4e45-82a2-2bcd06d248ff",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Contrato hasta 27/2",
@@ -186,11 +186,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "52497458-3bec-4b91-8127-facd51d4d75c",
+      "id": "df5675f4-c55c-431f-97a2-43394c547463",
       "client": "Alma Mora",
       "taskNumber": 1,
       "project": "Día de los Enamorados",
@@ -207,11 +207,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "e5c166ab-a961-4682-bdf2-2559cb18517a",
+      "id": "1d4962c4-d301-474e-93c5-35bf25e756fc",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Contrato hasta 13/2",
@@ -228,11 +228,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "89d6faa6-4e7c-4119-be40-e2f4d12e527c",
+      "id": "d179e394-65be-4fcc-93ce-ab08b41cb92e",
       "client": "Red",
       "taskNumber": null,
       "project": "Busqueda nuevas bandas WC26",
@@ -249,11 +249,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "3040ce0d-d267-4153-bcc1-5a7082ed5bc1",
+      "id": "c2b92ea9-f892-4f51-a62f-eda04e51ef14",
       "client": "DIAGEO",
       "taskNumber": 1,
       "project": "WC26 Responsible - stunt",
@@ -270,11 +270,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "2d85075d-042f-4be7-b610-17997e3ff461",
+      "id": "849c50b0-3b06-4df7-98f8-8fc90f75b48c",
       "client": "Red",
       "taskNumber": 2,
       "project": "Storyboard contenido Edul - WC26",
@@ -291,11 +291,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "bd98bf67-8969-4c9c-87cc-19ceda71f8b1",
+      "id": "cc2e1bd5-13da-49af-b191-472ecc83b84c",
       "client": "TIME OFF",
       "taskNumber": null,
       "project": "Agus OOO (dia recuperado)",
@@ -312,11 +312,11 @@
       "timeOffEnd": "2026-02-13",
       "timeOffType": "OOO",
       "timeOffTitle": "Agus OOO (dia recuperado)",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "50b99605-3394-4574-aacc-36d340923fbe",
+      "id": "103ceca7-2d57-41f6-824e-6ffb5bdd1cea",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Great Work - 15:30 a 18:30hs",
@@ -333,11 +333,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "ab39955e-986d-4a2c-9da7-7f0802ff1fc3",
+      "id": "dc520dc2-a509-499c-a25e-cb5b38970c2f",
       "client": "Red",
       "taskNumber": 1,
       "project": "Nuevos Contenidos WC26",
@@ -354,11 +354,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "503d0c0b-4fbf-461a-9591-ea224cd422c5",
+      "id": "841bc011-8944-4f16-bb70-9a861017aad4",
       "client": "ClubNutri",
       "taskNumber": 2,
       "project": "Placas Gabriela Watson",
@@ -375,11 +375,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "b197e194-0aac-4d26-a315-263edcfb3a47",
+      "id": "f1e73034-177d-40b5-bd54-2f895361d0e0",
       "client": "TIME OFF",
       "taskNumber": null,
       "project": "Marti PTO (20/2 - 6/3 -11 dias)",
@@ -396,11 +396,11 @@
       "timeOffEnd": "2026-03-06",
       "timeOffType": "Vacaciones",
       "timeOffTitle": "Marti PTO (20/2 - 6/3 -11 dias)",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "4ef5bd21-8080-430e-a902-5e8015941d1b",
+      "id": "65fadf2c-0f39-42f8-9351-a784607b6fde",
       "client": "Black",
       "taskNumber": null,
       "project": "Ajustes Lolla y OOH",
@@ -417,11 +417,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "8b1b2016-eb79-4705-8fa8-fbf2adedb93c",
+      "id": "a41c0a55-0e2a-4654-92cd-2e06f3bd07cc",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Great Work - 15:30 a 18:30hs",
@@ -438,11 +438,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "e9252ef0-5a06-4118-bc53-f92da3df347e",
+      "id": "ae8c7985-4967-41a4-ab4f-f634f665f004",
       "client": "DIAGEO",
       "taskNumber": 1,
       "project": "Responsible Drinking",
@@ -459,11 +459,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "7e680d45-a32b-4a27-8622-2a3aee340ee8",
+      "id": "15ea4de8-5934-418d-b7ee-e43cc0e57b11",
       "client": "El Esteco",
       "taskNumber": 2,
       "project": "Ajuste tradición KVs",
@@ -480,11 +480,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "f5b5f256-e23f-44e4-b943-c06358c13e39",
+      "id": "e5cb1815-2d29-4749-84be-a3ea78b18b8c",
       "client": "FLM",
       "taskNumber": 3,
       "project": "Piezas rrss vendimia",
@@ -501,11 +501,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "0c9b0319-7ec6-4455-99bc-ec3692c2a4a5",
+      "id": "ceba0959-a1e9-41ef-9546-d62edc6a95cb",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Great Work - 15:30 a 18:30hs",
@@ -522,11 +522,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "8cb4ce01-40b6-4e03-a1f1-20f14a111772",
+      "id": "d38a3258-ab2a-45d5-875d-f3744172eb9d",
       "client": "Red",
       "taskNumber": 1,
       "project": "Devolución Fotos IA WC26",
@@ -543,11 +543,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "fbc34ab0-6809-4a57-a5d9-f4b1f23cd75c",
+      "id": "aaf690dd-513b-4718-a648-f268d17bd6ab",
       "client": "Alma Mora",
       "taskNumber": 2,
       "project": "Supervisión Flores",
@@ -564,11 +564,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "4e7dd096-71f9-435c-b2f0-fd7ae5c0a109",
+      "id": "c7138091-94bf-4084-9b2d-00284ce55f7e",
       "client": "El Esteco",
       "taskNumber": 3,
       "project": "DD - Low alcohol KV",
@@ -585,11 +585,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "ad5f922a-79c8-43a4-98da-a719e23bbdbf",
+      "id": "6ec19792-b7fa-45c4-b21b-6bdb7f3aad29",
       "client": "Dadá",
       "taskNumber": 4,
       "project": "Supervisión - KV Low alcohol red & white blend",
@@ -606,11 +606,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "6ffb64ec-6d6d-4b1e-b3cc-6e743cc56d45",
+      "id": "0ff95529-f086-48af-81fa-b3695e2f43ec",
       "client": "ClubNutri",
       "taskNumber": 5,
       "project": "Revisar Libro ajuste",
@@ -627,11 +627,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "962e072e-2575-4332-ae7a-b6b941d3e7cc",
+      "id": "e6729469-55a6-4ada-94b4-30dc408fe708",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Retoques fotos x1",
@@ -648,11 +648,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "b2640ab1-d747-47cb-8765-7416eed998d1",
+      "id": "de945cb8-6b80-409f-99b0-5c75f3758581",
       "client": "Dadá",
       "taskNumber": 1,
       "project": "KV - Low alcohol red & white blend",
@@ -669,11 +669,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "36e90c52-bd3e-4323-b7b4-acbe74d76102",
+      "id": "4ff3d432-e2f8-47a1-a3ad-eb615338117c",
       "client": "ClubNutri",
       "taskNumber": 2,
       "project": "Caledario Marzo",
@@ -690,11 +690,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "23e2cfe7-e1a6-45c4-9691-99ef2280a6d4",
+      "id": "c6a56ab1-e5ab-4509-99a0-a64b51562516",
       "client": "Alma Mora",
       "taskNumber": 4,
       "project": "KV - Low Malbec",
@@ -711,11 +711,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "3b8eb263-945b-4524-9f45-c8ab593e3f17",
+      "id": "200fc4e4-bedb-4a13-a161-91cfca411dc5",
       "client": "Dadá",
       "taskNumber": 5,
       "project": "Tinto de verano placa (blanco + tinto)",
@@ -732,11 +732,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "a968cce1-7f5d-426c-8c5d-9c05dcadf058",
+      "id": "a2fe58ae-3da4-4539-b121-223cfda1d5bc",
       "client": "Black",
       "taskNumber": null,
       "project": "OOH SABRINA X LOLLA",
@@ -753,11 +753,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "2cdbd44e-0bd7-4ab9-a1e1-5a031c0c86c5",
+      "id": "cbf07f9f-109f-4014-960c-cae115b71b5e",
       "client": "Dadá",
       "taskNumber": null,
       "project": "Caja Irlanda - ajustes",
@@ -774,11 +774,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "11395152-02d5-47f5-8790-c815959526dd",
+      "id": "0b4d9358-4536-4264-91b2-c4c7382f05f4",
       "client": "Dadá",
       "taskNumber": null,
       "project": "KV Vikingo - masterbrand",
@@ -795,11 +795,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "7ecc2d6e-ae2c-4681-9954-8cc989e71c9b",
+      "id": "955144fc-955e-47a2-a091-eac90bb90f09",
       "client": "Red",
       "taskNumber": null,
       "project": "Armado Pieza Sorteo Bresh Chile",
@@ -816,11 +816,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "aab12982-10c3-4316-a9a4-f02ba40a83e5",
+      "id": "697d419b-ca71-4849-8934-550515004250",
       "client": "Red",
       "taskNumber": null,
       "project": "Lolla AR",
@@ -837,11 +837,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "70f7a7d6-2a9b-45f8-bcc2-49cdaa191731",
+      "id": "ab9db4ec-4998-4a75-bd36-5487acc83bf0",
       "client": "Red",
       "taskNumber": 1,
       "project": "Armado Video Stand Movistar Arena",
@@ -858,11 +858,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "0c748522-281a-4f43-911c-a9397c458e1f",
+      "id": "8eba4511-cdd9-4910-903f-7ceb0b559a01",
       "client": "Red",
       "taskNumber": 2,
       "project": "Ajustes Teaser WC 26",
@@ -879,11 +879,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "51925313-71c5-4627-a59e-99cfb515617e",
+      "id": "9aaa82e7-4037-48e1-8087-83c1c396b33c",
       "client": "Red",
       "taskNumber": 3,
       "project": "Ajuste video Viña del Mar",
@@ -900,11 +900,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "6be13963-2d95-42b2-87e0-215ce7ce4817",
+      "id": "222b6c88-34f9-46f3-b922-a9db88966cb7",
       "client": "Dadá",
       "taskNumber": 4,
       "project": "Tinto de verano - blanco y ambos",
@@ -921,11 +921,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "57fe08de-697d-4293-8b29-b10679a13bb6",
+      "id": "19465cd2-f321-40ef-a57b-a5452b80f95b",
       "client": "ClubNutri",
       "taskNumber": 5,
       "project": "Video Mariana Batista",
@@ -942,11 +942,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "7b9a8531-8be1-43ad-9980-c2396a099459",
+      "id": "2191f6ad-6127-42c4-8f0a-8675a4c00f13",
       "client": "Black",
       "taskNumber": null,
       "project": "1 video lolla",
@@ -963,11 +963,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "27e64d36-6084-4f74-b4bf-0dac5916acc5",
+      "id": "ff4656d3-4bed-48c3-b060-82d8f2ead9d1",
       "client": "DIAGEO",
       "taskNumber": null,
       "project": "Video moodboard Responsible drinking",
@@ -984,20 +984,20 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "915fb9a0-6fd1-4d90-b522-96fc7d978706",
-      "client": "El Esteco",
+      "id": "f7966203-49e2-4bdb-a99b-63ed87b2186c",
+      "client": "LA COMU",
       "taskNumber": 1,
-      "project": "Traducción KVs",
+      "project": "Great Work Zeke",
       "assignee": "Bua",
-      "supervisor": "",
-      "priority": "",
-      "deadline": "2026-02-13",
+      "supervisor": "Zeke",
+      "priority": "alta",
+      "deadline": "2026-03-27",
       "status": "en progreso",
-      "owner": "Luli",
+      "owner": "",
       "comments": "",
       "isSupervision": false,
       "isTimeOff": false,
@@ -1005,19 +1005,61 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "d194c248-9c89-4b38-8592-a4cd08086644",
-      "client": "LA COMU",
+      "id": "cf4a1bf4-fb90-440d-960e-7a1141dbe9f3",
+      "client": "Red",
+      "taskNumber": 1,
+      "project": "Campaña cultural Perú",
+      "assignee": "Bua",
+      "supervisor": "",
+      "priority": "alta",
+      "deadline": "2026-04-15",
+      "status": "sin empezar",
+      "owner": "Ari",
+      "comments": "",
+      "isSupervision": false,
+      "isTimeOff": false,
+      "timeOffStart": "",
+      "timeOffEnd": "",
+      "timeOffType": "",
+      "timeOffTitle": "",
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
+    },
+    {
+      "id": "b46b27e9-e841-4407-bb32-bd4330aecb13",
+      "client": "Red",
       "taskNumber": 2,
+      "project": "WC26 Stunt",
+      "assignee": "Bua",
+      "supervisor": "Whalys",
+      "priority": "alta",
+      "deadline": "2026-03-30",
+      "status": "en progreso",
+      "owner": "Juan",
+      "comments": "",
+      "isSupervision": false,
+      "isTimeOff": false,
+      "timeOffStart": "",
+      "timeOffEnd": "",
+      "timeOffType": "",
+      "timeOffTitle": "",
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
+    },
+    {
+      "id": "2454ae33-24c4-47ca-85ec-585f36abaaad",
+      "client": "LA COMU",
+      "taskNumber": 3,
       "project": "Credenciales agencia",
       "assignee": "Bua",
       "supervisor": "",
-      "priority": "",
-      "deadline": "",
-      "status": "on going",
+      "priority": "alta",
+      "deadline": "2026-04-07",
+      "status": "en progreso",
       "owner": "Sol",
       "comments": "",
       "isSupervision": false,
@@ -1026,80 +1068,17 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "7f1faa58-4837-4dec-b867-d7420a82725b",
-      "client": "FLM",
-      "taskNumber": 3,
-      "project": "Brandbook - manifiesto",
-      "assignee": "Bua",
-      "supervisor": "",
-      "priority": "media",
-      "deadline": "2026-02-18",
-      "status": "esperando respuesta",
-      "owner": "Jess",
-      "comments": "",
-      "isSupervision": false,
-      "isTimeOff": false,
-      "timeOffStart": "",
-      "timeOffEnd": "",
-      "timeOffType": "",
-      "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
-    },
-    {
-      "id": "aac87747-2145-4c94-afd7-e7c27469d16a",
-      "client": "ClubNutri",
-      "taskNumber": null,
-      "project": "Corrección libro",
-      "assignee": "Bua",
-      "supervisor": "",
-      "priority": "alta",
-      "deadline": "2026-02-19",
-      "status": "sin empezar",
-      "owner": "Del",
-      "comments": "",
-      "isSupervision": false,
-      "isTimeOff": false,
-      "timeOffStart": "",
-      "timeOffEnd": "",
-      "timeOffType": "",
-      "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
-    },
-    {
-      "id": "98c58994-c9a7-4e04-ad94-ab6aff724574",
-      "client": "DIAGEO",
-      "taskNumber": null,
-      "project": "WC26 Responsible Drinking",
-      "assignee": "Bua",
-      "supervisor": "",
-      "priority": "",
-      "deadline": "",
-      "status": "on going",
-      "owner": "Naki",
-      "comments": "",
-      "isSupervision": false,
-      "isTimeOff": false,
-      "timeOffStart": "",
-      "timeOffEnd": "",
-      "timeOffType": "",
-      "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.948Z",
-      "updatedAt": "2026-04-01T01:16:34.948Z"
-    },
-    {
-      "id": "b31a245c-422b-4513-abd9-22cf843065b1",
+      "id": "8513dec6-4316-4a22-9ba4-c41f03a0a991",
       "client": "JW CORE",
       "taskNumber": null,
       "project": "Tendencias",
       "assignee": "Bua",
       "supervisor": "",
-      "priority": "",
+      "priority": "media",
       "deadline": "",
       "status": "on going",
       "owner": "",
@@ -1110,11 +1089,32 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "4f8bd387-32d3-4e99-88e0-9c231857409c",
+      "id": "ca4ecc23-68be-42a1-9afb-3d9b3e7955e7",
+      "client": "TIME OFF",
+      "taskNumber": null,
+      "project": "OOO 30/03 al 5/04",
+      "assignee": "Bua",
+      "supervisor": "",
+      "priority": "",
+      "deadline": "2026-03-30",
+      "status": "sin empezar",
+      "owner": "",
+      "comments": "",
+      "isSupervision": false,
+      "isTimeOff": true,
+      "timeOffStart": "2026-03-30",
+      "timeOffEnd": "2026-04-05",
+      "timeOffType": "OOO",
+      "timeOffTitle": "OOO 30/03 al 5/04",
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
+    },
+    {
+      "id": "d5971e52-ded1-470e-bc51-849423b21586",
       "client": "ClubNutri",
       "taskNumber": 1,
       "project": "Objetivos 2026",
@@ -1131,11 +1131,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "e163d680-e839-428c-8c66-7086d785997f",
+      "id": "fb10096d-f8f8-4440-b050-c04af3421530",
       "client": "Alma Mora",
       "taskNumber": 2,
       "project": "Verificación IG",
@@ -1152,11 +1152,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "b79d0072-d7c7-41a8-a624-d2708f844423",
+      "id": "0ee8e9c0-78aa-4cd9-8047-ad4af8300f81",
       "client": "LA COMU",
       "taskNumber": 3,
       "project": "Evalucaciones Equipo",
@@ -1173,11 +1173,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "71b83d42-9e10-49aa-b9d7-43cd8d1ea2ad",
+      "id": "f05f59a6-13e3-479e-949b-7d281ee59c93",
       "client": "DIAGEO",
       "taskNumber": null,
       "project": "Tendencias",
@@ -1194,11 +1194,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "57dca0b6-7a91-4cf3-8eaa-fe0ea892c95c",
+      "id": "475663ca-3642-41e1-81df-eafbb8539742",
       "client": "Alma Mora",
       "taskNumber": 1,
       "project": "Publicaciones Día de los enamorados",
@@ -1215,11 +1215,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "e1f556a7-b222-420a-bed6-580feb63ceba",
+      "id": "792196aa-ce31-492f-b766-329ba33b15e5",
       "client": "Alma Mora",
       "taskNumber": 2,
       "project": "Repost Sofi Calvo Día de los enamorados",
@@ -1236,11 +1236,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "2d86f2ae-af60-45c5-a8ed-df88f1f53e70",
+      "id": "4a2f04dd-64f0-4173-8291-718b0187f3a3",
       "client": "ClubNutri",
       "taskNumber": 3,
       "project": "Matriz resultados enero",
@@ -1257,11 +1257,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "4b3640f1-9178-421c-9d9a-72fe3b1b3a28",
+      "id": "08e87642-9631-4da9-acf6-295e8f002163",
       "client": "ClubNutri",
       "taskNumber": 4,
       "project": "Stories Destacadas Expertos",
@@ -1278,11 +1278,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "7eb8883a-019b-4841-98b3-ab0c7aa37e1e",
+      "id": "592c34b5-0951-4b23-9805-cf3c15d34f49",
       "client": "ClubNutri",
       "taskNumber": 5,
       "project": "Calendario Abril",
@@ -1299,11 +1299,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "3e60e36f-3285-48f0-9581-191dbc79c7e1",
+      "id": "cd00f7e3-4eb4-4d76-a2b5-0ef070af04e8",
       "client": "Dadá",
       "taskNumber": 6,
       "project": "Guía - Manual influencers",
@@ -1320,11 +1320,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "5510a23d-566e-453f-9de5-26c4ebef54fa",
+      "id": "93b24968-8d4d-467c-960d-9176768d2bf8",
       "client": "ClubNutri",
       "taskNumber": null,
       "project": "Calendario febrero fechas",
@@ -1341,11 +1341,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "ae022bfc-3535-4408-ba60-be66c4d54146",
+      "id": "36e30ca0-e68e-44dd-b4c9-2d6ea7fbc928",
       "client": "ClubNutri",
       "taskNumber": null,
       "project": "Plan medios Campaña Leads",
@@ -1362,11 +1362,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "9d40d3de-692e-413e-9895-0a6b4da678b1",
+      "id": "4a104d74-f1e3-405a-bcfa-5ac1ed219730",
       "client": "ClubNutri",
       "taskNumber": null,
       "project": "Calendario marzo",
@@ -1383,11 +1383,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "eddc3c3b-20bc-4260-b728-99e75ef2b864",
+      "id": "b11a336d-2d66-46e3-8289-79c88a3b0572",
       "client": "ClubNutri",
       "taskNumber": null,
       "project": "Calendario TT + YT febrero",
@@ -1404,11 +1404,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "0a850821-0878-4066-a236-d9f5f538ab57",
+      "id": "b6c14e76-a314-4605-9767-51f00eae9179",
       "client": "ClubNutri",
       "taskNumber": null,
       "project": "Scouting influs",
@@ -1425,11 +1425,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "4d814c4b-3725-4298-93d7-7382102b9336",
+      "id": "39e2cbc4-0143-4d92-a770-5498493c5ed2",
       "client": "El Esteco",
       "taskNumber": null,
       "project": "Calendario marzo",
@@ -1446,11 +1446,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "8e01b8fa-cd35-468b-9e5f-244bc1dc3554",
+      "id": "968189dd-3397-4e63-b684-cd1f741802bd",
       "client": "FLM",
       "taskNumber": null,
       "project": "Calendario marzo",
@@ -1467,11 +1467,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "16ffce55-11a2-4a7b-9a96-2c9949cd5aeb",
+      "id": "6eaabafa-d7b6-4022-96c9-b01a0eb48d3f",
       "client": "Bodegas",
       "taskNumber": null,
       "project": "Moderación",
@@ -1488,11 +1488,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "fb31a448-a2df-4082-bdd4-6e0e4733d526",
+      "id": "922aedde-ec59-44b1-883f-f7bb9abda3ae",
       "client": "ClubNutri",
       "taskNumber": null,
       "project": "Moderación",
@@ -1509,11 +1509,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "37582bd2-3f6e-46e8-8389-3ddb23216d3f",
+      "id": "b3f2ea0e-a238-4b0d-bb90-97e0fb0d6566",
       "client": "LA COMU",
       "taskNumber": null,
       "project": "Búsqueda de tendencias/recursos/ideas",
@@ -1530,11 +1530,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "ef9e4265-8908-4d81-adec-c728a4368d4a",
+      "id": "e7390846-0d0f-4309-9fd5-27c75f8e3e44",
       "client": "Red",
       "taskNumber": 1,
       "project": "Sorteo entradas Movistar Arena",
@@ -1551,11 +1551,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "ecd8eb7c-82d0-42c0-b138-8109bf5e2f27",
+      "id": "79fb3abf-58f3-43d6-ae12-0a2a10e9c329",
       "client": "JW CORE",
       "taskNumber": 2,
       "project": "Repost Contenidos Cosquín + propuesta de copy",
@@ -1572,11 +1572,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "c22faf0f-0f0c-4ed5-9291-0c12d4e15f08",
+      "id": "38ec0468-cd24-4c51-830c-389bff6c6824",
       "client": "JW**",
       "taskNumber": 3,
       "project": "Stickers Viña del Mar",
@@ -1593,11 +1593,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "89c64649-9fcd-498e-8252-e58c3f123eef",
+      "id": "589647a2-dd43-4809-a8c1-aae5612727d9",
       "client": "JW CORE",
       "taskNumber": 4,
       "project": "Tendencias Chile",
@@ -1614,11 +1614,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "3896bfbd-9e61-4258-ab1e-1feed15f14dd",
+      "id": "df21262c-ec0b-4525-882e-900f9595a163",
       "client": "JW**",
       "taskNumber": 5,
       "project": "Base de datos influs",
@@ -1635,11 +1635,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "2556182c-ca4c-418b-be68-206b6b17a3b7",
+      "id": "4f330b66-6a67-4bf1-a983-7f98d8819492",
       "client": "Black",
       "taskNumber": null,
       "project": "Calendario LOLLA",
@@ -1656,11 +1656,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "94e66cec-fd53-4ee0-a635-e02a590b2f05",
+      "id": "2824a1a9-7685-42c2-b4d7-15ed76dfdf62",
       "client": "JW CORE",
       "taskNumber": null,
       "project": "Moderación",
@@ -1677,11 +1677,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "cf5eebcd-f205-4bb2-94f7-ff32bb4fac6b",
+      "id": "279c99a8-fc4c-4c02-8383-711e999e0813",
       "client": "JW CORE",
       "taskNumber": null,
       "project": "Ver streaming Chile",
@@ -1698,11 +1698,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "5e7b850e-b1af-4806-bd57-a9ba389f6e53",
+      "id": "1d4c3737-8fdf-4e36-b761-8b4a4e34b5ba",
       "client": "Alma Mora",
       "taskNumber": null,
       "project": "Ageism \"eiyism\"",
@@ -1719,11 +1719,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "a1e73cdc-3c47-49fd-b475-d42c3220420d",
+      "id": "56b6c178-f079-451a-aa68-7d53fe24eabe",
       "client": "Red",
       "taskNumber": null,
       "project": "Videos Cosquin Rock",
@@ -1740,11 +1740,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "3f94dccf-2864-4f13-ae73-42cdba1e2ce7",
+      "id": "fa39f187-4e46-4a4c-aa57-0bbff6e0a17b",
       "client": "Alma Mora",
       "taskNumber": null,
       "project": "Idea Flores",
@@ -1761,11 +1761,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "42a20865-1ecd-4d1d-b1a4-c9167a1b3622",
+      "id": "18eed546-cf9e-422a-801f-20ed720169de",
       "client": "Dadá",
       "taskNumber": null,
       "project": "Supervisión Videos- Tinto de verano",
@@ -1782,11 +1782,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "6c00e305-ebd2-4ca3-96d3-f12eebc8ae58",
+      "id": "627c7b0e-03d4-4f42-885e-26ac5b68248c",
       "client": "Dadá",
       "taskNumber": null,
       "project": "Ajustes piezas masterbrand",
@@ -1803,11 +1803,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "7ae13c14-6191-4ee7-a7ff-8e235481f4be",
+      "id": "718e8c66-7a00-4e35-ad90-aafb57920121",
       "client": "Dadá",
       "taskNumber": null,
       "project": "Diseño Irlanda Cajas x3",
@@ -1824,11 +1824,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "f42cc589-dd0d-462e-8778-d5c896959698",
+      "id": "6241716f-eb71-4154-84f5-5cbcdb872329",
       "client": "El Esteco",
       "taskNumber": null,
       "project": "KV Blend de Extremos Pinot Noir",
@@ -1845,11 +1845,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "cc9d5694-6b88-48c9-9720-60765d8aabaf",
+      "id": "9cb5d31b-908b-4d8f-920b-da95ee8d921f",
       "client": "Red",
       "taskNumber": null,
       "project": "Ajustes Reel WC26",
@@ -1866,11 +1866,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "fa804431-be56-4c59-bd98-9a59de0b178d",
+      "id": "3309ab71-2127-4930-8ef2-32b6c34a28a0",
       "client": "Red",
       "taskNumber": null,
       "project": "Ajustes reels WC26",
@@ -1887,11 +1887,11 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     },
     {
-      "id": "41c1b5aa-60ae-4c6d-a76f-bde9109f82e2",
+      "id": "4fbb00dc-6dbc-4530-be0d-01cb6f41db19",
       "client": "Red",
       "taskNumber": null,
       "project": "Edición Video UY WC26",
@@ -1908,8 +1908,8 @@
       "timeOffEnd": "",
       "timeOffType": "",
       "timeOffTitle": "",
-      "createdAt": "2026-04-01T01:16:34.949Z",
-      "updatedAt": "2026-04-01T01:16:34.949Z"
+      "createdAt": "2026-04-01T01:23:50.757Z",
+      "updatedAt": "2026-04-01T01:23:50.757Z"
     }
   ]
 }

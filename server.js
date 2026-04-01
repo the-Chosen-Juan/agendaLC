@@ -867,8 +867,8 @@ function parseCSVServer(csvText) {
       task._timeOffTitle = projectText;
 
       // Extract date range from project text (DD/MM or DD/MM/YYYY format)
-      // e.g. "Marti PTO 20/2 - 6/3" → start=20/2, end=6/3
-      const dateRangeMatch = projectText.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*[-–—]\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
+      // e.g. "Marti PTO 20/2 - 6/3" or "OOO 30/03 al 5/04" → start, end
+      const dateRangeMatch = projectText.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*(?:[-–—]|al?|hasta)\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
       const singleDateMatch = !dateRangeMatch && projectText.match(/(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/);
 
       const parseDDMM = (str) => {

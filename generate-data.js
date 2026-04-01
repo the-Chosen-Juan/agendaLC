@@ -100,13 +100,13 @@ const tasks = [
   createTask({ client: "Black", taskNumber: null, project: "1 video lolla", assignee: "Jota", supervisor: "Nacho", priority: "alta", deadline: "", status: "TBD", owner: "Naki" }),
   createTask({ client: "DIAGEO", taskNumber: null, project: "Video moodboard Responsible drinking", assignee: "Jota", supervisor: "", priority: "alta", deadline: "", status: "esperando respuesta", owner: "" }),
 
-  // ---- Assignee: Bua (6 tasks) ----
-  createTask({ client: "El Esteco", taskNumber: 1, project: "Traducción KVs", assignee: "Bua", supervisor: "", priority: "", deadline: "2026-02-13", status: "en progreso", owner: "Luli" }),
-  createTask({ client: "LA COMU", taskNumber: 2, project: "Credenciales agencia", assignee: "Bua", supervisor: "", priority: "", deadline: "", status: "on going", owner: "Sol" }),
-  createTask({ client: "FLM", taskNumber: 3, project: "Brandbook - manifiesto", assignee: "Bua", supervisor: "", priority: "media", deadline: "2026-02-18", status: "esperando respuesta", owner: "Jess" }),
-  createTask({ client: "ClubNutri", taskNumber: null, project: "Corrección libro", assignee: "Bua", supervisor: "", priority: "alta", deadline: "2026-02-19", status: "sin empezar", owner: "Del" }),
-  createTask({ client: "DIAGEO", taskNumber: null, project: "WC26 Responsible Drinking", assignee: "Bua", supervisor: "", priority: "", deadline: "", status: "on going", owner: "Naki" }),
-  createTask({ client: "JW CORE", taskNumber: null, project: "Tendencias", assignee: "Bua", supervisor: "", priority: "", deadline: "", status: "on going", owner: "" }),
+  // ---- Assignee: Bua (6 tasks + 1 time-off) ----
+  createTask({ client: "LA COMU", taskNumber: 1, project: "Great Work Zeke", assignee: "Bua", supervisor: "Zeke", priority: "alta", deadline: "2026-03-27", status: "en progreso", owner: "" }),
+  createTask({ client: "Red", taskNumber: 1, project: "Campaña cultural Perú", assignee: "Bua", supervisor: "", priority: "alta", deadline: "2026-04-15", status: "sin empezar", owner: "Ari" }),
+  createTask({ client: "Red", taskNumber: 2, project: "WC26 Stunt", assignee: "Bua", supervisor: "Whalys", priority: "alta", deadline: "2026-03-30", status: "en progreso", owner: "Juan" }),
+  createTask({ client: "LA COMU", taskNumber: 3, project: "Credenciales agencia", assignee: "Bua", supervisor: "", priority: "alta", deadline: "2026-04-07", status: "en progreso", owner: "Sol" }),
+  createTask({ client: "JW CORE", taskNumber: null, project: "Tendencias", assignee: "Bua", supervisor: "", priority: "media", deadline: "", status: "on going", owner: "" }),
+  createTask({ client: "TIME OFF", taskNumber: null, project: "OOO 30/03 al 5/04", assignee: "Bua", supervisor: "", priority: "", deadline: "2026-03-30", status: "sin empezar", owner: "", isTimeOff: true, timeOffStart: "2026-03-30", timeOffEnd: "2026-04-05", timeOffType: "OOO", timeOffTitle: "OOO 30/03 al 5/04" }),
 
   // ---- Assignee: Jose (4 tasks) ----
   createTask({ client: "ClubNutri", taskNumber: 1, project: "Objetivos 2026", assignee: "Jose", supervisor: "Jose", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Jose" }),
