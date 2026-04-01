@@ -3400,3 +3400,175 @@ span.flatpickr-weekday {
   .heatmap-day-label { font-size: .55rem; min-width: 40px; }
   .heatmap-summary { flex-direction: column; }
 }
+
+/* ===========================
+   REDUCED MOTION SUPPORT
+   =========================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===========================
+   FOCUS-VISIBLE INDICATORS
+   =========================== */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.btn:focus-visible,
+.btn-icon:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(99,102,241,.15);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--primary-light);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.modal-select:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+}
+
+/* Remove default outlines since we use focus-visible */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ===========================
+   BUTTON LOADING STATE
+   =========================== */
+.btn.loading {
+  pointer-events: none;
+  opacity: .7;
+  position: relative;
+}
+
+.btn.loading .material-icons-round:first-child {
+  animation: btnSpin 1s linear infinite;
+}
+
+@keyframes btnSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===========================
+   TOAST MOBILE POSITIONING
+   =========================== */
+@media (max-width: 768px) {
+  .toast-container {
+    bottom: auto;
+    top: .75rem;
+    right: .75rem;
+    left: .75rem;
+  }
+
+  .toast {
+    font-size: .8rem;
+    padding: .65rem 1rem;
+  }
+}
+
+/* ===========================
+   SEARCH HIGHLIGHT
+   =========================== */
+.search-highlight {
+  background: rgba(245,158,11,.25);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .search-highlight {
+  background: rgba(245,158,11,.35);
+}
+
+/* ===========================
+   AUTOFILL STYLING
+   =========================== */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0px 1000px var(--surface) inset;
+  transition: background-color 5000s ease-in-out 0s;
+  border-color: var(--primary);
+}
+
+/* ===========================
+   MODAL SCROLL INDICATORS
+   =========================== */
+.modal-content {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 0);
+}
+
+.modal-body {
+  position: relative;
+}
+
+.modal-content.scrollable-top {
+  box-shadow: var(--shadow-xl), inset 0 8px 6px -6px rgba(0,0,0,.1);
+}
+
+.modal-content.scrollable-bottom::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  display: block;
+  height: 24px;
+  margin-top: -24px;
+  background: linear-gradient(to top, var(--surface), transparent);
+  pointer-events: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+[data-theme="dark"] .modal-content.scrollable-top {
+  box-shadow: var(--shadow-xl), inset 0 8px 6px -6px rgba(0,0,0,.3);
+}
+
+/* ===========================
+   HEATMAP ACCESSIBILITY
+   =========================== */
+.heatmap-cell[data-count]::after {
+  content: attr(data-count);
+}
+
+.heatmap-cell[data-count="0"]::after {
+  content: '';
+}
+
+/* Skip-to-content link for keyboard users */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  background: var(--primary);
+  color: #fff;
+  padding: .75rem 1.25rem;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  z-index: 1000;
+  font-weight: 600;
+  font-size: .9rem;
+  text-decoration: none;
+  transition: top .2s;
+}
+
+.skip-link:focus {
+  top: 0;
+}

@@ -4461,6 +4461,14 @@ function escHtml(str) {
   return div.innerHTML;
 }
 
+function highlightMatch(str, query) {
+  if (!str || !query) return escHtml(str);
+  const escaped = escHtml(str);
+  const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${q})`, 'gi');
+  return escaped.replace(regex, '<mark class="search-highlight">$1</mark>');
+}
+
 function escAttr(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -4664,10 +4672,10 @@ function performOverlaySearch(query) {
     item.innerHTML = `
       <span class="material-icons-round result-icon">assignment</span>
       <div class="search-result-info">
-        <div class="search-result-title">${escHtml(t.project || 'Sin proyecto')}</div>
+        <div class="search-result-title">${highlightMatch(t.project || 'Sin proyecto', query)}</div>
         <div class="search-result-meta">
-          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.65rem;padding:.1rem .35rem">${escHtml(t.client || '—')}</span>
-          ${t.assignee ? `&nbsp;·&nbsp;${escHtml(t.assignee)}` : ''}
+          <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.65rem;padding:.1rem .35rem">${highlightMatch(t.client || '—', query)}</span>
+          ${t.assignee ? `&nbsp;·&nbsp;${highlightMatch(t.assignee, query)}` : ''}
           ${t.status ? `&nbsp;·&nbsp;${escHtml(t.status)}` : ''}
         </div>
       </div>
@@ -5433,6 +5441,36 @@ initDatePicker('#new-task-deadline');
 initDatePicker('#timeoff-start');
 initDatePicker('#timeoff-end');
 initDatePicker('#cal-event-date');
+
+// --- MODAL SCROLL INDICATORS ---
+(function() {
+  function updateScrollClasses(modalContent) {
+    if (!modalContent) return;
+    const hasTopScroll = modalContent.scrollTop > 8;
+    const hasBottomScroll = modalContent.scrollHeight - modalContent.scrollTop - modalContent.clientHeight > 8;
+    modalContent.classList.toggle('scrollable-top', hasTopScroll);
+    modalContent.classList.toggle('scrollable-bottom', hasBottomScroll);
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach(m => {
+      if (m.type === 'attributes' && m.attributeName === 'class') {
+        const modal = m.target;
+        if (modal.classList.contains('modal') && !modal.classList.contains('hidden')) {
+          const content = modal.querySelector('.modal-content');
+          if (content) {
+            updateScrollClasses(content);
+            content.addEventListener('scroll', () => updateScrollClasses(content), { passive: true });
+          }
+        }
+      }
+    });
+  });
+
+  document.querySelectorAll('.modal').forEach(modal => {
+    observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+  });
+})();
 
 // --- INIT ---
 loadData();

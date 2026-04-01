@@ -15,6 +15,8 @@
 </head>
 <body>
 
+  <a href="#view-agenda" class="skip-link">Saltar al contenido</a>
+
   <!-- MAIN APP -->
   <div id="app" class="app">
     <aside id="sidebar" class="sidebar">
@@ -249,10 +251,10 @@
   </div>
 
   <!-- NEW TASK MODAL -->
-  <div id="new-task-modal" class="modal hidden">
+  <div id="new-task-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="new-task-modal-heading">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
-      <div class="modal-header"><h2>Nueva tarea</h2><button class="btn-icon modal-close" id="new-task-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2 id="new-task-modal-heading">Nueva tarea</h2><button class="btn-icon modal-close" id="new-task-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group"><label>Cliente</label><div class="modal-select" id="new-task-client" data-field="client" data-value="" tabindex="0"><span class="modal-select-text">Seleccionar cliente...</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
@@ -284,7 +286,7 @@
   </div>
 
   <!-- TIME OFF MODAL -->
-  <div id="timeoff-modal" class="modal hidden">
+  <div id="timeoff-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="timeoff-modal-title">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
       <div class="modal-header"><h2 id="timeoff-modal-title">Time Off</h2><button class="btn-icon modal-close" id="timeoff-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
@@ -303,10 +305,10 @@
   </div>
 
   <!-- COPY TASK MODAL -->
-  <div id="copy-modal" class="modal hidden">
+  <div id="copy-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="copy-modal-heading">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header"><h2>Copiar tarea a otro asignado</h2><button class="btn-icon modal-close" id="copy-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2 id="copy-modal-heading">Copiar tarea a otro asignado</h2><button class="btn-icon modal-close" id="copy-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <div class="form-group"><label>Nuevo asignado</label><div class="modal-select" id="copy-assignee" data-field="assignee" data-value="" tabindex="0"><span class="modal-select-text">Seleccioná...</span><span class="material-icons-round modal-select-arrow">expand_more</span></div></div>
         <div class="modal-footer">
@@ -318,7 +320,7 @@
   </div>
 
   <!-- CALENDAR EVENT EDIT MODAL -->
-  <div id="cal-event-modal" class="modal hidden">
+  <div id="cal-event-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="cal-event-title">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
       <div class="modal-header"><h2 id="cal-event-title">Editar evento</h2><button class="btn-icon modal-close" id="cal-event-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
@@ -335,10 +337,10 @@
   </div>
 
   <!-- IMPORT PREVIEW MODAL -->
-  <div id="import-modal" class="modal hidden">
+  <div id="import-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="import-modal-heading">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
-      <div class="modal-header"><h2>Importar tareas</h2><button class="btn-icon modal-close" id="import-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
+      <div class="modal-header"><h2 id="import-modal-heading">Importar tareas</h2><button class="btn-icon modal-close" id="import-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
       <div class="modal-body">
         <p id="import-preview" style="margin-bottom:1rem;color:var(--text-secondary);font-size:.9rem"></p>
         <div id="import-column-info" style="margin-bottom:1rem;font-size:.8rem;color:var(--text-muted)"></div>
@@ -352,7 +354,7 @@
   </div>
 
   <!-- PROMPT MODAL (add/edit member) -->
-  <div id="prompt-modal" class="modal hidden">
+  <div id="prompt-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="prompt-modal-title">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-sm">
       <div class="modal-header"><h2 id="prompt-modal-title">Agregar</h2><button class="btn-icon modal-close" id="prompt-modal-close" aria-label="Cerrar"><span class="material-icons-round">close</span></button></div>
@@ -384,7 +386,7 @@
   </div>
 
   <!-- SEARCH OVERLAY (Ctrl+K) -->
-  <div id="search-overlay" class="search-overlay hidden">
+  <div id="search-overlay" class="search-overlay hidden" role="search" aria-label="Buscar tareas">
     <div class="search-overlay-backdrop"></div>
     <div class="search-overlay-panel">
       <div class="search-overlay-input-wrap">
