@@ -3571,11 +3571,12 @@ function renderHeatmap() {
 
   container.innerHTML = html;
 
-  // Heatmap click handlers: clicking a cell or member name navigates to Agenda filtered by that person
+  // Heatmap click handlers: clicking a cell navigates to Agenda and highlights the task(s) for that member on that date
   container.querySelectorAll('.heatmap-cell[data-member]').forEach(cell => {
     cell.addEventListener('click', () => {
       const member = cell.dataset.member;
-      if (member) navigateToAgendaForPerson(member);
+      const date = cell.dataset.date;
+      if (member && date) navigateToTasksForMemberOnDate(member, date);
     });
   });
   container.querySelectorAll('.heatmap-name').forEach(nameEl => {
@@ -3637,6 +3638,72 @@ function navigateToTask(taskId) {
         row.scrollIntoView({ behavior: 'smooth', block: 'center' });
         row.classList.add('highlight-task');
         setTimeout(() => row.classList.remove('highlight-task'), 3000);
+      }
+    }, 100);
+  }, 50);
+}
+
+// Navigate to Agenda view and highlight tasks for a specific member on a specific date
+function navigateToTasksForMemberOnDate(member, date) {
+  const teamGroups = settings.teamGroups || [];
+  const groupMembers = {};
+  teamGroups.forEach(tg => { groupMembers[tg.name] = new Set([tg.name, ...(tg.members || [])]); });
+  const matchSet = groupMembers[member];
+  const matchMember = matchSet ? (t) => matchSet.has(t.assignee) : (t) => t.assignee === member;
+
+  // Find tasks for this member due on this date
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const todayStr = now.toISOString().slice(0, 10);
+  let targetTasks = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline === date);
+  // If clicking on today, also include overdue tasks
+  if (date === todayStr) {
+    const overdue = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline && t.deadline < date);
+    targetTasks = [...overdue, ...targetTasks];
+  }
+
+  if (targetTasks.length === 0) return;
+
+  // If there's exactly one task, use the existing navigateToTask
+  if (targetTasks.length === 1) {
+    navigateToTask(targetTasks[0].id);
+    return;
+  }
+
+  // Multiple tasks: clear filters, render, then highlight all of them
+  currentFilter.assignee = '';
+  currentFilter.status = '';
+  currentFilter.priority = 'all';
+  currentFilter.client = '';
+  currentFilter.search = '';
+  saveFilters();
+  switchView('agenda');
+  populateFilterDropdowns();
+  restoreFilters();
+  renderTasks();
+  updateStats();
+
+  setTimeout(() => {
+    // Expand the group if collapsed
+    const groupKey = targetTasks[0].assignee || 'Sin asignar';
+    if (collapsedGroups[groupKey]) {
+      collapsedGroups[groupKey] = false;
+      localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+      renderTasks();
+    }
+
+    setTimeout(() => {
+      let firstRow = null;
+      targetTasks.forEach(t => {
+        const row = document.querySelector(`tr[data-id="${t.id}"]`) || document.querySelector(`[data-task-id="${t.id}"]`);
+        if (row) {
+          row.classList.add('highlight-task');
+          setTimeout(() => row.classList.remove('highlight-task'), 3000);
+          if (!firstRow) firstRow = row;
+        }
+      });
+      if (firstRow) {
+        firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }, 100);
   }, 50);
