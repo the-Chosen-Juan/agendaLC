@@ -319,9 +319,15 @@ async function autoDeleteCompletedTasks() {
 
 // --- POPULATE DROPDOWNS ---
 function populateFilterDropdowns() {
+  // For team groups, show the group name instead of individual member names
+  const teamGroups = settings.teamGroups || [];
+  const memberInGroup = new Set();
+  teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
+
   const assignees = [...new Set([
-    ...(settings.teamMembers || []).map(m => m.name),
-    ...tasks.map(t => t.assignee).filter(Boolean)
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name)).map(m => m.name),
+    ...teamGroups.map(tg => tg.name),
+    ...tasks.map(t => t.assignee).filter(a => a && !memberInGroup.has(a))
   ])];
   const clients = [...new Set([
     ...(settings.clients || []).map(c => c.name),
@@ -577,8 +583,19 @@ function getRegularTasks() {
 }
 
 function getContractTasks() {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
   // Deduplicate contracts: keep only one per assignee+deadline
-  const all = tasks.filter(t => isContractTask(t));
+  // Also filter out expired contracts (deadline in the past)
+  const all = tasks.filter(t => {
+    if (!isContractTask(t)) return false;
+    // Hide contracts with expired deadlines
+    if (t.deadline) {
+      const dl = new Date(t.deadline + 'T23:59:59');
+      if (dl < now) return false;
+    }
+    return true;
+  });
   const seen = new Set();
   return all.filter(ct => {
     const key = `${(ct.assignee || '').toLowerCase()}|${ct.deadline || ct.project || ''}`;
@@ -621,12 +638,47 @@ function renderTasks() {
 
   container.innerHTML = '';
 
+  // Show active filter banner when any filter is active
+  const filterParts = [];
+  if (currentFilter.assignee) filterParts.push(`Asignado: ${currentFilter.assignee}`);
+  if (currentFilter.status) filterParts.push(`Estado: ${currentFilter.status}`);
+  if (currentFilter.client) filterParts.push(`Cliente: ${currentFilter.client}`);
+  if (currentFilter.search) filterParts.push(`Búsqueda: "${currentFilter.search}"`);
+  if (currentFilter.priority && currentFilter.priority !== 'all') filterParts.push(`Prioridad: ${currentFilter.priority}`);
+  if (filterParts.length > 0) {
+    const banner = document.createElement('div');
+    banner.className = 'filter-active-banner';
+    banner.innerHTML = `
+      <span class="material-icons-round" style="font-size:1rem">filter_alt</span>
+      <span>${filterParts.join(' · ')}</span>
+      <button class="btn btn-ghost btn-xs filter-clear-btn" title="Limpiar filtros">
+        <span class="material-icons-round" style="font-size:.9rem">close</span> Limpiar
+      </button>
+    `;
+    banner.querySelector('.filter-clear-btn').addEventListener('click', () => {
+      currentFilter.assignee = '';
+      currentFilter.status = '';
+      currentFilter.priority = 'all';
+      currentFilter.client = '';
+      currentFilter.search = '';
+      currentFilter._overdue = false;
+      saveFilters();
+      populateFilterDropdowns();
+      restoreFilters();
+      renderTasks();
+      updateStats();
+    });
+    container.appendChild(banner);
+  }
+
   if (regularFiltered.length === 0 && esperandoTasks.length === 0 && completedTasks.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <span class="material-icons-round">inbox</span>
-        <p>No hay tareas que mostrar</p>
-      </div>`;
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className = 'empty-state';
+    emptyDiv.innerHTML = `
+      <span class="material-icons-round">inbox</span>
+      <p>No hay tareas que mostrar</p>
+    `;
+    container.appendChild(emptyDiv);
     return;
   }
 
@@ -784,23 +836,29 @@ function renderGroupedTasks(container, filtered) {
     (tg.members || []).forEach(m => { memberToTeam[m] = tg; });
   });
 
-  // Add members who only have timeoff or contract entries (no regular tasks)
-  [...timeOffs, ...allContracts].forEach(t => {
-    const key = t.assignee;
-    if (!key || key.toLowerCase() === 'sin asignar') return;
-    if (!groups[key]) {
-      groups[key] = [];
-      sortedKeys.push(key);
-    }
-  });
+  // Check if any filter/search is active — if so, don't show empty members
+  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client ||
+    currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
 
-  // Add all assigneeOrder members so teams always show even with 0 tasks
-  order.forEach(name => {
-    if (!groups[name]) {
-      groups[name] = [];
-      sortedKeys.push(name);
-    }
-  });
+  if (!hasActiveFilter) {
+    // Add members who only have timeoff or contract entries (no regular tasks)
+    [...timeOffs, ...allContracts].forEach(t => {
+      const key = t.assignee;
+      if (!key || key.toLowerCase() === 'sin asignar') return;
+      if (!groups[key]) {
+        groups[key] = [];
+        sortedKeys.push(key);
+      }
+    });
+
+    // Add all assigneeOrder members so teams always show even with 0 tasks
+    order.forEach(name => {
+      if (!groups[name]) {
+        groups[name] = [];
+        sortedKeys.push(name);
+      }
+    });
+  }
 
   // Sort with team-aware ordering: legacy team names use their first member's position
   const getOrderIndex = (name) => {
@@ -886,6 +944,11 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
   // Hide team if no tasks, time-offs, or contracts across all members
   if (totalTasks === 0 && teamTimeOffs.length === 0 && teamContracts.length === 0) return;
 
+  // When a filter/search is active, only show team if it has matching tasks
+  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client ||
+    currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
+  if (hasActiveFilter && totalTasks === 0) return;
+
   const teamKey = `__team_${teamName}`;
   const isTeamCollapsed = collapsedGroups[teamKey] === true;
 
@@ -932,11 +995,23 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
     const member = (settings.teamMembers || []).find(m => m.name === memberName);
     const mColor = member?.color || getColorForName(memberName);
     const mInitials = member?.initials || getInitials(memberName);
-    const mTimeOffs = timeOffs.filter(to => to.assignee === memberName);
+    // Include time-off entries assigned to this member OR to the team group
+    // (if the title mentions this member's name, it's their time-off)
+    const mTimeOffs = timeOffs.filter(to => {
+      if (to.assignee === memberName) return true;
+      // Team group time-off: check if the title/project mentions this member
+      if (to.assignee === teamName) {
+        const title = (to.timeOffTitle || to.project || '').toLowerCase();
+        return title.includes(memberName.toLowerCase());
+      }
+      return false;
+    });
     const mContracts = allContracts.filter(c => c.assignee === memberName);
 
     // Hide members with nothing to show
     if (memberTasks.length === 0 && mTimeOffs.length === 0 && mContracts.length === 0) return;
+    // When a filter/search is active, only show members with matching tasks
+    if (hasActiveFilter && memberTasks.length === 0) return;
     const mOverdue = memberTasks.filter(t => {
       if (!t.deadline || t.status === 'completado') return false;
       return new Date(t.deadline + 'T00:00:00') < now;
@@ -1176,6 +1251,11 @@ function renderIndividualGroup(container, assignee, groups, timeOffs, now) {
 
   // Hide members with nothing to show
   if (groupTasks.length === 0 && memberTimeOffs.length === 0 && memberContracts.length === 0) return;
+
+  // When a filter/search is active, only show members that have matching tasks
+  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client ||
+    currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
+  if (hasActiveFilter && groupTasks.length === 0) return;
 
   const overdueCount = groupTasks.filter(t => {
     if (!t.deadline || t.status === 'completado') return false;
@@ -1448,7 +1528,13 @@ function bindBadgeClicks(header) {
       e.stopPropagation();
       const taskId = badge.dataset.id;
       const ct = tasks.find(t => t.id === taskId);
-      if (!ct) return;
+      if (!ct) {
+        // Task not found (stale data) — offer to remove the badge
+        if (confirm('No se encontró la tarea de contrato. ¿Eliminar el badge?')) {
+          badge.remove();
+        }
+        return;
+      }
       openContractEditor(badge, ct);
     });
   });
@@ -2140,9 +2226,23 @@ function getFilteredTasks() {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
+  // Build team group assignee matching: when filtering by an assignee,
+  // also match tasks assigned to their team group name (or individual members)
+  let assigneeMatchSet = null;
+  if (currentFilter.assignee) {
+    const teamGroups = settings.teamGroups || [];
+    assigneeMatchSet = new Set([currentFilter.assignee]);
+    // If filter is a team group name, also include individual member names
+    const tg = teamGroups.find(g => g.name === currentFilter.assignee);
+    if (tg) (tg.members || []).forEach(m => assigneeMatchSet.add(m));
+    // If filter is an individual member, also include their team group name
+    const memberTeam = teamGroups.find(g => (g.members || []).includes(currentFilter.assignee));
+    if (memberTeam) assigneeMatchSet.add(memberTeam.name);
+  }
+
   return getRegularTasks().filter(t => {
     if (currentFilter.priority !== 'all' && (t.priority || '').toLowerCase() !== currentFilter.priority) return false;
-    if (currentFilter.assignee && t.assignee !== currentFilter.assignee) return false;
+    if (assigneeMatchSet && !assigneeMatchSet.has(t.assignee)) return false;
     if (currentFilter.status && t.status !== currentFilter.status) return false;
     if (currentFilter.client && t.client !== currentFilter.client) return false;
     if (currentFilter._overdue) {
@@ -3208,13 +3308,34 @@ function renderHeatmap() {
   const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta');
   const timeOffs = getTimeOffEntries();
 
-  // Get all team members + anyone with tasks
+  // Get all team members + anyone with tasks, consolidating team groups
+  // Individual members of a team group (e.g. "Agus P.", "Pau") are NOT shown
+  // separately — only the group name (e.g. "Agus y Pau") appears, with their
+  // tasks aggregated.
+  const teamGroups = settings.teamGroups || [];
+  const memberInGroup = new Set();
+  teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
+
   const memberSet = new Set();
-  (settings.teamMembers || []).forEach(m => memberSet.add(m.name));
-  regularTasks.forEach(t => { if (t.assignee) memberSet.add(t.assignee); });
+  (settings.teamMembers || []).forEach(m => {
+    if (!memberInGroup.has(m.name)) memberSet.add(m.name);
+  });
+  // Add team group names and any task assignee that isn't an individual in a group
+  teamGroups.forEach(tg => memberSet.add(tg.name));
+  regularTasks.forEach(t => {
+    if (t.assignee && !memberInGroup.has(t.assignee)) memberSet.add(t.assignee);
+  });
   const members = [...memberSet].sort((a, b) => {
     const order = settings.assigneeOrder || [];
-    const ia = order.indexOf(a), ib = order.indexOf(b);
+    // For team group names, use first member's position in assigneeOrder
+    const getIdx = (name) => {
+      let idx = order.indexOf(name);
+      if (idx !== -1) return idx;
+      const tg = teamGroups.find(g => g.name === name);
+      if (tg && tg.members && tg.members[0]) return order.indexOf(tg.members[0]);
+      return -1;
+    };
+    const ia = getIdx(a), ib = getIdx(b);
     if (ia === -1 && ib === -1) return a.localeCompare(b);
     if (ia === -1) return 1;
     if (ib === -1) return -1;
@@ -3239,9 +3360,19 @@ function renderHeatmap() {
   const heatData = {};
   let globalMax = 0;
 
+  // Build lookup: for team group names, also include tasks from individual members
+  const groupMembers = {};
+  teamGroups.forEach(tg => {
+    groupMembers[tg.name] = new Set([tg.name, ...(tg.members || [])]);
+  });
+
   members.forEach(member => {
     heatData[member] = {};
-    const memberTasks = regularTasks.filter(t => t.assignee === member);
+    // If this is a team group, include tasks from all group members + the group name
+    const matchSet = groupMembers[member];
+    const memberTasks = matchSet
+      ? regularTasks.filter(t => matchSet.has(t.assignee))
+      : regularTasks.filter(t => t.assignee === member);
     const withDeadline = memberTasks.filter(t => t.deadline);
     const noDeadline = memberTasks.filter(t => !t.deadline);
 
@@ -3260,15 +3391,26 @@ function renderHeatmap() {
   });
 
   // Build time-off lookup: member -> set of dates
+  // For team group time-off, also map to the group name so heatmap cells show "off"
   const timeOffDates = {};
   timeOffs.forEach(to => {
     if (!to.assignee || !to.timeOffStart || !to.timeOffEnd) return;
-    if (!timeOffDates[to.assignee]) timeOffDates[to.assignee] = new Set();
+    const dates = new Set();
     const start = new Date(to.timeOffStart + 'T00:00:00');
     const end = new Date(to.timeOffEnd + 'T00:00:00');
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      timeOffDates[to.assignee].add(d.toISOString().slice(0, 10));
+      dates.add(d.toISOString().slice(0, 10));
     }
+    // Assign to the direct assignee
+    if (!timeOffDates[to.assignee]) timeOffDates[to.assignee] = new Set();
+    dates.forEach(d => timeOffDates[to.assignee].add(d));
+    // If the assignee is an individual in a team group, also map to the team group name
+    const tg = teamGroups.find(g => (g.members || []).includes(to.assignee));
+    if (tg) {
+      if (!timeOffDates[tg.name]) timeOffDates[tg.name] = new Set();
+      dates.forEach(d => timeOffDates[tg.name].add(d));
+    }
+    // If the assignee IS a team group name, map dates to the group name (already done above)
   });
 
   function getHeatLevel(count) {
@@ -3295,14 +3437,24 @@ function renderHeatmap() {
   html += '</div>';
 
   members.forEach(member => {
+    // For team groups, use group color/initials; for team group names look up the group config
+    const tgConfig = teamGroups.find(tg => tg.name === member);
     const m = (settings.teamMembers || []).find(tm => tm.name === member);
-    const color = m?.color || getColorForName(member);
+    const color = tgConfig?.color || m?.color || getColorForName(member);
     const initials = m?.initials || getInitials(member);
-    const memberTotal = regularTasks.filter(t => t.assignee === member).length;
-    const memberOverdue = regularTasks.filter(t => t.assignee === member && t.deadline && new Date(t.deadline + 'T00:00:00') < now).length;
+    const matchSet = groupMembers[member];
+    const memberTotal = matchSet
+      ? regularTasks.filter(t => matchSet.has(t.assignee)).length
+      : regularTasks.filter(t => t.assignee === member).length;
+    const memberOverdue = (matchSet
+      ? regularTasks.filter(t => matchSet.has(t.assignee))
+      : regularTasks.filter(t => t.assignee === member)
+    ).filter(t => t.deadline && new Date(t.deadline + 'T00:00:00') < now).length;
 
-    // Time-off badge for heatmap member row
-    const memberTimeOffs = timeOffs.filter(to => to.assignee === member);
+    // Time-off badge for heatmap member row (include group-level time-off)
+    const memberTimeOffs = matchSet
+      ? timeOffs.filter(to => matchSet.has(to.assignee))
+      : timeOffs.filter(to => to.assignee === member);
     let heatmapTimeoffBadge = '';
     if (memberTimeOffs.length > 0) {
       const nextTo = memberTimeOffs[0];
@@ -3335,11 +3487,12 @@ function renderHeatmap() {
 
       // Build tooltip with task names
       let cellTitle = '';
+      const matchMember = matchSet ? (t) => matchSet.has(t.assignee) : (t) => t.assignee === member;
       if (isOff) {
         cellTitle = `${member}: Time Off — ${day.label}`;
       } else {
-        const dayTasks = regularTasks.filter(t => t.assignee === member && t.deadline === day.date);
-        const overdueTasks = (day.date === days[0].date) ? regularTasks.filter(t => t.assignee === member && t.deadline && t.deadline < day.date) : [];
+        const dayTasks = regularTasks.filter(t => matchMember(t) && t.deadline === day.date);
+        const overdueTasks = (day.date === days[0].date) ? regularTasks.filter(t => matchMember(t) && t.deadline && t.deadline < day.date) : [];
         const allDayTasks = [...overdueTasks, ...dayTasks];
         if (allDayTasks.length > 0) {
           cellTitle = allDayTasks.map(t => `${t.project || t.client || 'Sin título'}`).join('\n');
@@ -3368,11 +3521,13 @@ function renderHeatmap() {
   const totalOverdue = regularTasks.filter(t => t.deadline && new Date(t.deadline + 'T00:00:00') < now).length;
   const avgPerPerson = members.length > 0 ? (totalActive / members.length).toFixed(1) : 0;
   const busiestMember = members.reduce((best, m) => {
-    const c = regularTasks.filter(t => t.assignee === m).length;
+    const ms = groupMembers[m];
+    const c = ms ? regularTasks.filter(t => ms.has(t.assignee)).length : regularTasks.filter(t => t.assignee === m).length;
     return c > best.count ? { name: m, count: c } : best;
   }, { name: '—', count: 0 });
   const freestMember = members.reduce((best, m) => {
-    const c = regularTasks.filter(t => t.assignee === m).length;
+    const ms = groupMembers[m];
+    const c = ms ? regularTasks.filter(t => ms.has(t.assignee)).length : regularTasks.filter(t => t.assignee === m).length;
     return c < best.count ? { name: m, count: c } : best;
   }, { name: '—', count: Infinity });
   if (freestMember.count === Infinity) freestMember.count = 0;

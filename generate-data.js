@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Helper to create a task object
-function createTask({ client, taskNumber, project, assignee, supervisor, priority, deadline, status, owner, comments, isTimeOff }) {
+function createTask({ client, taskNumber, project, assignee, supervisor, priority, deadline, status, owner, comments, isTimeOff, timeOffStart, timeOffEnd, timeOffType, timeOffTitle }) {
   const now = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
@@ -19,9 +19,10 @@ function createTask({ client, taskNumber, project, assignee, supervisor, priorit
     comments: comments || "",
     isSupervision: false,
     isTimeOff: isTimeOff || false,
-    timeOffStart: "",
-    timeOffEnd: "",
-    timeOffType: "",
+    timeOffStart: timeOffStart || "",
+    timeOffEnd: timeOffEnd || "",
+    timeOffType: timeOffType || "",
+    timeOffTitle: timeOffTitle || "",
     createdAt: now,
     updatedAt: now
   };
@@ -55,13 +56,13 @@ const tasks = [
   // ---- Assignee: Agus y Pau (4 tasks) ----
   createTask({ client: "DIAGEO", taskNumber: 1, project: "WC26 Responsible - stunt", assignee: "Agus y Pau", supervisor: "Liso", priority: "alta", deadline: "2026-02-25", status: "en progreso", owner: "Naki" }),
   createTask({ client: "Red", taskNumber: 2, project: "Storyboard contenido Edul - WC26", assignee: "Agus y Pau", supervisor: "Whalys", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Juan" }),
-  createTask({ client: "TIME OFF", taskNumber: null, project: "Agus OOO (dia recuperado)", assignee: "Agus y Pau", supervisor: "Nacho", priority: "TBD", deadline: "2026-02-13", status: "sin empezar", owner: "LuMos", comments: "Recupera de haber estado este ultimo finde laburando" }),
+  createTask({ client: "TIME OFF", taskNumber: null, project: "Agus OOO (dia recuperado)", assignee: "Agus y Pau", supervisor: "Nacho", priority: "TBD", deadline: "2026-02-13", status: "sin empezar", owner: "LuMos", comments: "Recupera de haber estado este ultimo finde laburando", isTimeOff: true, timeOffStart: "2026-02-13", timeOffEnd: "2026-02-13", timeOffType: "OOO", timeOffTitle: "Agus OOO (dia recuperado)" }),
   createTask({ client: "LA COMU", taskNumber: null, project: "Great Work - 15:30 a 18:30hs", assignee: "Agus y Pau", supervisor: "Liso", priority: "alta", deadline: "2026-02-19", status: "on going", owner: "LuMos" }),
 
   // ---- Assignee: Chiari & Marti (5 tasks) ----
   createTask({ client: "Red", taskNumber: 1, project: "Nuevos Contenidos WC26", assignee: "Chiari & Marti", supervisor: "Whalys", priority: "baja", deadline: "2026-02-18", status: "en progreso", owner: "Juan" }),
   createTask({ client: "ClubNutri", taskNumber: 2, project: "Placas Gabriela Watson", assignee: "Chiari & Marti", supervisor: "Ruls", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Del" }),
-  createTask({ client: "TIME OFF", taskNumber: null, project: "Marti PTO (20/2 - 6/3 -11 dias)", assignee: "Chiari & Marti", supervisor: "", priority: "", deadline: "2026-02-20", status: "sin empezar", owner: "LuMos" }),
+  createTask({ client: "TIME OFF", taskNumber: null, project: "Marti PTO (20/2 - 6/3 -11 dias)", assignee: "Chiari & Marti", supervisor: "", priority: "", deadline: "2026-02-20", status: "sin empezar", owner: "LuMos", isTimeOff: true, timeOffStart: "2026-02-20", timeOffEnd: "2026-03-06", timeOffType: "Vacaciones", timeOffTitle: "Marti PTO (20/2 - 6/3 -11 dias)" }),
   createTask({ client: "Black", taskNumber: null, project: "Ajustes Lolla y OOH", assignee: "Chiari & Marti", supervisor: "Nacho", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Naki" }),
   createTask({ client: "LA COMU", taskNumber: null, project: "Great Work - 15:30 a 18:30hs", assignee: "Chiari & Marti", supervisor: "Liso", priority: "alta", deadline: "", status: "on going", owner: "LuMos" }),
 
@@ -248,7 +249,7 @@ if (!fs.existsSync(dataDir)) {
 const agendaPath = path.join(dataDir, 'agenda.json');
 const settingsPath = path.join(dataDir, 'settings.json');
 
-fs.writeFileSync(agendaPath, JSON.stringify(tasks, null, 2), 'utf8');
+fs.writeFileSync(agendaPath, JSON.stringify({ tasks }, null, 2), 'utf8');
 console.log(`Written ${tasks.length} tasks to ${agendaPath}`);
 
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');

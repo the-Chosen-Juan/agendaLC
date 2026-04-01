@@ -146,11 +146,6 @@
       "name": "Sol",
       "color": "#a855f7",
       "role": "Owner"
-    },
-    {
-      "name": "Cata",
-      "color": "#f43f5e",
-      "role": "Owner"
     }
   ],
   "clients": [
@@ -245,12 +240,31 @@
     "Ubi"
   ],
   "teamGroups": [
-    { "name": "Agus y Pau", "color": "#3b82f6", "members": ["Agus P.", "Pau"] },
-    { "name": "Chiari & Marti", "color": "#a855f7", "members": ["Chiari", "Marti"] },
-    { "name": "Juli y Sofi", "color": "#06b6d4", "members": ["Juli", "Sofi"] }
+    {
+      "name": "Agus y Pau",
+      "color": "#3b82f6",
+      "members": [
+        "Agus P.",
+        "Pau"
+      ]
+    },
+    {
+      "name": "Chiari & Marti",
+      "color": "#a855f7",
+      "members": [
+        "Chiari",
+        "Marti"
+      ]
+    },
+    {
+      "name": "Juli y Sofi",
+      "color": "#06b6d4",
+      "members": [
+        "Juli",
+        "Sofi"
+      ]
+    }
   ],
   "supervisors": [],
-  "owners": [],
-  "leaderPool": ["Agus", "Jess", "Naki", "Del", "Juan", "Luli", "Cata"],
-  "dataVersion": 3
+  "owners": []
 }

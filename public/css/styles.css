@@ -2109,6 +2109,36 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   animation: highlightTask 3s ease-out;
 }
 
+/* Active filter banner */
+.filter-active-banner {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem 1rem;
+  margin-bottom: .75rem;
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-light);
+  border-radius: 8px;
+  font-size: .85rem;
+  color: var(--primary-dark);
+}
+.filter-active-banner .filter-clear-btn {
+  margin-left: auto;
+  color: var(--primary);
+  font-weight: 600;
+}
+.filter-active-banner .filter-clear-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Dark mode */
+[data-theme="dark"] .filter-active-banner {
+  background: rgba(99, 102, 241, .12);
+  border-color: rgba(99, 102, 241, .3);
+  color: var(--primary-light);
+}
+
 @keyframes confettiBurst {
   0% { transform: scale(0) rotate(0deg); opacity: 1; }
   50% { opacity: 1; }
