@@ -19,8 +19,7 @@ const settings = {
     { name: "Tomi", color: "#10b981", role: "Equipo" },
     { name: "Agus P.", color: "#3b82f6", role: "Equipo", team: "Agus y Pau" },
     { name: "Pau", color: "#60a5fa", role: "Equipo", team: "Agus y Pau" },
-    { name: "Chiari", color: "#a855f7", role: "Equipo", team: "Chiari & Marti" },
-    { name: "Marti", color: "#c084fc", role: "Equipo", team: "Chiari & Marti" },
+    { name: "Marti", color: "#c084fc", role: "Equipo" },
     { name: "Juli", color: "#06b6d4", role: "Equipo", team: "Juli y Sofi" },
     { name: "Sofi", color: "#22d3ee", role: "Equipo", team: "Juli y Sofi" },
     { name: "Liso", color: "#06b6d4", role: "Supervisor" },
@@ -47,7 +46,6 @@ const settings = {
   ],
   teamGroups: [
     { name: "Agus y Pau", color: "#3b82f6", members: ["Agus P.", "Pau"] },
-    { name: "Chiari & Marti", color: "#a855f7", members: ["Chiari", "Marti"] },
     { name: "Juli y Sofi", color: "#06b6d4", members: ["Juli", "Sofi"] }
   ],
   supervisors: [],
@@ -85,12 +83,12 @@ const tasks = [
   { id: crypto.randomUUID(), client: "TIME OFF", taskNumber: null, project: "Agus OOO (dia recuperado)", assignee: "Agus y Pau", supervisor: "Nacho", priority: "TBD", deadline: "2026-02-13", status: "sin empezar", owner: "LuMos", comments: "Recupera de haber estado este ultimo finde laburando" },
   { id: crypto.randomUUID(), client: "LA COMU", taskNumber: null, project: "Great Work - 15:30 a 18:30hs", assignee: "Agus y Pau", supervisor: "Liso", priority: "alta", deadline: "2026-02-19", status: "on going", owner: "LuMos", comments: "" },
 
-  // Asignado ap: 7 | Chiari & Marti
-  { id: crypto.randomUUID(), client: "Black", taskNumber: 1, project: "Ajustes Lolla y OOH", assignee: "Chiari & Marti", supervisor: "Nacho", priority: "alta", deadline: "2026-02-11", status: "sin empezar", owner: "Naki", comments: "" },
-  { id: crypto.randomUUID(), client: "Dadá", taskNumber: 2, project: "KV Wordings - Low alcohol red & white blend", assignee: "Chiari & Marti", supervisor: "Nacho", priority: "media", deadline: "2026-02-12", status: "sin empezar", owner: "Luli", comments: "" },
-  { id: crypto.randomUUID(), client: "Red", taskNumber: 3, project: "Nuevos Contenidos WC26", assignee: "Chiari & Marti", supervisor: "Nacho", priority: "baja", deadline: "2026-02-13", status: "sin empezar", owner: "Juan", comments: "" },
-  { id: crypto.randomUUID(), client: "LA COMU", taskNumber: 4, project: "Great Work - 15:30 a 18:30hs", assignee: "Chiari & Marti", supervisor: "Liso", priority: "alta", deadline: "", status: "on going", owner: "LuMos", comments: "" },
-  { id: crypto.randomUUID(), client: "TIME OFF", taskNumber: null, project: "Marti PTO (20/2 - 6/3 -11 días)", assignee: "Chiari & Marti", supervisor: "", priority: "", deadline: "2026-02-20", status: "sin empezar", owner: "LuMos", comments: "" }
+  // Asignado ap: 7 | Marti
+  { id: crypto.randomUUID(), client: "Black", taskNumber: 1, project: "Ajustes Lolla y OOH", assignee: "Marti", supervisor: "Nacho", priority: "alta", deadline: "2026-02-11", status: "sin empezar", owner: "Naki", comments: "" },
+  { id: crypto.randomUUID(), client: "Dadá", taskNumber: 2, project: "KV Wordings - Low alcohol red & white blend", assignee: "Marti", supervisor: "Nacho", priority: "media", deadline: "2026-02-12", status: "sin empezar", owner: "Luli", comments: "" },
+  { id: crypto.randomUUID(), client: "Red", taskNumber: 3, project: "Nuevos Contenidos WC26", assignee: "Marti", supervisor: "Nacho", priority: "baja", deadline: "2026-02-13", status: "sin empezar", owner: "Juan", comments: "" },
+  { id: crypto.randomUUID(), client: "LA COMU", taskNumber: 4, project: "Great Work - 15:30 a 18:30hs", assignee: "Marti", supervisor: "Liso", priority: "alta", deadline: "", status: "on going", owner: "LuMos", comments: "" },
+  { id: crypto.randomUUID(), client: "TIME OFF", taskNumber: null, project: "Marti PTO (20/2 - 6/3 -11 días)", assignee: "Marti", supervisor: "", priority: "", deadline: "2026-02-20", status: "sin empezar", owner: "LuMos", comments: "" }
 ];
 
 // Add timestamps

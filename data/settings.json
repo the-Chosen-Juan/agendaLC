@@ -34,16 +34,9 @@
       "team": "Agus y Pau"
     },
     {
-      "name": "Chiari",
-      "color": "#a855f7",
-      "role": "Equipo",
-      "team": "Chiari & Marti"
-    },
-    {
       "name": "Marti",
       "color": "#c084fc",
-      "role": "Equipo",
-      "team": "Chiari & Marti"
+      "role": "Equipo"
     },
     {
       "name": "Juli",
@@ -227,7 +220,6 @@
     "Tomi",
     "Agus P.",
     "Pau",
-    "Chiari",
     "Marti",
     "Juli",
     "Sofi",
@@ -246,14 +238,6 @@
       "members": [
         "Agus P.",
         "Pau"
-      ]
-    },
-    {
-      "name": "Chiari & Marti",
-      "color": "#a855f7",
-      "members": [
-        "Chiari",
-        "Marti"
       ]
     },
     {
