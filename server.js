@@ -247,7 +247,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       dataVersion: settings.dataVersion || 0,
       sheetSyncUrl: settings.sheetSyncUrl || '',
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
-      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 30,
       sheetSyncLastRun: settings.sheetSyncLastRun || null,
       sheetSyncLastResult: settings.sheetSyncLastResult || null
     });
@@ -288,7 +288,7 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       dataVersion: settings.dataVersion || 0,
       sheetSyncUrl: settings.sheetSyncUrl || '',
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
-      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 30,
       sheetSyncLastRun: settings.sheetSyncLastRun || null,
       sheetSyncLastResult: settings.sheetSyncLastResult || null
     });
@@ -499,6 +499,18 @@ app.post('/api/activity-log', authMiddleware, async (req, res) => {
 // ============================================================
 
 // Server-side CSV parser
+// Name aliases: different spellings in the sheet that should map to the canonical name
+const NAME_ALIASES = {
+  'mel': 'Meli',
+  'meli': 'Meli',
+};
+
+function normalizeAssigneeName(name) {
+  if (!name) return name;
+  const lower = name.trim().toLowerCase();
+  return NAME_ALIASES[lower] || name.trim();
+}
+
 function parseCSVServer(csvText) {
   const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
@@ -701,9 +713,15 @@ function parseCSVServer(csvText) {
         }
 
         // Clean assignee: strip "N | " prefix (e.g. "1 | Whalys" → "Whalys")
+        // Also extract the priority number for ordering
         if (field === 'assignee') {
-          const m = val.match(/^\d+\s*\|\s*(.+)$/);
-          if (m) val = m[1].trim();
+          const m = val.match(/^(\d+)\s*\|\s*(.+)$/);
+          if (m) {
+            task._assigneePriority = parseInt(m[1], 10);
+            val = m[2].trim();
+          }
+          // Normalize name aliases (e.g. "Mel" → "Meli")
+          val = normalizeAssigneeName(val);
         }
 
         // Normalize status with common-sense translations
@@ -970,6 +988,16 @@ async function performSheetSync() {
     if (!existingByComposite[key]) existingByComposite[key] = t;
   });
 
+  // Collect assignee priority numbers from sheet BEFORE the loop cleans them
+  const assigneePriorities = {};
+  for (const st of sheetTasks) {
+    const name = st.assignee;
+    const prio = st._assigneePriority;
+    if (name && prio != null && (assigneePriorities[name] === undefined || prio < assigneePriorities[name])) {
+      assigneePriorities[name] = prio;
+    }
+  }
+
   const finalRegular = [];
   const usedIds = new Set();
   let created = 0, updated = 0, unchanged = 0;
@@ -988,6 +1016,9 @@ async function performSheetSync() {
     }
 
     // Extract and clean internal flags before comparing
+    const assigneePriority = st._assigneePriority || null;
+    delete st._assigneePriority;
+
     const isContrato = st._isContrato || false;
     delete st._isContrato;
 
@@ -1064,11 +1095,28 @@ async function performSheetSync() {
   const finalTasks = [...contractTasks, ...finalRegular];
   await saveTasks(finalTasks);
 
-  // Clean up assigneeOrder and teamMembers: remove names with no tasks
+  // Build assigneeOrder from Google Sheet priority numbers (the "N | Name" format)
+  // This respects the exact order defined in the sheet
   const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(Boolean));
-  if (settings.assigneeOrder) {
-    settings.assigneeOrder = settings.assigneeOrder.filter(name => activeAssignees.has(name));
+
+  // If we extracted priority numbers from the sheet, use them for ordering
+  if (Object.keys(assigneePriorities).length > 0) {
+    const orderedBySheet = Object.entries(assigneePriorities)
+      .filter(([name]) => activeAssignees.has(name))
+      .sort((a, b) => a[1] - b[1])
+      .map(([name]) => name);
+    // Add any active assignees that didn't have a priority number at the end
+    activeAssignees.forEach(name => {
+      if (!orderedBySheet.includes(name)) orderedBySheet.push(name);
+    });
+    settings.assigneeOrder = orderedBySheet;
+  } else {
+    // Fallback: just clean up the existing order
+    if (settings.assigneeOrder) {
+      settings.assigneeOrder = settings.assigneeOrder.filter(name => activeAssignees.has(name));
+    }
   }
+
   if (settings.teamMembers) {
     settings.teamMembers = settings.teamMembers.filter(m => activeAssignees.has(m.name));
   }
@@ -1285,7 +1333,7 @@ app.put('/api/sheet-sync/config', authMiddleware, async (req, res) => {
     res.json({
       sheetSyncUrl: settings.sheetSyncUrl || '',
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
-      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 30,
       sheetSyncLastRun: settings.sheetSyncLastRun || null,
       sheetSyncLastResult: settings.sheetSyncLastResult || null
     });
@@ -1300,7 +1348,7 @@ app.get('/api/sheet-sync/status', authMiddleware, async (req, res) => {
     res.json({
       sheetSyncUrl: settings.sheetSyncUrl || '',
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
-      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 60,
+      sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 30,
       sheetSyncLastRun: settings.sheetSyncLastRun || null,
       sheetSyncLastResult: settings.sheetSyncLastResult || null
     });
@@ -1317,7 +1365,7 @@ if (process.env.VERCEL !== '1') {
     try {
       const settings = await getSettings();
       if (settings.sheetSyncEnabled && settings.sheetSyncUrl) {
-        const interval = (settings.sheetSyncIntervalSec || 60) * 1000;
+        const interval = (settings.sheetSyncIntervalSec || 30) * 1000;
         syncTimer = setInterval(async () => {
           try {
             const s = await getSettings();

@@ -252,9 +252,7 @@ async function loadData() {
       } catch {}
     }
 
-    // Auto-delete completed tasks older than configured days
-    await autoDeleteCompletedTasks();
-
+    // Render immediately, then auto-delete in background
     populateFilterDropdowns();
     restoreFilters();
     renderTasks();
@@ -265,6 +263,9 @@ async function loadData() {
     applyTabVisibility();
     startPresencePolling();
     startSheetSyncPolling();
+
+    // Auto-delete completed tasks older than configured days (non-blocking)
+    autoDeleteCompletedTasks().catch(() => {});
   } catch (err) {
     console.error('Failed to load data:', err);
   }
@@ -284,6 +285,17 @@ async function softRefresh() {
     updateStats();
     renderLeader();
     updateOverdueBadge();
+    applyTabVisibility();
+    // Re-render whichever view is currently visible
+    const visibleView = document.querySelector('.view:not(.hidden)');
+    if (visibleView) {
+      const viewId = visibleView.id.replace('view-', '');
+      if (viewId === 'heatmap') renderHeatmap();
+      if (viewId === 'kanban') renderKanban();
+      if (viewId === 'calendar') renderCalendar();
+      if (viewId === 'clients') renderClientsDashboard();
+      if (viewId === 'timeline') renderTimeline();
+    }
   } catch (err) {
     console.error('Refresh failed:', err);
   }
@@ -1331,7 +1343,15 @@ function buildTimeoffHtml(timeOffList) {
     const startFmt = formatDateShort(to.timeOffStart);
     const endFmt = formatDateShort(to.timeOffEnd);
     const hasDateInTitle = /\d{1,2}\/\d{1,2}/.test(title);
-    const badgeLabel = hasDateInTitle ? title : (startFmt && endFmt ? `${title} (${startFmt} - ${endFmt})` : title);
+    // Calculate days count
+    let daysInfo = '';
+    if (to.timeOffStart && to.timeOffEnd) {
+      const s = new Date(to.timeOffStart + 'T00:00:00');
+      const e = new Date(to.timeOffEnd + 'T00:00:00');
+      const diff = Math.round((e - s) / 86400000) + 1;
+      daysInfo = ` · ${diff} día${diff !== 1 ? 's' : ''}`;
+    }
+    const badgeLabel = hasDateInTitle ? `${title}${daysInfo}` : (startFmt && endFmt ? `${title} (${startFmt} - ${endFmt}${daysInfo})` : title);
     html += `<span class="timeoff-badge" data-id="${to.id}" title="${escAttr(badgeLabel)}">
       <span class="material-icons-round">beach_access</span>
       ${escHtml(badgeLabel)}
@@ -3065,7 +3085,8 @@ function renderCalendar() {
         const toTask = tasks.find(t => t.id === taskId);
         if (toTask) openTimeOffModal(toTask);
       } else {
-        openCalEventModal(taskId);
+        // Navigate to the task in the Agenda view
+        navigateToTask(taskId);
       }
     });
   });
@@ -3280,10 +3301,30 @@ function renderHeatmap() {
     const memberTotal = regularTasks.filter(t => t.assignee === member).length;
     const memberOverdue = regularTasks.filter(t => t.assignee === member && t.deadline && new Date(t.deadline + 'T00:00:00') < now).length;
 
+    // Time-off badge for heatmap member row
+    const memberTimeOffs = timeOffs.filter(to => to.assignee === member);
+    let heatmapTimeoffBadge = '';
+    if (memberTimeOffs.length > 0) {
+      const nextTo = memberTimeOffs[0];
+      let toLabel = nextTo.timeOffType || 'Time Off';
+      const startFmt = formatDateShort(nextTo.timeOffStart);
+      const endFmt = formatDateShort(nextTo.timeOffEnd);
+      // Calculate days
+      let daysCount = '';
+      if (nextTo.timeOffStart && nextTo.timeOffEnd) {
+        const s = new Date(nextTo.timeOffStart + 'T00:00:00');
+        const e = new Date(nextTo.timeOffEnd + 'T00:00:00');
+        const diff = Math.round((e - s) / 86400000) + 1;
+        daysCount = ` (${diff}d)`;
+      }
+      heatmapTimeoffBadge = `<span class="heatmap-timeoff-badge" title="${escAttr(toLabel)}: ${startFmt} - ${endFmt}${daysCount}"><span class="material-icons-round" style="font-size:.7rem">beach_access</span></span>`;
+    }
+
     html += '<div class="heatmap-row">';
     html += `<div class="heatmap-label">
       <div class="heatmap-avatar" style="background:${color}">${initials}</div>
       <span class="heatmap-name">${escHtml(member)}</span>
+      ${heatmapTimeoffBadge}
       ${memberOverdue > 0 ? `<span class="heatmap-overdue" title="${memberOverdue} vencida${memberOverdue > 1 ? 's' : ''}"><span class="material-icons-round">warning</span>${memberOverdue}</span>` : ''}
     </div>`;
 
@@ -3292,7 +3333,24 @@ function renderHeatmap() {
       const isOff = timeOffDates[member]?.has(day.date);
       const level = isOff ? 'off' : getHeatLevel(count);
 
-      html += `<div class="heatmap-cell heatmap-level-${level} ${day.isWeekend ? 'weekend' : ''}" title="${escAttr(member)}: ${isOff ? 'Time Off' : count + ' tarea' + (count !== 1 ? 's' : '')} — ${day.label}">
+      // Build tooltip with task names
+      let cellTitle = '';
+      if (isOff) {
+        cellTitle = `${member}: Time Off — ${day.label}`;
+      } else {
+        const dayTasks = regularTasks.filter(t => t.assignee === member && t.deadline === day.date);
+        const overdueTasks = (day.date === days[0].date) ? regularTasks.filter(t => t.assignee === member && t.deadline && t.deadline < day.date) : [];
+        const allDayTasks = [...overdueTasks, ...dayTasks];
+        if (allDayTasks.length > 0) {
+          cellTitle = allDayTasks.map(t => `${t.project || t.client || 'Sin título'}`).join('\n');
+        } else if (count > 0) {
+          cellTitle = `${member}: ${count} tarea${count !== 1 ? 's' : ''} — ${day.label}`;
+        } else {
+          cellTitle = `${member}: sin tareas — ${day.label}`;
+        }
+      }
+
+      html += `<div class="heatmap-cell heatmap-level-${level} ${day.isWeekend ? 'weekend' : ''}" data-member="${escAttr(member)}" data-date="${day.date}" title="${escAttr(cellTitle)}" style="cursor:pointer">
         ${isOff ? '<span class="material-icons-round" style="font-size:.65rem">beach_access</span>' : (count > 0 ? count : '')}
       </div>`;
     });
@@ -3343,6 +3401,76 @@ function renderHeatmap() {
   </div>`;
 
   container.innerHTML = html;
+
+  // Heatmap click handlers: clicking a cell or member name navigates to Agenda filtered by that person
+  container.querySelectorAll('.heatmap-cell[data-member]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const member = cell.dataset.member;
+      if (member) navigateToAgendaForPerson(member);
+    });
+  });
+  container.querySelectorAll('.heatmap-name').forEach(nameEl => {
+    nameEl.style.cursor = 'pointer';
+    nameEl.addEventListener('click', (e) => {
+      const row = e.target.closest('.heatmap-row');
+      const firstCell = row?.querySelector('.heatmap-cell[data-member]');
+      const member = firstCell?.dataset.member;
+      if (member) navigateToAgendaForPerson(member);
+    });
+  });
+}
+
+// Navigate to Agenda view filtered by a specific person
+function navigateToAgendaForPerson(assignee) {
+  currentFilter.assignee = assignee;
+  currentFilter.status = '';
+  currentFilter.priority = 'all';
+  currentFilter.client = '';
+  currentFilter.search = '';
+  saveFilters();
+  switchView('agenda');
+  populateFilterDropdowns();
+  restoreFilters();
+  renderTasks();
+  updateStats();
+}
+
+// Navigate to Agenda view and highlight/scroll to a specific task
+function navigateToTask(taskId) {
+  currentFilter.assignee = '';
+  currentFilter.status = '';
+  currentFilter.priority = 'all';
+  currentFilter.client = '';
+  currentFilter.search = '';
+  saveFilters();
+  switchView('agenda');
+  populateFilterDropdowns();
+  restoreFilters();
+  renderTasks();
+  updateStats();
+
+  // Find and scroll to the task row, expanding its group if needed
+  setTimeout(() => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Expand the group if collapsed
+    const groupKey = task.assignee || 'Sin asignar';
+    if (collapsedGroups[groupKey]) {
+      collapsedGroups[groupKey] = false;
+      localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
+      renderTasks();
+    }
+
+    setTimeout(() => {
+      const row = document.querySelector(`tr[data-id="${taskId}"]`) || document.querySelector(`[data-task-id="${taskId}"]`);
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('highlight-task');
+        setTimeout(() => row.classList.remove('highlight-task'), 3000);
+      }
+    }, 100);
+  }, 50);
 }
 
 // --- KANBAN PIPELINE VIEW ---
@@ -3731,7 +3859,15 @@ function renderTeam() {
         if (toLabel.startsWith(pfx)) toLabel = toLabel.slice(pfx.length);
       }
       const hasDateInLabel = /\d{1,2}\/\d{1,2}/.test(toLabel);
-      const dateRange = hasDateInLabel ? '' : `: ${formatDateShort(nextTo.timeOffStart)} - ${formatDateShort(nextTo.timeOffEnd)}`;
+      // Calculate days count
+      let teamDaysInfo = '';
+      if (nextTo.timeOffStart && nextTo.timeOffEnd) {
+        const s = new Date(nextTo.timeOffStart + 'T00:00:00');
+        const e = new Date(nextTo.timeOffEnd + 'T00:00:00');
+        const diff = Math.round((e - s) / 86400000) + 1;
+        teamDaysInfo = ` · ${diff} día${diff !== 1 ? 's' : ''}`;
+      }
+      const dateRange = hasDateInLabel ? teamDaysInfo : `: ${formatDateShort(nextTo.timeOffStart)} - ${formatDateShort(nextTo.timeOffEnd)}${teamDaysInfo}`;
       timeoffInfo = `<div class="member-timeoff-info">
         <span class="material-icons-round">beach_access</span>
         ${escHtml(toLabel)}${dateRange}
@@ -3743,6 +3879,8 @@ function renderTeam() {
 
     const card = document.createElement('div');
     card.className = `member-card${member.team ? ' member-card-team' : ''}`;
+    card.style.cursor = 'pointer';
+    card.dataset.memberName = member.name;
     card.innerHTML = `
       <div class="member-avatar" style="background:${member.color || getColorForName(member.name)}">${initials}</div>
       <div class="member-info">
@@ -3758,6 +3896,10 @@ function renderTeam() {
         <span class="material-icons-round">close</span>
       </button>
     `;
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.member-edit') || e.target.closest('.member-delete')) return;
+      navigateToAgendaForPerson(member.name);
+    });
     grid.appendChild(card);
   });
 
@@ -4820,11 +4962,16 @@ function startSheetSyncPolling() {
     return;
   }
 
-  const intervalSec = settings.sheetSyncIntervalSec || 60;
+  const intervalSec = Math.max(15, settings.sheetSyncIntervalSec || 30);
   updateSyncIndicator(settings.sheetSyncLastResult?.error ? 'error' : 'ok');
 
+  // Trigger an immediate sync on start
+  setTimeout(async () => {
+    try { await triggerSheetSync(); } catch {}
+  }, 1000);
+
   sheetSyncInterval = setInterval(async () => {
-    if (document.visibilityState === 'hidden') return;
+    // Still sync even when tab is hidden, to keep data fresh
     try {
       await triggerSheetSync();
     } catch {}
