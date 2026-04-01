@@ -642,8 +642,10 @@ function renderTasks() {
 
   // Separate completed and esperando
   const completedTasks = allFiltered.filter(t => t.status === 'completado');
-  const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta');
-  const regularFiltered = allFiltered.filter(t => t.status !== 'esperando respuesta' && t.status !== 'completado');
+  // Only unassigned esperando tasks go to the global section;
+  // esperando tasks WITH an assignee stay under their person
+  const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta' && !t.assignee);
+  const regularFiltered = allFiltered.filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee));
 
   container.innerHTML = '';
 
@@ -3318,7 +3320,7 @@ function renderHeatmap() {
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta');
+  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee));
   const timeOffs = getTimeOffEntries();
 
   // Get all team members + anyone with tasks, consolidating team groups
@@ -3505,11 +3507,21 @@ function renderHeatmap() {
       } else {
         const dayTasks = regularTasks.filter(t => matchMember(t) && t.deadline === day.date);
         const overdueTasks = (day.date === days[0].date) ? regularTasks.filter(t => matchMember(t) && t.deadline && t.deadline < day.date) : [];
+        const noDeadlineTasks = regularTasks.filter(t => matchMember(t) && !t.deadline);
         const allDayTasks = [...overdueTasks, ...dayTasks];
-        if (allDayTasks.length > 0) {
-          cellTitle = allDayTasks.map(t => `${t.project || t.client || 'Sin título'}`).join('\n');
-        } else if (count > 0) {
-          cellTitle = `${member}: ${count} tarea${count !== 1 ? 's' : ''} — ${day.label}`;
+        const tooltipLines = [];
+        if (overdueTasks.length > 0) {
+          tooltipLines.push(...overdueTasks.map(t => `⚠ ${t.project || t.client || 'Sin título'}`));
+        }
+        if (dayTasks.length > 0) {
+          tooltipLines.push(...dayTasks.map(t => `${t.project || t.client || 'Sin título'}`));
+        }
+        if (noDeadlineTasks.length > 0) {
+          tooltipLines.push(`— Sin deadline (${noDeadlineTasks.length}):`);
+          tooltipLines.push(...noDeadlineTasks.map(t => `  ${t.project || t.client || 'Sin título'}`));
+        }
+        if (tooltipLines.length > 0) {
+          cellTitle = `${member} — ${day.label}\n${tooltipLines.join('\n')}`;
         } else {
           cellTitle = `${member}: sin tareas — ${day.label}`;
         }
@@ -3653,10 +3665,10 @@ function navigateToTasksForMemberOnDate(member, date) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const todayStr = now.toISOString().slice(0, 10);
-  let targetTasks = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline === date);
+  let targetTasks = tasks.filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee) && !t.timeOffStart && matchMember(t) && t.deadline === date);
   // If clicking on today, also include overdue tasks
   if (date === todayStr) {
-    const overdue = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline && t.deadline < date);
+    const overdue = tasks.filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee) && !t.timeOffStart && matchMember(t) && t.deadline && t.deadline < date);
     targetTasks = [...overdue, ...targetTasks];
   }
 

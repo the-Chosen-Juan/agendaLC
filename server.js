@@ -1103,16 +1103,30 @@ async function performSheetSync() {
 
   // Find the best matching team member for a partial name (e.g. "Agus" → "Agus P.")
   function findMemberMatch(part) {
-    const lower = part.toLowerCase();
+    const lower = part.toLowerCase().trim();
+    if (!lower) return null;
+
     // Exact match
     const exact = teamMemberNames.find(n => n.toLowerCase() === lower);
+
+    // Word-boundary startsWith: "Agus" matches "Agus P." but not "Agustina"
+    // This catches cases where compound names abbreviate (e.g. "Agus" in "Agus y Pau" → "Agus P.")
+    const wordStartsWith = teamMemberNames.find(n => {
+      const nl = n.toLowerCase();
+      return nl !== lower && (nl.startsWith(lower + ' ') || nl.startsWith(lower + '.'));
+    });
+
+    // Prefer word-boundary startsWith (longer form of same name) over exact
+    // e.g. "Agus" → prefer "Agus P." (team member) over "Agus" (owner)
+    if (wordStartsWith) return wordStartsWith;
     if (exact) return exact;
-    // Starts-with match (e.g. "Agus" matches "Agus P.")
-    const startsWith = teamMemberNames.find(n => n.toLowerCase().startsWith(lower));
+
+    // General startsWith (member name starts with part)
+    const startsWith = teamMemberNames.find(n =>
+      n.toLowerCase().startsWith(lower) && n.toLowerCase() !== lower
+    );
     if (startsWith) return startsWith;
-    // Reverse: member name starts with the part (e.g. "Pau" matches "Pau")
-    const reverseMatch = teamMemberNames.find(n => lower.startsWith(n.toLowerCase()));
-    if (reverseMatch) return reverseMatch;
+
     return null;
   }
 
@@ -1196,6 +1210,9 @@ async function performSheetSync() {
     if (existingMemberNames.has(name)) continue;
     // Don't add team group names as individual members
     if (detectedGroups.some(g => g.name === name)) continue;
+    // Don't add compound names with "y" / "&" separators as individual members
+    // These are team pair names (e.g. "Juli y Sofi") not real individual members
+    if (/\s+(?:y|&)\s+/i.test(name)) continue;
     // Auto-add with a color based on their position
     const colorIdx = (settings.teamMembers || []).length % TEAM_COLORS.length;
     if (!settings.teamMembers) settings.teamMembers = [];
