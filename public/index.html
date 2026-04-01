@@ -191,6 +191,15 @@
           <div id="tab-visibility-list" class="tab-visibility-list"></div>
         </div>
         <div class="settings-card">
+          <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">visibility_off</span>Nombres ocultos</h2>
+          <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Nombres de asignados que no deben aparecer en la agenda (por ejemplo, nombres viejos de la hoja de cálculo).</p>
+          <div id="hidden-assignees-list" class="settings-leader-list"></div>
+          <div style="display:flex;gap:.5rem;margin-top:.75rem">
+            <input type="text" id="hidden-assignee-input" placeholder="Nombre a ocultar..." style="flex:1;padding:.55rem .75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:.85rem">
+            <button class="btn btn-ghost btn-sm" id="add-hidden-assignee-btn"><span class="material-icons-round">block</span> Ocultar</button>
+          </div>
+        </div>
+        <div class="settings-card">
           <h2><span class="material-icons-round" style="vertical-align:middle;margin-right:.5rem;color:var(--primary)">sync</span>Google Sheets Auto-Sync</h2>
           <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:1rem">Sincronización automática con Google Sheets. Los cambios en la hoja se reflejan automáticamente.</p>
           <div style="margin-bottom:1rem">

@@ -249,7 +249,8 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
       sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 30,
       sheetSyncLastRun: settings.sheetSyncLastRun || null,
-      sheetSyncLastResult: settings.sheetSyncLastResult || null
+      sheetSyncLastResult: settings.sheetSyncLastResult || null,
+      hiddenAssignees: settings.hiddenAssignees || []
     });
   } catch (err) {
     console.error('Get settings error:', err);
@@ -273,6 +274,7 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.sheetSyncUrl !== undefined) settings.sheetSyncUrl = req.body.sheetSyncUrl;
     if (req.body.sheetSyncEnabled !== undefined) settings.sheetSyncEnabled = req.body.sheetSyncEnabled;
     if (req.body.sheetSyncIntervalSec !== undefined) settings.sheetSyncIntervalSec = req.body.sheetSyncIntervalSec;
+    if (req.body.hiddenAssignees !== undefined) settings.hiddenAssignees = req.body.hiddenAssignees;
     await saveSettings(settings);
     res.json({
       teamMembers: settings.teamMembers,
@@ -290,7 +292,8 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
       sheetSyncIntervalSec: settings.sheetSyncIntervalSec || 30,
       sheetSyncLastRun: settings.sheetSyncLastRun || null,
-      sheetSyncLastResult: settings.sheetSyncLastResult || null
+      sheetSyncLastResult: settings.sheetSyncLastResult || null,
+      hiddenAssignees: settings.hiddenAssignees || []
     });
   } catch (err) {
     console.error('Update settings error:', err);
@@ -1098,7 +1101,8 @@ async function performSheetSync() {
   // Auto-detect team groups from assignee names in the sheet.
   // Names like "Agus y Pau" or "Juli & Sofi" are split by " y " / " & "
   // and matched against known teamMembers to build teamGroups automatically.
-  const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(Boolean));
+  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
+  const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(a => a && !hiddenSet.has(a.toLowerCase())));
   const teamMemberNames = (settings.teamMembers || []).map(m => m.name);
 
   // Find the best matching team member for a partial name (e.g. "Agus" → "Agus P.")
@@ -1208,6 +1212,8 @@ async function performSheetSync() {
 
   for (const [name, prio] of Object.entries(assigneePriorities)) {
     if (existingMemberNames.has(name)) continue;
+    // Don't add hidden assignees
+    if (hiddenSet.has(name.toLowerCase())) continue;
     // Don't add team group names as individual members
     if (detectedGroups.some(g => g.name === name)) continue;
     // Don't add compound names with "y" / "&" separators as individual members
@@ -1224,9 +1230,9 @@ async function performSheetSync() {
     existingMemberNames.add(name);
   }
 
-  // Remove members who no longer have active tasks in the sheet
+  // Remove members who no longer have active tasks in the sheet or are hidden
   if (settings.teamMembers) {
-    settings.teamMembers = settings.teamMembers.filter(m => activeAssignees.has(m.name));
+    settings.teamMembers = settings.teamMembers.filter(m => activeAssignees.has(m.name) && !hiddenSet.has(m.name.toLowerCase()));
   }
 
   const result = {

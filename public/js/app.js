@@ -5,7 +5,7 @@
 // --- STATE ---
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
-let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2 };
+let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2, hiddenAssignees: [] };
 let currentFilter = JSON.parse(localStorage.getItem('agenda_filters') || 'null') || { priority: 'all', assignee: '', status: '', client: '', search: '' };
 function saveFilters() { localStorage.setItem('agenda_filters', JSON.stringify(currentFilter)); }
 
@@ -13,9 +13,13 @@ function saveFilters() { localStorage.setItem('agenda_filters', JSON.stringify(c
 // Only includes explicitly registered team members and team groups, NOT random
 // assignee names that appear in synced tasks or assigneeOrder.
 function getKnownAssignees() {
+  const hidden = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
   const known = new Set();
-  (settings.teamMembers || []).forEach(m => known.add(m.name));
-  (settings.teamGroups || []).forEach(tg => { known.add(tg.name); (tg.members || []).forEach(m => known.add(m)); });
+  (settings.teamMembers || []).forEach(m => { if (!hidden.has(m.name.toLowerCase())) known.add(m.name); });
+  (settings.teamGroups || []).forEach(tg => {
+    if (!hidden.has(tg.name.toLowerCase())) known.add(tg.name);
+    (tg.members || []).forEach(m => { if (!hidden.has(m.toLowerCase())) known.add(m); });
+  });
   return known;
 }
 function restoreFilters() {
@@ -333,9 +337,10 @@ function populateFilterDropdowns() {
   teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
 
   // Known assignees: team members (excluding individual group members) + team group names
+  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
   const knownMembers = new Set([
-    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
-    ...teamGroups.map(tg => tg.name),
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance') && !hiddenSet.has(m.name.toLowerCase())).map(m => m.name),
+    ...teamGroups.filter(tg => !hiddenSet.has(tg.name.toLowerCase())).map(tg => tg.name),
   ]);
   const assignees = [...knownMembers];
   const clients = [...new Set([
@@ -932,7 +937,8 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
   const memberNames = teamGroup.members || [];
 
   // Collect ALL tasks for this team: individual members + legacy pair-assigned tasks
-  const allTeamAssignees = [...memberNames, teamName];
+  // Deduplicate in case team name matches a member name
+  const allTeamAssignees = [...new Set([...memberNames, teamName])];
   let allTeamTasks = [];
   allTeamAssignees.forEach(name => {
     if (groups[name]) {
@@ -1132,7 +1138,8 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
   });
 
   // --- Legacy tasks (still assigned to old pair name) ---
-  const legacyTasks = sortTasksByNumber(groups[teamName] || []).filter(t => {
+  // Skip if team name matches a member name (tasks already rendered under that member)
+  const legacyTasks = memberNames.includes(teamName) ? [] : sortTasksByNumber(groups[teamName] || []).filter(t => {
     const proj = (t.project || '').trim();
     return proj && !/^[-–—]+$/.test(proj) && !t.isTimeOff && !isContractTask(t);
   });
@@ -4296,7 +4303,72 @@ function renderSettingsPage() {
   renderLeaderPool();
   document.getElementById('auto-delete-days').value = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
   renderTabVisibility();
+  renderHiddenAssignees();
   renderSyncSettings();
+}
+
+function renderHiddenAssignees() {
+  const container = document.getElementById('hidden-assignees-list');
+  if (!container) return;
+  const hidden = settings.hiddenAssignees || [];
+
+  container.innerHTML = '';
+  if (hidden.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">No hay nombres ocultos.</p>';
+  } else {
+    hidden.forEach(name => {
+      const item = document.createElement('div');
+      item.className = 'settings-leader-item';
+      item.innerHTML = `
+        <span class="material-icons-round" style="font-size:1rem;color:var(--text-muted)">block</span>
+        <span>${escHtml(name)}</span>
+        <button class="leader-delete-btn" data-name="${escAttr(name)}" title="Mostrar de nuevo">
+          <span class="material-icons-round">close</span>
+        </button>
+      `;
+      container.appendChild(item);
+    });
+    container.querySelectorAll('.leader-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.name;
+        settings.hiddenAssignees = (settings.hiddenAssignees || []).filter(n => n !== name);
+        try {
+          await api('PUT', '/settings', { hiddenAssignees: settings.hiddenAssignees });
+          renderHiddenAssignees();
+          renderTasks();
+          updateStats();
+          toast(`"${name}" visible de nuevo`);
+        } catch (err) { toast('Error al guardar', 'error'); }
+      });
+    });
+  }
+
+  const addBtn = document.getElementById('add-hidden-assignee-btn');
+  const input = document.getElementById('hidden-assignee-input');
+  if (addBtn && input) {
+    // Remove old listeners by cloning
+    const newBtn = addBtn.cloneNode(true);
+    addBtn.parentNode.replaceChild(newBtn, addBtn);
+    newBtn.addEventListener('click', async () => {
+      const name = input.value.trim();
+      if (!name) return;
+      if (!settings.hiddenAssignees) settings.hiddenAssignees = [];
+      if (settings.hiddenAssignees.includes(name)) { toast('Ya está oculto'); return; }
+      settings.hiddenAssignees.push(name);
+      input.value = '';
+      try {
+        await api('PUT', '/settings', { hiddenAssignees: settings.hiddenAssignees });
+        renderHiddenAssignees();
+        renderTasks();
+        updateStats();
+        populateFilterDropdowns();
+        toast(`"${name}" oculto`);
+      } catch (err) { toast('Error al guardar', 'error'); }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') newBtn.click();
+    });
+  }
 }
 
 // --- TAB VISIBILITY SETTINGS ---
