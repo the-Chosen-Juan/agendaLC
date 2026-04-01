@@ -504,8 +504,10 @@ app.post('/api/activity-log', authMiddleware, async (req, res) => {
 // Server-side CSV parser
 // Name aliases: different spellings in the sheet that should map to the canonical name
 const NAME_ALIASES = {
-  'mel': 'Meli',
-  'meli': 'Meli',
+  'mel': 'Mel',
+  'meli': 'Mel',
+  'tomi': 'Tomy',
+  'tomy': 'Tomy',
 };
 
 function normalizeAssigneeName(name) {
@@ -723,7 +725,7 @@ function parseCSVServer(csvText) {
             task._assigneePriority = parseInt(m[1], 10);
             val = m[2].trim();
           }
-          // Normalize name aliases (e.g. "Mel" → "Meli")
+          // Normalize name aliases (e.g. "Meli" → "Mel", "Tomi" → "Tomy")
           val = normalizeAssigneeName(val);
         }
 

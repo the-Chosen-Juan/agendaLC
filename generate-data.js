@@ -39,22 +39,22 @@ const tasks = [
   createTask({ client: "LA COMU", taskNumber: null, project: "Great Work - 15:30 a 18:30hs", assignee: "Whalys", supervisor: "Liso", priority: "alta", deadline: "2026-02-19", status: "on going", owner: "LuMos" }),
 
   // ---- Assignee: Nacho (4 tasks) ----
-  createTask({ client: "DIAGEO", taskNumber: 1, project: "WC26 Responsible - stunt", assignee: "Nacho", supervisor: "Liso", priority: "media", deadline: "2026-02-25", status: "en progreso", owner: "Naki" }),
+  createTask({ client: "DIAGEO", taskNumber: 1, project: "WC26 Responsible - stunt", assignee: "Nacho", supervisor: "Liso", priority: "media", deadline: "2026-02-25", status: "en progreso", owner: "Ari" }),
   createTask({ client: "LA COMU", taskNumber: 2, project: "Great Work - 15:30 a 18:30hs", assignee: "Nacho", supervisor: "Liso", priority: "alta", deadline: "2026-02-19", status: "on going", owner: "LuMos" }),
   createTask({ client: "ClubNutri", taskNumber: 3, project: "Supervision Campaña Leads", assignee: "Nacho", supervisor: "Nacho", priority: "media", deadline: "2026-02-18", status: "sin empezar", owner: "Del" }),
-  createTask({ client: "PORSCHE", taskNumber: 4, project: "Supervision Caja azul (activaciones)", assignee: "Nacho", supervisor: "Zeke", priority: "baja", deadline: "2026-02-13", status: "sin empezar", owner: "Barbi" }),
+  createTask({ client: "PORSCHE", taskNumber: 4, project: "Supervision Caja azul (activaciones)", assignee: "Nacho", supervisor: "Zeke", priority: "baja", deadline: "2026-02-13", status: "sin empezar", owner: "Juli Rey" }),
 
   // ---- Assignee: Nia Freelo (2 tasks) ----
   createTask({ client: "ClubNutri", taskNumber: 1, project: "Campaña Leads", assignee: "Nia Freelo", supervisor: "Nacho", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Del" }),
   createTask({ client: "LA COMU", taskNumber: null, project: "Contrato hasta 27/2", assignee: "Nia Freelo", supervisor: "", priority: "", deadline: "2026-02-27", status: "en progreso", owner: "LuMos" }),
 
   // ---- Assignee: Tomi (3 tasks) ----
-  createTask({ client: "Alma Mora", taskNumber: 1, project: "Día de los Enamorados", assignee: "Tomi", supervisor: "Whalys", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Jess" }),
-  createTask({ client: "LA COMU", taskNumber: null, project: "Contrato hasta 13/2", assignee: "Tomi", supervisor: "Whalys", priority: "", deadline: "2026-02-13", status: "en progreso", owner: "LuMos" }),
-  createTask({ client: "Red", taskNumber: null, project: "Busqueda nuevas bandas WC26", assignee: "Tomi", supervisor: "Whalys", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Juan" }),
+  createTask({ client: "Alma Mora", taskNumber: 1, project: "Día de los Enamorados", assignee: "Tomy", supervisor: "Whalys", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Jess" }),
+  createTask({ client: "LA COMU", taskNumber: null, project: "Contrato hasta 13/2", assignee: "Tomy", supervisor: "Whalys", priority: "", deadline: "2026-02-13", status: "en progreso", owner: "LuMos" }),
+  createTask({ client: "Red", taskNumber: null, project: "Busqueda nuevas bandas WC26", assignee: "Tomy", supervisor: "Whalys", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Juan" }),
 
   // ---- Assignee: Agus y Pau (4 tasks) ----
-  createTask({ client: "DIAGEO", taskNumber: 1, project: "WC26 Responsible - stunt", assignee: "Agus y Pau", supervisor: "Liso", priority: "alta", deadline: "2026-02-25", status: "en progreso", owner: "Naki" }),
+  createTask({ client: "DIAGEO", taskNumber: 1, project: "WC26 Responsible - stunt", assignee: "Agus y Pau", supervisor: "Liso", priority: "alta", deadline: "2026-02-25", status: "en progreso", owner: "Ari" }),
   createTask({ client: "Red", taskNumber: 2, project: "Storyboard contenido Edul - WC26", assignee: "Agus y Pau", supervisor: "Whalys", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Juan" }),
   createTask({ client: "TIME OFF", taskNumber: null, project: "Agus OOO (dia recuperado)", assignee: "Agus y Pau", supervisor: "Nacho", priority: "TBD", deadline: "2026-02-13", status: "sin empezar", owner: "LuMos", comments: "Recupera de haber estado este ultimo finde laburando", isTimeOff: true, timeOffStart: "2026-02-13", timeOffEnd: "2026-02-13", timeOffType: "OOO", timeOffTitle: "Agus OOO (dia recuperado)" }),
   createTask({ client: "LA COMU", taskNumber: null, project: "Great Work - 15:30 a 18:30hs", assignee: "Agus y Pau", supervisor: "Liso", priority: "alta", deadline: "2026-02-19", status: "on going", owner: "LuMos" }),
@@ -63,7 +63,7 @@ const tasks = [
   createTask({ client: "Red", taskNumber: 1, project: "Nuevos Contenidos WC26", assignee: "Chiari & Marti", supervisor: "Whalys", priority: "baja", deadline: "2026-02-18", status: "en progreso", owner: "Juan" }),
   createTask({ client: "ClubNutri", taskNumber: 2, project: "Placas Gabriela Watson", assignee: "Chiari & Marti", supervisor: "Ruls", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Del" }),
   createTask({ client: "TIME OFF", taskNumber: null, project: "Marti PTO (20/2 - 6/3 -11 dias)", assignee: "Chiari & Marti", supervisor: "", priority: "", deadline: "2026-02-20", status: "sin empezar", owner: "LuMos", isTimeOff: true, timeOffStart: "2026-02-20", timeOffEnd: "2026-03-06", timeOffType: "Vacaciones", timeOffTitle: "Marti PTO (20/2 - 6/3 -11 dias)" }),
-  createTask({ client: "Black", taskNumber: null, project: "Ajustes Lolla y OOH", assignee: "Chiari & Marti", supervisor: "Nacho", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Naki" }),
+  createTask({ client: "Black", taskNumber: null, project: "Ajustes Lolla y OOH", assignee: "Chiari & Marti", supervisor: "Nacho", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Ari" }),
   createTask({ client: "LA COMU", taskNumber: null, project: "Great Work - 15:30 a 18:30hs", assignee: "Chiari & Marti", supervisor: "Liso", priority: "alta", deadline: "", status: "on going", owner: "LuMos" }),
 
   // ---- Assignee: Juli y Sofi (4 tasks) ----
@@ -81,15 +81,15 @@ const tasks = [
   createTask({ client: "LA COMU", taskNumber: null, project: "Retoques fotos x1", assignee: "Ruls", supervisor: "", priority: "media", deadline: "", status: "TBD", owner: "LuMos", comments: "quedan varias" }),
 
   // ---- Assignee: Meli (9 tasks) ----
-  createTask({ client: "Dadá", taskNumber: 1, project: "KV - Low alcohol red & white blend", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Luli" }),
-  createTask({ client: "ClubNutri", taskNumber: 2, project: "Caledario Marzo", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Del" }),
-  createTask({ client: "Alma Mora", taskNumber: 4, project: "KV - Low Malbec", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Luli" }),
-  createTask({ client: "Dadá", taskNumber: 5, project: "Tinto de verano placa (blanco + tinto)", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Luli" }),
-  createTask({ client: "Black", taskNumber: null, project: "OOH SABRINA X LOLLA", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Naki" }),
-  createTask({ client: "Dadá", taskNumber: null, project: "Caja Irlanda - ajustes", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Luli" }),
-  createTask({ client: "Dadá", taskNumber: null, project: "KV Vikingo - masterbrand", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "", status: "TBD", owner: "Luli" }),
-  createTask({ client: "Red", taskNumber: null, project: "Armado Pieza Sorteo Bresh Chile", assignee: "Meli", supervisor: "Ruls", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Juan" }),
-  createTask({ client: "Red", taskNumber: null, project: "Lolla AR", assignee: "Meli", supervisor: "", priority: "alta", deadline: "", status: "TBD", owner: "Juan" }),
+  createTask({ client: "Dadá", taskNumber: 1, project: "KV - Low alcohol red & white blend", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Luli" }),
+  createTask({ client: "ClubNutri", taskNumber: 2, project: "Caledario Marzo", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Del" }),
+  createTask({ client: "Alma Mora", taskNumber: 4, project: "KV - Low Malbec", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Luli" }),
+  createTask({ client: "Dadá", taskNumber: 5, project: "Tinto de verano placa (blanco + tinto)", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Luli" }),
+  createTask({ client: "Black", taskNumber: null, project: "OOH SABRINA X LOLLA", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Ari" }),
+  createTask({ client: "Dadá", taskNumber: null, project: "Caja Irlanda - ajustes", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Luli" }),
+  createTask({ client: "Dadá", taskNumber: null, project: "KV Vikingo - masterbrand", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "", status: "TBD", owner: "Luli" }),
+  createTask({ client: "Red", taskNumber: null, project: "Armado Pieza Sorteo Bresh Chile", assignee: "Mel", supervisor: "Ruls", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Juan" }),
+  createTask({ client: "Red", taskNumber: null, project: "Lolla AR", assignee: "Mel", supervisor: "", priority: "alta", deadline: "", status: "TBD", owner: "Juan" }),
 
   // ---- Assignee: Jota (7 tasks) ----
   createTask({ client: "Red", taskNumber: 1, project: "Armado Video Stand Movistar Arena", assignee: "Jota", supervisor: "", priority: "alta", deadline: "2026-02-13", status: "sin empezar", owner: "Juan" }),
@@ -97,7 +97,7 @@ const tasks = [
   createTask({ client: "Red", taskNumber: 3, project: "Ajuste video Viña del Mar", assignee: "Jota", supervisor: "", priority: "alta", deadline: "2026-02-13", status: "sin empezar", owner: "Juan" }),
   createTask({ client: "Dadá", taskNumber: 4, project: "Tinto de verano - blanco y ambos", assignee: "Jota", supervisor: "Whalys", priority: "alta", deadline: "2026-02-18", status: "en progreso", owner: "Luli" }),
   createTask({ client: "ClubNutri", taskNumber: 5, project: "Video Mariana Batista", assignee: "Jota", supervisor: "", priority: "alta", deadline: "2026-02-19", status: "sin empezar", owner: "Del" }),
-  createTask({ client: "Black", taskNumber: null, project: "1 video lolla", assignee: "Jota", supervisor: "Nacho", priority: "alta", deadline: "", status: "TBD", owner: "Naki" }),
+  createTask({ client: "Black", taskNumber: null, project: "1 video lolla", assignee: "Jota", supervisor: "Nacho", priority: "alta", deadline: "", status: "TBD", owner: "Ari" }),
   createTask({ client: "DIAGEO", taskNumber: null, project: "Video moodboard Responsible drinking", assignee: "Jota", supervisor: "", priority: "alta", deadline: "", status: "esperando respuesta", owner: "" }),
 
   // ---- Assignee: Bua (6 tasks + 1 time-off) ----
@@ -138,7 +138,7 @@ const tasks = [
   createTask({ client: "JW**", taskNumber: 3, project: "Stickers Viña del Mar", assignee: "Ubi", supervisor: "Jose", priority: "alta", deadline: "2026-02-13", status: "en progreso", owner: "Juan", comments: "Ya quedaron subidos a Giphy y pendientes de aprobación." }),
   createTask({ client: "JW CORE", taskNumber: 4, project: "Tendencias Chile", assignee: "Ubi", supervisor: "Jose", priority: "media", deadline: "2026-02-18", status: "on going", owner: "Jose" }),
   createTask({ client: "JW**", taskNumber: 5, project: "Base de datos influs", assignee: "Ubi", supervisor: "Jose", priority: "media", deadline: "2026-02-18", status: "en progreso", owner: "Jose", comments: "Chequear influs y completar excel" }),
-  createTask({ client: "Black", taskNumber: null, project: "Calendario LOLLA", assignee: "Ubi", supervisor: "Jose", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Naki", comments: "Esperando respuesta de cliente" }),
+  createTask({ client: "Black", taskNumber: null, project: "Calendario LOLLA", assignee: "Ubi", supervisor: "Jose", priority: "alta", deadline: "", status: "esperando respuesta", owner: "Ari", comments: "Esperando respuesta de cliente" }),
   createTask({ client: "JW CORE", taskNumber: null, project: "Moderación", assignee: "Ubi", supervisor: "Jose", priority: "media", deadline: "", status: "on going", owner: "Jose" }),
   createTask({ client: "JW CORE", taskNumber: null, project: "Ver streaming Chile", assignee: "Ubi", supervisor: "Jose", priority: "media", deadline: "", status: "on going", owner: "Jose" }),
 
@@ -165,7 +165,8 @@ const settings = {
     { name: "Whalys", color: "#6366f1", role: "Equipo" },
     { name: "Nacho", color: "#f59e0b", role: "Equipo" },
     { name: "Nia Freelo", color: "#ec4899", role: "Freelance" },
-    { name: "Tomi", color: "#10b981", role: "Equipo" },
+    { name: "Tomy", color: "#10b981", role: "Equipo" },
+    { name: "Vero Chile", color: "#f43f5e", role: "Equipo" },
     { name: "Agus P.", color: "#3b82f6", role: "Equipo", team: "Agus y Pau" },
     { name: "Pau", color: "#60a5fa", role: "Equipo", team: "Agus y Pau" },
     { name: "Chiari", color: "#a855f7", role: "Equipo", team: "Chiari & Marti" },
@@ -173,7 +174,7 @@ const settings = {
     { name: "Juli", color: "#06b6d4", role: "Equipo", team: "Juli y Sofi" },
     { name: "Sofi", color: "#22d3ee", role: "Equipo", team: "Juli y Sofi" },
     { name: "Ruls", color: "#ef4444", role: "Equipo" },
-    { name: "Meli", color: "#d946ef", role: "Equipo" },
+    { name: "Mel", color: "#d946ef", role: "Equipo" },
     { name: "Jota", color: "#f97316", role: "Equipo" },
     { name: "Bua", color: "#14b8a6", role: "Equipo" },
     { name: "Jose", color: "#0ea5e9", role: "Equipo" },
@@ -184,8 +185,8 @@ const settings = {
     { name: "Agus", color: "#f97316", role: "Owner" },
     { name: "Jess", color: "#e11d48", role: "Owner" },
     { name: "LuMos", color: "#8b5cf6", role: "Owner" },
-    { name: "Naki", color: "#84cc16", role: "Owner" },
-    { name: "Barbi", color: "#d946ef", role: "Owner" },
+    { name: "Ari", color: "#84cc16", role: "Owner" },
+    { name: "Juli Rey", color: "#d946ef", role: "Owner" },
     { name: "Del", color: "#0ea5e9", role: "Owner" },
     { name: "Juan", color: "#ef4444", role: "Owner" },
     { name: "Luli", color: "#ec4899", role: "Owner" },
@@ -211,7 +212,8 @@ const settings = {
     "Whalys",
     "Nacho",
     "Nia Freelo",
-    "Tomi",
+    "Tomy",
+    "Vero Chile",
     "Agus P.",
     "Pau",
     "Chiari",
@@ -219,7 +221,7 @@ const settings = {
     "Juli",
     "Sofi",
     "Ruls",
-    "Meli",
+    "Mel",
     "Jota",
     "Bua",
     "Jose",

@@ -17,8 +17,13 @@
       "role": "Freelance"
     },
     {
-      "name": "Tomi",
+      "name": "Tomy",
       "color": "#10b981",
+      "role": "Equipo"
+    },
+    {
+      "name": "Vero Chile",
+      "color": "#f43f5e",
       "role": "Equipo"
     },
     {
@@ -56,7 +61,7 @@
       "role": "Equipo"
     },
     {
-      "name": "Meli",
+      "name": "Mel",
       "color": "#d946ef",
       "role": "Equipo"
     },
@@ -111,12 +116,12 @@
       "role": "Owner"
     },
     {
-      "name": "Naki",
+      "name": "Ari",
       "color": "#84cc16",
       "role": "Owner"
     },
     {
-      "name": "Barbi",
+      "name": "Juli Rey",
       "color": "#d946ef",
       "role": "Owner"
     },
@@ -217,14 +222,15 @@
     "Whalys",
     "Nacho",
     "Nia Freelo",
-    "Tomi",
+    "Tomy",
+    "Vero Chile",
     "Agus P.",
     "Pau",
     "Marti",
     "Juli",
     "Sofi",
     "Ruls",
-    "Meli",
+    "Mel",
     "Jota",
     "Bua",
     "Jose",
