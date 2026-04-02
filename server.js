@@ -234,10 +234,18 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
   try {
     const settings = await getSettings();
     // Filter hidden assignees from teamMembers, assigneeOrder, and teamGroups
-    const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
-    const filteredTeamMembers = (settings.teamMembers || []).filter(m => !hiddenSet.has(m.name.toLowerCase()));
-    const filteredAssigneeOrder = (settings.assigneeOrder || []).filter(n => !hiddenSet.has(n.toLowerCase()));
-    const filteredTeamGroups = (settings.teamGroups || []).filter(tg => !hiddenSet.has(tg.name.toLowerCase()));
+    // Use normalized comparison (trim, lowercase, strip accents, normalize separators)
+    function normName(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+[&y]\s+/g, ' & '); }
+    const hiddenNorms = new Set((settings.hiddenAssignees || []).map(n => normName(n)));
+    const isHidden = (name) => hiddenNorms.has(normName(name));
+    const filteredTeamGroups = (settings.teamGroups || []).filter(tg => !isHidden(tg.name));
+    // Clean up member.team references that point to hidden groups
+    const visibleGroupNames = new Set(filteredTeamGroups.map(tg => tg.name));
+    const filteredTeamMembers = (settings.teamMembers || []).filter(m => !isHidden(m.name)).map(m => {
+      if (m.team && !visibleGroupNames.has(m.team)) return { ...m, team: undefined };
+      return m;
+    });
+    const filteredAssigneeOrder = (settings.assigneeOrder || []).filter(n => !isHidden(n));
     res.json({
       teamMembers: filteredTeamMembers,
       clients: settings.clients || [],
@@ -281,15 +289,19 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.sheetSyncIntervalSec !== undefined) settings.sheetSyncIntervalSec = req.body.sheetSyncIntervalSec;
     if (req.body.hiddenAssignees !== undefined) settings.hiddenAssignees = req.body.hiddenAssignees;
     await saveSettings(settings);
-    // Filter hidden assignees from response
-    const hiddenSet2 = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
+    // Filter hidden assignees from response (robust normalized matching)
+    function normName2(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+[&y]\s+/g, ' & '); }
+    const hiddenNorms2 = new Set((settings.hiddenAssignees || []).map(n => normName2(n)));
+    const isHidden2 = (name) => hiddenNorms2.has(normName2(name));
+    const filteredTG2 = (settings.teamGroups || []).filter(tg => !isHidden2(tg.name));
+    const visibleGN2 = new Set(filteredTG2.map(tg => tg.name));
     res.json({
-      teamMembers: (settings.teamMembers || []).filter(m => !hiddenSet2.has(m.name.toLowerCase())),
+      teamMembers: (settings.teamMembers || []).filter(m => !isHidden2(m.name)).map(m => m.team && !visibleGN2.has(m.team) ? { ...m, team: undefined } : m),
       clients: settings.clients,
       supervisors: settings.supervisors,
       owners: settings.owners,
-      assigneeOrder: (settings.assigneeOrder || []).filter(n => !hiddenSet2.has(n.toLowerCase())),
-      teamGroups: (settings.teamGroups || []).filter(tg => !hiddenSet2.has(tg.name.toLowerCase())),
+      assigneeOrder: (settings.assigneeOrder || []).filter(n => !isHidden2(n)),
+      teamGroups: filteredTG2,
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       leaderHistory: settings.leaderHistory || [],
@@ -1124,8 +1136,23 @@ async function performSheetSync() {
   // Auto-detect team groups from assignee names in the sheet.
   // Names like "Agus y Pau" or "Juli & Sofi" are split by " y " / " & "
   // and matched against known teamMembers to build teamGroups automatically.
-  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
-  const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(a => a && !hiddenSet.has(a.toLowerCase())));
+  // Normalize hidden names: trim, lowercase, and strip accents for robust matching
+  function normalizeForCompare(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  const hiddenNormalized = (settings.hiddenAssignees || []).map(n => normalizeForCompare(n));
+  const hiddenSet = new Set(hiddenNormalized);
+  function isHiddenName(name) {
+    if (!name) return false;
+    const n = normalizeForCompare(name);
+    if (hiddenSet.has(n)) return true;
+    // Also check partial/fuzzy: "Sofi & Jose" should match "Sofi &  Jose" or "Sofi y Jose"
+    // Normalize separators: treat " y " and " & " as equivalent
+    const norm = n.replace(/\s+[&y]\s+/g, ' & ');
+    for (const h of hiddenNormalized) {
+      if (h.replace(/\s+[&y]\s+/g, ' & ') === norm) return true;
+    }
+    return false;
+  }
+  const activeAssignees = new Set(finalTasks.map(t => t.assignee).filter(a => a && !isHiddenName(a)));
   const teamMemberNames = (settings.teamMembers || []).map(m => m.name);
 
   // Find the best matching team member for a partial name (e.g. "Agus" → "Agus P.")
@@ -1236,7 +1263,7 @@ async function performSheetSync() {
   for (const [name, prio] of Object.entries(assigneePriorities)) {
     if (existingMemberNames.has(name)) continue;
     // Don't add hidden assignees
-    if (hiddenSet.has(name.toLowerCase())) continue;
+    if (isHiddenName(name)) continue;
     // Don't add team group names as individual members
     if (detectedGroups.some(g => g.name === name)) continue;
     // Don't add compound names with "y" / "&" separators as individual members
@@ -1255,7 +1282,7 @@ async function performSheetSync() {
 
   // Remove members who no longer have active tasks in the sheet or are hidden
   if (settings.teamMembers) {
-    settings.teamMembers = settings.teamMembers.filter(m => activeAssignees.has(m.name) && !hiddenSet.has(m.name.toLowerCase()));
+    settings.teamMembers = settings.teamMembers.filter(m => activeAssignees.has(m.name) && !isHiddenName(m.name));
   }
 
   const result = {

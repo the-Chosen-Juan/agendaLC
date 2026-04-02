@@ -5,7 +5,7 @@
 // --- STATE ---
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
-let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 2, hiddenAssignees: [] };
+let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 5, hiddenAssignees: [] };
 let currentFilter = JSON.parse(localStorage.getItem('agenda_filters') || 'null') || { priority: 'all', assignee: '', status: '', client: '', search: '' };
 function saveFilters() { localStorage.setItem('agenda_filters', JSON.stringify(currentFilter)); }
 
@@ -337,10 +337,13 @@ function populateFilterDropdowns() {
   teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
 
   // Known assignees: team members (excluding individual group members) + team group names
-  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
+  // Robust hidden name matching: trim, lowercase, strip accents, normalize separators
+  function normH(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+[&y]\s+/g, ' & '); }
+  const hiddenNs = new Set((settings.hiddenAssignees || []).map(n => normH(n)));
+  const isHiddenN = (name) => name && hiddenNs.has(normH(name));
   const knownMembers = new Set([
-    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance') && !hiddenSet.has(m.name.toLowerCase())).map(m => m.name),
-    ...teamGroups.filter(tg => !hiddenSet.has(tg.name.toLowerCase())).map(tg => tg.name),
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && !m.team && (!m.role || m.role === 'Equipo' || m.role === 'Freelance') && !isHiddenN(m.name)).map(m => m.name),
+    ...teamGroups.filter(tg => !isHiddenN(tg.name)).map(tg => tg.name),
   ]);
   const assignees = [...knownMembers];
   const clients = [...new Set([
@@ -647,10 +650,8 @@ function renderTasks() {
 
   // Separate completed and esperando
   const completedTasks = allFiltered.filter(t => t.status === 'completado');
-  // Only unassigned esperando tasks go to the global section;
-  // esperando tasks WITH an assignee stay under their person
-  const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta' && !t.assignee);
-  const regularFiltered = allFiltered.filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee));
+  const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta');
+  const regularFiltered = allFiltered.filter(t => t.status !== 'esperando respuesta' && t.status !== 'completado');
 
   container.innerHTML = '';
 
@@ -3020,10 +3021,12 @@ function renderCalendarAssigneeFilters() {
   const memberInGroup = new Set();
   teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
 
-  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
+  function normCal(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+[&y]\s+/g, ' & '); }
+  const hiddenCalNs = new Set((settings.hiddenAssignees || []).map(n => normCal(n)));
+  const isHiddenCal = (name) => name && hiddenCalNs.has(normCal(name));
   const allAssignees = [...new Set([
-    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && !m.team && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
-    ...teamGroups.filter(tg => !hiddenSet.has(tg.name.toLowerCase())).map(tg => tg.name),
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && !m.team && !isHiddenCal(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
+    ...teamGroups.filter(tg => !isHiddenCal(tg.name)).map(tg => tg.name),
   ])].sort();
 
   container.innerHTML = '';
@@ -3354,7 +3357,7 @@ function renderHeatmap() {
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee));
+  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta');
   const timeOffs = getTimeOffEntries();
 
   // Get all team members + anyone with tasks, consolidating team groups
@@ -3366,14 +3369,16 @@ function renderHeatmap() {
   teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
 
   // Only show known team members — never random/stale assignees from synced tasks
-  const knownAssignees = getKnownAssignees();
-  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
+  // Robust hidden name matching: trim, lowercase, strip accents, normalize separators
+  function normHidden(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+[&y]\s+/g, ' & '); }
+  const hiddenNorms = new Set((settings.hiddenAssignees || []).map(n => normHidden(n)));
+  function isHiddenName(name) { return name && hiddenNorms.has(normHidden(name)); }
   const memberSet = new Set();
   (settings.teamMembers || []).forEach(m => {
-    if (!memberInGroup.has(m.name) && !m.team && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')) memberSet.add(m.name);
+    if (!memberInGroup.has(m.name) && !m.team && !isHiddenName(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')) memberSet.add(m.name);
   });
   // Add team group names (not individual members of groups)
-  teamGroups.forEach(tg => { if (!hiddenSet.has(tg.name.toLowerCase())) memberSet.add(tg.name); });
+  teamGroups.forEach(tg => { if (!isHiddenName(tg.name)) memberSet.add(tg.name); });
   const members = [...memberSet].sort((a, b) => {
     const order = settings.assigneeOrder || [];
     // For team group names, use first member's position in assigneeOrder
@@ -3700,10 +3705,10 @@ function navigateToTasksForMemberOnDate(member, date) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const todayStr = now.toISOString().slice(0, 10);
-  let targetTasks = tasks.filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee) && !t.timeOffStart && matchMember(t) && t.deadline === date);
+  let targetTasks = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline === date);
   // If clicking on today, also include overdue tasks
   if (date === todayStr) {
-    const overdue = tasks.filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && !t.assignee) && !t.timeOffStart && matchMember(t) && t.deadline && t.deadline < date);
+    const overdue = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline && t.deadline < date);
     targetTasks = [...overdue, ...targetTasks];
   }
 
@@ -3967,9 +3972,11 @@ function renderTeam() {
 
   // Group members by team for visual grouping
   const renderedTeamNames = new Set();
-  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
-  const allMembers = (settings.teamMembers || []).filter(m => !hiddenSet.has(m.name.toLowerCase()));
-  const teamGroupsList = (settings.teamGroups || []).filter(tg => !hiddenSet.has(tg.name.toLowerCase()));
+  function normTeam(s) { return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+[&y]\s+/g, ' & '); }
+  const hiddenTeamNs = new Set((settings.hiddenAssignees || []).map(n => normTeam(n)));
+  const isHiddenTeam = (name) => name && hiddenTeamNs.has(normTeam(name));
+  const allMembers = (settings.teamMembers || []).filter(m => !isHiddenTeam(m.name));
+  const teamGroupsList = (settings.teamGroups || []).filter(tg => !isHiddenTeam(tg.name));
 
   allMembers.forEach(member => {
     // If this member belongs to a team, render the team label once before its first member
