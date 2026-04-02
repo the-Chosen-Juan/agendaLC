@@ -4337,7 +4337,7 @@ document.getElementById('add-client-btn').addEventListener('click', () => {
 // --- SETTINGS PAGE ---
 function renderSettingsPage() {
   renderLeaderPool();
-  document.getElementById('auto-delete-days').value = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
+  document.getElementById('auto-delete-days').value = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 5;
   renderTabVisibility();
   renderHiddenAssignees();
   renderSyncSettings();
