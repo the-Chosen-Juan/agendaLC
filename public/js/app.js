@@ -3022,7 +3022,7 @@ function renderCalendarAssigneeFilters() {
 
   const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
   const allAssignees = [...new Set([
-    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && !m.team && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
     ...teamGroups.filter(tg => !hiddenSet.has(tg.name.toLowerCase())).map(tg => tg.name),
   ])].sort();
 
@@ -3370,7 +3370,7 @@ function renderHeatmap() {
   const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
   const memberSet = new Set();
   (settings.teamMembers || []).forEach(m => {
-    if (!memberInGroup.has(m.name) && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')) memberSet.add(m.name);
+    if (!memberInGroup.has(m.name) && !m.team && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')) memberSet.add(m.name);
   });
   // Add team group names (not individual members of groups)
   teamGroups.forEach(tg => { if (!hiddenSet.has(tg.name.toLowerCase())) memberSet.add(tg.name); });

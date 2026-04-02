@@ -233,13 +233,18 @@ app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
 app.get('/api/settings', authMiddleware, async (req, res) => {
   try {
     const settings = await getSettings();
+    // Filter hidden assignees from teamMembers, assigneeOrder, and teamGroups
+    const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
+    const filteredTeamMembers = (settings.teamMembers || []).filter(m => !hiddenSet.has(m.name.toLowerCase()));
+    const filteredAssigneeOrder = (settings.assigneeOrder || []).filter(n => !hiddenSet.has(n.toLowerCase()));
+    const filteredTeamGroups = (settings.teamGroups || []).filter(tg => !hiddenSet.has(tg.name.toLowerCase()));
     res.json({
-      teamMembers: settings.teamMembers || [],
+      teamMembers: filteredTeamMembers,
       clients: settings.clients || [],
       supervisors: settings.supervisors || [],
       owners: settings.owners || [],
-      assigneeOrder: settings.assigneeOrder || [],
-      teamGroups: settings.teamGroups || [],
+      assigneeOrder: filteredAssigneeOrder,
+      teamGroups: filteredTeamGroups,
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       leaderHistory: settings.leaderHistory || [],
@@ -276,13 +281,15 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.sheetSyncIntervalSec !== undefined) settings.sheetSyncIntervalSec = req.body.sheetSyncIntervalSec;
     if (req.body.hiddenAssignees !== undefined) settings.hiddenAssignees = req.body.hiddenAssignees;
     await saveSettings(settings);
+    // Filter hidden assignees from response
+    const hiddenSet2 = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
     res.json({
-      teamMembers: settings.teamMembers,
+      teamMembers: (settings.teamMembers || []).filter(m => !hiddenSet2.has(m.name.toLowerCase())),
       clients: settings.clients,
       supervisors: settings.supervisors,
       owners: settings.owners,
-      assigneeOrder: settings.assigneeOrder || [],
-      teamGroups: settings.teamGroups || [],
+      assigneeOrder: (settings.assigneeOrder || []).filter(n => !hiddenSet2.has(n.toLowerCase())),
+      teamGroups: (settings.teamGroups || []).filter(tg => !hiddenSet2.has(tg.name.toLowerCase())),
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       leaderHistory: settings.leaderHistory || [],
