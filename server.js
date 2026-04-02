@@ -248,7 +248,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       leaderHistory: settings.leaderHistory || [],
-      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,
+      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 5,
       dataVersion: settings.dataVersion || 0,
       sheetSyncUrl: settings.sheetSyncUrl || '',
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
@@ -293,7 +293,7 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       leaderHistory: settings.leaderHistory || [],
-      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2,
+      autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 5,
       dataVersion: settings.dataVersion || 0,
       sheetSyncUrl: settings.sheetSyncUrl || '',
       sheetSyncEnabled: settings.sheetSyncEnabled || false,
@@ -1010,6 +1010,10 @@ async function performSheetSync() {
     }
   }
 
+  // Auto-delete threshold: skip completed tasks from the sheet that are old enough to be auto-deleted
+  const autoDeleteDays = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 5;
+  const autoDeleteCutoff = autoDeleteDays > 0 ? Date.now() - autoDeleteDays * 24 * 60 * 60 * 1000 : 0;
+
   const finalRegular = [];
   const usedIds = new Set();
   let created = 0, updated = 0, unchanged = 0;
@@ -1050,6 +1054,13 @@ async function performSheetSync() {
 
     if (existing && !usedIds.has(existing.id)) {
       usedIds.add(existing.id);
+
+      // Drop completed tasks that exceed auto-delete threshold
+      if (autoDeleteDays > 0 && (st.status || existing.status) === 'completado') {
+        const ts = existing.completedAt || existing.updatedAt || existing.createdAt;
+        if (ts && new Date(ts).getTime() < autoDeleteCutoff) continue;
+      }
+
       // Check if anything changed
       let changed = false;
       const fields = ['client', 'project', 'assignee', 'supervisor', 'priority', 'deadline', 'status', 'owner', 'comments', 'taskNumber'];
@@ -1085,6 +1096,9 @@ async function performSheetSync() {
         unchanged++;
       }
     } else {
+      // Don't re-create completed tasks from the sheet (they were already auto-deleted)
+      if (autoDeleteDays > 0 && st.status === 'completado') continue;
+
       // New task from sheet (flags already extracted above)
       const newTask = {
         id: crypto.randomUUID(),

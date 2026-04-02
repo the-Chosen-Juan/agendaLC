@@ -314,13 +314,13 @@ async function softRefresh() {
 }
 
 async function autoDeleteCompletedTasks() {
-  const days = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 2;
+  const days = settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 5;
   if (days <= 0) return; // 0 = disabled
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   const toDelete = tasks.filter(t => {
     if (t.status !== 'completado') return false;
-    // Use updatedAt as proxy for completion time (completedAt doesn't exist)
-    const ts = t.updatedAt || t.createdAt;
+    // Prefer completedAt, fall back to updatedAt/createdAt
+    const ts = t.completedAt || t.updatedAt || t.createdAt;
     return ts && new Date(ts).getTime() < cutoff;
   });
   if (toDelete.length > 0) {
@@ -782,7 +782,7 @@ function renderCompletedSection(container, completedTasks) {
   const section = document.createElement('div');
   section.className = 'completed-section';
 
-  const isCollapsed = collapsedGroups['__completed__'] === true; // visible by default
+  const isCollapsed = collapsedGroups['__completed__'] !== false; // collapsed by default
 
   const header = document.createElement('div');
   header.className = 'completed-header';
