@@ -3020,9 +3020,10 @@ function renderCalendarAssigneeFilters() {
   const memberInGroup = new Set();
   teamGroups.forEach(tg => (tg.members || []).forEach(m => memberInGroup.add(m)));
 
+  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
   const allAssignees = [...new Set([
-    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
-    ...teamGroups.map(tg => tg.name),
+    ...(settings.teamMembers || []).filter(m => !memberInGroup.has(m.name) && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')).map(m => m.name),
+    ...teamGroups.filter(tg => !hiddenSet.has(tg.name.toLowerCase())).map(tg => tg.name),
   ])].sort();
 
   container.innerHTML = '';
@@ -3366,12 +3367,13 @@ function renderHeatmap() {
 
   // Only show known team members — never random/stale assignees from synced tasks
   const knownAssignees = getKnownAssignees();
+  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
   const memberSet = new Set();
   (settings.teamMembers || []).forEach(m => {
-    if (!memberInGroup.has(m.name) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')) memberSet.add(m.name);
+    if (!memberInGroup.has(m.name) && !hiddenSet.has(m.name.toLowerCase()) && (!m.role || m.role === 'Equipo' || m.role === 'Freelance')) memberSet.add(m.name);
   });
   // Add team group names (not individual members of groups)
-  teamGroups.forEach(tg => memberSet.add(tg.name));
+  teamGroups.forEach(tg => { if (!hiddenSet.has(tg.name.toLowerCase())) memberSet.add(tg.name); });
   const members = [...memberSet].sort((a, b) => {
     const order = settings.assigneeOrder || [];
     // For team group names, use first member's position in assigneeOrder
@@ -3965,8 +3967,9 @@ function renderTeam() {
 
   // Group members by team for visual grouping
   const renderedTeamNames = new Set();
-  const allMembers = settings.teamMembers || [];
-  const teamGroupsList = settings.teamGroups || [];
+  const hiddenSet = new Set((settings.hiddenAssignees || []).map(n => n.toLowerCase()));
+  const allMembers = (settings.teamMembers || []).filter(m => !hiddenSet.has(m.name.toLowerCase()));
+  const teamGroupsList = (settings.teamGroups || []).filter(tg => !hiddenSet.has(tg.name.toLowerCase()));
 
   allMembers.forEach(member => {
     // If this member belongs to a team, render the team label once before its first member
