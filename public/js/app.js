@@ -649,9 +649,12 @@ function renderTasks() {
   const allFiltered = getFilteredTasks();
 
   // Separate completed and esperando
+  // "esperando respuesta" in ASSIGNEE (no real person) → bottom section
+  // "esperando respuesta" in STATUS with a real person assigned → stays under that person
+  const isEsperandoAssignee = (a) => !a || /esperando/i.test(a);
   const completedTasks = allFiltered.filter(t => t.status === 'completado');
-  const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta');
-  const regularFiltered = allFiltered.filter(t => t.status !== 'esperando respuesta' && t.status !== 'completado');
+  const esperandoTasks = allFiltered.filter(t => t.status === 'esperando respuesta' && isEsperandoAssignee(t.assignee));
+  const regularFiltered = allFiltered.filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && isEsperandoAssignee(t.assignee)));
 
   container.innerHTML = '';
 
@@ -1103,8 +1106,7 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
       const supervisors = (t.supervisor || '').split(',').map(s => s.trim());
       return supervisors.includes(memberName) &&
         t.assignee !== memberName &&
-        t.status !== 'completado' &&
-        t.status !== 'esperando respuesta';
+        t.status !== 'completado';
     });
 
     let supervisedSection = null;
@@ -1349,8 +1351,7 @@ function renderIndividualGroup(container, assignee, groups, timeOffs, now) {
     const supervisors = (t.supervisor || '').split(',').map(s => s.trim());
     return supervisors.includes(assignee) &&
       t.assignee !== assignee &&
-      t.status !== 'completado' &&
-      t.status !== 'esperando respuesta';
+      t.status !== 'completado';
   });
 
   let supervisedSection = null;
@@ -2871,7 +2872,8 @@ function renderTimeline() {
 
   // Collect tasks with deadlines in the next 2 weeks (+ overdue)
   const relevantTasks = getRegularTasks().filter(t => {
-    if (!t.deadline || t.status === 'completado' || t.status === 'esperando respuesta') return false;
+    if (!t.deadline || t.status === 'completado') return false;
+    if (t.status === 'esperando respuesta' && (!t.assignee || /esperando/i.test(t.assignee))) return false;
     return true;
   });
 
@@ -3080,10 +3082,11 @@ function renderCalendar() {
 
   if (calFilters.deadlines) {
     // Include both regular tasks and contract tasks on calendar
-    // Exclude "esperando respuesta" tasks — they're on hold and shouldn't clutter the calendar
+    // Exclude unassigned "esperando respuesta" tasks — they're on hold
+    // But keep esperando tasks that have a real person assigned
     [...getRegularTasks(), ...getContractTasks()].forEach(t => {
       if (!t.deadline) return;
-      if (t.status === 'esperando respuesta') return;
+      if (t.status === 'esperando respuesta' && (!t.assignee || /esperando/i.test(t.assignee))) return;
       // Apply assignee filter
       if (t.assignee && calAssigneeFilters[t.assignee] === false) return;
       if (!deadlineMap[t.deadline]) deadlineMap[t.deadline] = [];
@@ -3357,7 +3360,7 @@ function renderHeatmap() {
 
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta');
+  const regularTasks = getRegularTasks().filter(t => t.status !== 'completado' && !(t.status === 'esperando respuesta' && (!t.assignee || /esperando/i.test(t.assignee))));
   const timeOffs = getTimeOffEntries();
 
   // Get all team members + anyone with tasks, consolidating team groups
@@ -3705,10 +3708,11 @@ function navigateToTasksForMemberOnDate(member, date) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const todayStr = now.toISOString().slice(0, 10);
-  let targetTasks = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline === date);
+  const isUnassignedEsperando = (t) => t.status === 'esperando respuesta' && (!t.assignee || /esperando/i.test(t.assignee));
+  let targetTasks = tasks.filter(t => t.status !== 'completado' && !isUnassignedEsperando(t) && !t.timeOffStart && matchMember(t) && t.deadline === date);
   // If clicking on today, also include overdue tasks
   if (date === todayStr) {
-    const overdue = tasks.filter(t => t.status !== 'completado' && t.status !== 'esperando respuesta' && !t.timeOffStart && matchMember(t) && t.deadline && t.deadline < date);
+    const overdue = tasks.filter(t => t.status !== 'completado' && !isUnassignedEsperando(t) && !t.timeOffStart && matchMember(t) && t.deadline && t.deadline < date);
     targetTasks = [...overdue, ...targetTasks];
   }
 

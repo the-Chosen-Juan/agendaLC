@@ -917,14 +917,23 @@ function parseCSVServer(csvText) {
       }
     }
 
-    // Skip tasks with z-prefixed assignees (organizational, not real people)
+    // Handle z-prefixed assignees (organizational, not real people)
     const assigneeLower = (task.assignee || '').toLowerCase().trim();
-    if (/^z{1,3}[_\s]/.test(assigneeLower)) continue;
+    if (/^z{1,3}[_\s]/.test(assigneeLower)) {
+      // z_esperando respuesta → keep the task but clear assignee so it goes to bottom section
+      if (/esperando/i.test(assigneeLower)) {
+        task.assignee = '';
+        task.status = 'esperando respuesta';
+      } else {
+        // Other z-sections (zz_lider, zzz_info, etc.) → skip entirely
+        continue;
+      }
+    }
     // Skip known non-team / unassigned entries
     if (['sin asignar', 'unassigned', 'abi'].includes(assigneeLower)) continue;
 
     // Only include rows that have actual task data
-    if (task.project || (task.client && task.assignee)) {
+    if (task.project || (task.client && task.assignee) || (task.client && task.status === 'esperando respuesta')) {
       parsed.push(task);
     }
   }
