@@ -17,6 +17,23 @@
   </script>
 </head>
 <body>
+  <!-- SVG filters for liquid glass refraction -->
+  <svg style="position:absolute;width:0;height:0" aria-hidden="true">
+    <defs>
+      <filter id="liquid-glass" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" result="blur"/>
+        <feSpecularLighting in="blur" surfaceScale="3" specularConstant="0.6" specularExponent="30" result="specular">
+          <fePointLight x="100" y="60" z="200"/>
+        </feSpecularLighting>
+        <feComposite in="specular" in2="SourceGraphic" operator="in" result="specClip"/>
+        <feComposite in="SourceGraphic" in2="specClip" operator="arithmetic" k1="0" k2="1" k3="0.15" k4="0"/>
+      </filter>
+      <filter id="liquid-distort" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" seed="2" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
   <div class="orbs"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
 
   <a href="#view-agenda" class="skip-link">Saltar al contenido</a>

@@ -94,6 +94,16 @@
   --radius: 8px;
   --radius-lg: 10px;
   --radius-xs: 3px;
+
+  /* Liquid glass tokens — light mode */
+  --glass-bg: rgba(253,250,243,.55);
+  --glass-bg-strong: rgba(253,250,243,.75);
+  --glass-border: rgba(255,255,255,.5);
+  --glass-border-subtle: rgba(255,255,255,.25);
+  --glass-highlight: rgba(255,255,255,.75);
+  --glass-shadow: rgba(28,26,20,.06);
+  --glass-blur: 12px;
+  --glass-saturate: 160%;
 }
 
 /* ===========================
@@ -166,6 +176,16 @@
   --radius: 10px;
   --radius-lg: 14px;
   --radius-xs: 4px;
+
+  /* Liquid glass tokens — dark mode */
+  --glass-bg: linear-gradient(135deg, rgba(125,211,163,.08) 0%, rgba(255,255,255,.03) 100%);
+  --glass-bg-strong: linear-gradient(155deg, rgba(125,211,163,.12) 0%, rgba(255,255,255,.04) 100%);
+  --glass-border: rgba(125,211,163,.2);
+  --glass-border-subtle: rgba(255,255,255,.06);
+  --glass-highlight: rgba(255,255,255,.08);
+  --glass-shadow: rgba(0,0,0,.4);
+  --glass-blur: 16px;
+  --glass-saturate: 180%;
 }
 
 /* Dark mode text contrast for heatmap cells */
@@ -241,67 +261,6 @@
 }
 
 /* ===========================
-   AMBIENT ORBS (dark mode only)
-   =========================== */
-.orbs {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0;
-  transition: opacity .6s ease;
-}
-
-[data-theme="dark"] .orb { opacity: .14; }
-
-.orb.o1 {
-  width: 700px;
-  height: 700px;
-  background: #D4703A;
-  top: -15%;
-  right: -10%;
-  animation: morphOrb1 22s ease-in-out infinite;
-}
-.orb.o2 {
-  width: 500px;
-  height: 500px;
-  background: #4A6FE0;
-  bottom: -10%;
-  left: -5%;
-  animation: morphOrb2 28s ease-in-out infinite;
-}
-.orb.o3 {
-  width: 300px;
-  height: 300px;
-  background: #1BA8C0;
-  top: 40%;
-  left: 45%;
-  animation: morphOrb3 18s ease-in-out infinite;
-}
-
-@keyframes morphOrb1 {
-  0%, 100% { border-radius: 62% 38% 55% 45% / 50% 60% 40% 50%; transform: translate(0, 0) rotate(0deg); }
-  33% { border-radius: 45% 55% 60% 40% / 55% 45% 55% 45%; transform: translate(30px, -20px) rotate(5deg); }
-  66% { border-radius: 55% 45% 40% 60% / 45% 55% 45% 55%; transform: translate(-20px, 20px) rotate(-3deg); }
-}
-@keyframes morphOrb2 {
-  0%, 100% { border-radius: 50% 60% 40% 50% / 62% 38% 55% 45%; transform: translate(0, 0) rotate(0deg); }
-  33% { border-radius: 40% 60% 55% 45% / 50% 50% 50% 50%; transform: translate(20px, 30px) rotate(-4deg); }
-  66% { border-radius: 55% 45% 50% 50% / 40% 60% 45% 55%; transform: translate(-15px, -25px) rotate(6deg); }
-}
-@keyframes morphOrb3 {
-  0%, 100% { border-radius: 55% 45% 50% 50% / 50% 55% 45% 50%; transform: translate(0, 0) scale(1); }
-  50% { border-radius: 45% 55% 55% 45% / 55% 45% 50% 50%; transform: translate(15px, -15px) scale(1.05); }
-}
-
-/* ===========================
    RESET & BASE
    =========================== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -315,10 +274,6 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
-}
-
-[data-theme="dark"] body {
-  background: var(--bg) radial-gradient(ellipse 100% 60% at 50% 0%, rgba(125,211,163,.04), transparent 60%) no-repeat;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -820,11 +775,17 @@ h1, h2, h3, .heading {
   display: flex;
   align-items: center;
   gap: .75rem;
-  padding: .75rem 0;
+  padding: .75rem .5rem;
   margin-top: 1rem;
-  border-bottom: 2px solid var(--primary-bg);
+  border-bottom: 2px solid var(--accent-soft, var(--primary-bg));
   cursor: pointer;
   user-select: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: background .2s var(--ease);
+}
+
+.group-header:hover {
+  background: var(--glass-bg);
 }
 
 .group-header:first-child { margin-top: 0; }
@@ -3675,36 +3636,285 @@ span.flatpickr-weekday {
 }
 
 /* ===========================
-   EDITORIAL/DARK ENHANCEMENTS
+   LIQUID GLASS DESIGN SYSTEM
    =========================== */
 
-/* Cards get elevated background + subtle top highlight */
+/* --- Glass surface mixin applied to cards, panels, modals --- */
 .client-card,
 .team-card,
+.stat-card,
 .heatmap-summary-card,
-.modal-content,
 .dropdown-menu {
-  background: var(--bg-elev, var(--surface));
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,.07);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 8px 32px var(--glass-shadow),
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 rgba(0,0,0,.03);
+  position: relative;
 }
 
-/* Card hover lift */
+/* Specular highlight layer on glass surfaces */
+.client-card::before,
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,.18) 0%,
+    rgba(255,255,255,.05) 40%,
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+[data-theme="dark"] .client-card::before,
+[data-theme="dark"] .stat-card::before {
+  background: linear-gradient(
+    135deg,
+    rgba(125,211,163,.08) 0%,
+    rgba(255,255,255,.02) 40%,
+    transparent 60%
+  );
+}
+
+/* Glass card hover: lift + glow */
 .client-card:hover,
-.team-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  transition: transform .25s var(--spring), box-shadow .25s var(--ease);
+.team-card:hover,
+.stat-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow:
+    0 16px 48px var(--glass-shadow),
+    0 4px 16px var(--glass-shadow),
+    inset 0 1px 0 var(--glass-highlight);
+  transition: transform .35s var(--spring), box-shadow .35s var(--ease);
 }
 
-/* Dark mode frosted glass sidebar */
+[data-theme="dark"] .client-card:hover,
+[data-theme="dark"] .team-card:hover,
+[data-theme="dark"] .stat-card:hover {
+  box-shadow:
+    0 16px 48px rgba(0,0,0,.5),
+    0 0 30px rgba(125,211,163,.06),
+    inset 0 1px 0 rgba(125,211,163,.15);
+}
+
+/* --- Frosted glass sidebar --- */
+.sidebar {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(20px) saturate(var(--glass-saturate));
+  border-right: 1px solid var(--glass-border-subtle) !important;
+  box-shadow: 4px 0 24px var(--glass-shadow);
+}
+
 [data-theme="dark"] .sidebar {
-  background: rgba(18,21,28,.92);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border-right-color: var(--border);
+  background: linear-gradient(180deg, rgba(18,21,28,.88) 0%, rgba(10,12,16,.95) 100%) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-right-color: rgba(125,211,163,.1) !important;
+  box-shadow: 4px 0 32px rgba(0,0,0,.4), inset -1px 0 0 rgba(125,211,163,.05);
 }
 
-/* Page title editorial style */
+/* --- Frosted glass topbar --- */
+.topbar {
+  background: rgba(247,244,238,.7) !important;
+  backdrop-filter: blur(20px) saturate(var(--glass-saturate)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(var(--glass-saturate)) !important;
+  border-bottom: 1px solid var(--glass-border-subtle) !important;
+  box-shadow: 0 1px 12px var(--glass-shadow);
+}
+
+[data-theme="dark"] .topbar {
+  background: rgba(10,12,16,.75) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-bottom-color: rgba(125,211,163,.08) !important;
+  box-shadow: 0 1px 16px rgba(0,0,0,.4), inset 0 -1px 0 rgba(125,211,163,.05);
+}
+
+/* --- Glass nav active pill --- */
+.nav-item.active {
+  background: linear-gradient(155deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.18) 100%) !important;
+  border: 1px solid rgba(255,255,255,.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.75),
+    inset 0 -1px 0 rgba(0,0,0,.04),
+    0 2px 10px rgba(0,0,0,.07);
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  border-left: 3px solid var(--accent) !important;
+}
+
+[data-theme="dark"] .nav-item.active {
+  background: linear-gradient(155deg, rgba(125,211,163,.15) 0%, rgba(125,211,163,.04) 100%) !important;
+  border: 1px solid rgba(125,211,163,.25);
+  box-shadow:
+    inset 0 1px 0 rgba(125,211,163,.2),
+    inset 0 -1px 0 rgba(0,0,0,.1),
+    0 2px 12px rgba(125,211,163,.08);
+  border-left: 3px solid var(--accent) !important;
+}
+
+/* --- Glass modal --- */
+.modal-content {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 24px 80px var(--glass-shadow),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+[data-theme="dark"] .modal-content {
+  background: linear-gradient(160deg, rgba(18,21,28,.92) 0%, rgba(12,14,18,.96) 100%) !important;
+  border-color: rgba(125,211,163,.15);
+  box-shadow:
+    0 24px 80px rgba(0,0,0,.6),
+    0 0 60px rgba(125,211,163,.04),
+    inset 0 1px 0 rgba(125,211,255,.08);
+}
+
+/* --- Glass dropdown --- */
+.dropdown-menu {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-color: var(--glass-border);
+}
+
+[data-theme="dark"] .dropdown-menu {
+  background: linear-gradient(160deg, rgba(18,21,28,.92) 0%, rgba(12,14,18,.96) 100%) !important;
+  border-color: rgba(125,211,163,.12);
+}
+
+/* --- Glass buttons --- */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
+  transition: left .5s var(--ease);
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+/* --- Glass toast --- */
+.toast {
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+[data-theme="dark"] .toast {
+  background: rgba(18,21,28,.85) !important;
+  border: 1px solid rgba(125,211,163,.12);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+
+/* --- Glass search box --- */
+.search-box {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  border-color: var(--glass-border-subtle) !important;
+}
+
+.search-box:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(167,74,31,.1)), 0 4px 16px var(--glass-shadow);
+}
+
+/* --- Glass group headers (agenda view) --- */
+.group-header {
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+}
+
+/* --- Ambient orbs enhanced --- */
+.orbs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0;
+  transition: opacity .8s var(--ease);
+  will-change: transform, border-radius;
+}
+
+[data-theme="editorial"] .orb { opacity: .06; }
+[data-theme="dark"] .orb { opacity: .18; }
+
+.orb.o1 {
+  width: 700px;
+  height: 700px;
+  background: #D4703A;
+  top: -15%;
+  right: -10%;
+  animation: morphOrb1 22s ease-in-out infinite;
+}
+.orb.o2 {
+  width: 500px;
+  height: 500px;
+  background: #4A6FE0;
+  bottom: -10%;
+  left: -5%;
+  animation: morphOrb2 28s ease-in-out infinite;
+}
+.orb.o3 {
+  width: 300px;
+  height: 300px;
+  background: #1BA8C0;
+  top: 40%;
+  left: 45%;
+  animation: morphOrb3 18s ease-in-out infinite;
+}
+
+@keyframes morphOrb1 {
+  0%, 100% { border-radius: 62% 38% 55% 45% / 50% 60% 40% 50%; transform: translate(0, 0) rotate(0deg); }
+  33% { border-radius: 45% 55% 60% 40% / 55% 45% 55% 45%; transform: translate(40px, -30px) rotate(8deg); }
+  66% { border-radius: 55% 45% 40% 60% / 45% 55% 45% 55%; transform: translate(-30px, 25px) rotate(-5deg); }
+}
+@keyframes morphOrb2 {
+  0%, 100% { border-radius: 50% 60% 40% 50% / 62% 38% 55% 45%; transform: translate(0, 0) rotate(0deg); }
+  33% { border-radius: 40% 60% 55% 45% / 50% 50% 50% 50%; transform: translate(25px, 40px) rotate(-6deg); }
+  66% { border-radius: 55% 45% 50% 50% / 40% 60% 45% 55%; transform: translate(-20px, -30px) rotate(8deg); }
+}
+@keyframes morphOrb3 {
+  0%, 100% { border-radius: 55% 45% 50% 50% / 50% 55% 45% 50%; transform: translate(0, 0) scale(1); }
+  50% { border-radius: 45% 55% 55% 45% / 55% 45% 50% 50%; transform: translate(20px, -20px) scale(1.08); }
+}
+
+/* --- Page title editorial style --- */
 [data-theme="editorial"] .page-title {
   font-family: var(--font-display);
   font-style: italic;
@@ -3716,7 +3926,7 @@ span.flatpickr-weekday {
   font-weight: 700;
 }
 
-/* Focus visible uses accent */
+/* --- Focus uses accent --- */
 :focus-visible {
   outline-color: var(--accent) !important;
 }
@@ -3726,9 +3936,37 @@ span.flatpickr-weekday {
   box-shadow: 0 0 0 4px var(--accent-soft, rgba(167,74,31,.15)) !important;
 }
 
-/* Dark mode orbs visibility in reduced motion */
+/* --- Reduced motion --- */
 @media (prefers-reduced-motion: reduce) {
   .orb { animation: none !important; }
+  .btn-primary::before { display: none; }
+}
+
+/* --- Dark mode radial gradient on body --- */
+[data-theme="dark"] body {
+  background: var(--bg) radial-gradient(ellipse 100% 60% at 50% 0%, rgba(125,211,163,.05), transparent 60%) no-repeat !important;
+}
+
+/* --- Liquid refraction on hover for glass cards --- */
+.client-card:hover::before,
+.stat-card:hover::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,.28) 0%,
+    rgba(255,255,255,.08) 35%,
+    transparent 55%
+  );
+  transition: background .4s var(--ease);
+}
+
+[data-theme="dark"] .client-card:hover::before,
+[data-theme="dark"] .stat-card:hover::before {
+  background: linear-gradient(
+    135deg,
+    rgba(125,211,163,.15) 0%,
+    rgba(125,211,163,.04) 35%,
+    transparent 55%
+  );
 }
 
 /* ===========================
