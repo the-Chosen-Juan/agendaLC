@@ -746,6 +746,8 @@ function parseCSVServer(csvText) {
           }
           // Normalize name aliases (e.g. "Meli" → "Mel", "Tomi" → "Tomy")
           val = normalizeAssigneeName(val);
+          // Normalize compound pair names: " & " → " y " for consistent matching
+          val = val.replace(/\s+&\s+/g, ' y ');
         }
 
         // Normalize status with common-sense translations
@@ -1008,16 +1010,24 @@ async function performSheetSync() {
   const regularTasks = allTasks;
   const contractTasks = []; // nothing preserved outside the sync cycle
 
-  // Build lookup of existing regular tasks by taskNumber
+  // Normalize compound pair separators for consistent matching
+  function normSep(s) { return (s || '').toLowerCase().replace(/\s+&\s+/g, ' y '); }
+
+  // Build lookup of existing regular tasks by taskNumber+assignee for precise matching
   const existingByNumber = {};
   regularTasks.forEach(t => {
-    if (t.taskNumber) existingByNumber[String(t.taskNumber)] = t;
+    if (t.taskNumber) {
+      const numKey = `${String(t.taskNumber)}|${normSep(t.assignee)}`;
+      if (!existingByNumber[numKey]) existingByNumber[numKey] = t;
+      // Also store by just number as fallback
+      if (!existingByNumber[String(t.taskNumber)]) existingByNumber[String(t.taskNumber)] = t;
+    }
   });
 
   // Also build a composite key lookup for tasks without numbers
   const existingByComposite = {};
   regularTasks.forEach(t => {
-    const key = `${(t.client || '').toLowerCase()}|${(t.project || '').toLowerCase()}|${(t.assignee || '').toLowerCase()}`;
+    const key = `${normSep(t.client)}|${(t.project || '').toLowerCase()}|${normSep(t.assignee)}`;
     if (!existingByComposite[key]) existingByComposite[key] = t;
   });
 
@@ -1043,10 +1053,12 @@ async function performSheetSync() {
     // Try to match: first by taskNumber, then by composite key
     let existing = null;
     if (st.taskNumber) {
-      existing = existingByNumber[String(st.taskNumber)];
+      // Prefer precise match by number+assignee, fall back to number-only
+      const preciseKey = `${String(st.taskNumber)}|${normSep(st.assignee)}`;
+      existing = existingByNumber[preciseKey] || existingByNumber[String(st.taskNumber)];
     }
     if (!existing) {
-      const key = `${(st.client || '').toLowerCase()}|${(st.project || '').toLowerCase()}|${(st.assignee || '').toLowerCase()}`;
+      const key = `${normSep(st.client)}|${(st.project || '').toLowerCase()}|${normSep(st.assignee)}`;
       existing = existingByComposite[key];
       // Don't reuse a task that was already matched
       if (existing && usedIds.has(existing.id)) existing = null;

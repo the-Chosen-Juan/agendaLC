@@ -135,20 +135,21 @@ function toast(message, type = 'success', action = null) {
 
 // --- DARK MODE ---
 const darkModeToggle = document.getElementById('dark-mode-toggle');
-if (localStorage.getItem('darkMode') === 'true') {
-  document.documentElement.setAttribute('data-theme', 'dark');
+const currentTheme = document.documentElement.dataset.theme || localStorage.getItem('agenda_theme') || 'editorial';
+document.documentElement.dataset.theme = currentTheme;
+if (currentTheme === 'dark') {
   darkModeToggle.querySelector('.material-icons-round').textContent = 'light_mode';
 }
 
 darkModeToggle.addEventListener('click', () => {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const isDark = document.documentElement.dataset.theme === 'dark';
   if (isDark) {
-    document.documentElement.removeAttribute('data-theme');
-    localStorage.setItem('darkMode', 'false');
+    document.documentElement.dataset.theme = 'editorial';
+    localStorage.setItem('agenda_theme', 'editorial');
     darkModeToggle.querySelector('.material-icons-round').textContent = 'dark_mode';
   } else {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    localStorage.setItem('darkMode', 'true');
+    document.documentElement.dataset.theme = 'dark';
+    localStorage.setItem('agenda_theme', 'dark');
     darkModeToggle.querySelector('.material-icons-round').textContent = 'light_mode';
   }
 });
@@ -3858,7 +3859,7 @@ function renderClientsDashboard() {
       <div class="client-card-header" data-client="${escAttr(clientName)}">
         <div class="client-card-title">
           <span class="client-badge" style="background:${clientColor.bg};color:${clientColor.text};font-size:.85rem;padding:.35rem .75rem">${escHtml(clientName)}</span>
-          <span class="group-count">${tasks.length} tarea${tasks.length !== 1 ? 's' : ''}</span>
+          <span class="group-count">${uniqueCount} tarea${uniqueCount !== 1 ? 's' : ''}</span>
           <span class="client-health" style="color:${healthColor}">
             <span class="material-icons-round" style="font-size:.85rem">${healthIcon}</span>
             ${healthLabel}
