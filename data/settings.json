@@ -27,16 +27,9 @@
       "role": "Equipo"
     },
     {
-      "name": "Agus P.",
+      "name": "Agus y Pau",
       "color": "#3b82f6",
-      "role": "Equipo",
-      "team": "Agus y Pau"
-    },
-    {
-      "name": "Pau",
-      "color": "#60a5fa",
-      "role": "Equipo",
-      "team": "Agus y Pau"
+      "role": "Equipo"
     },
     {
       "name": "Marti",
@@ -44,16 +37,9 @@
       "role": "Equipo"
     },
     {
-      "name": "Juli",
+      "name": "Juli y Sofi",
       "color": "#06b6d4",
-      "role": "Equipo",
-      "team": "Juli y Sofi"
-    },
-    {
-      "name": "Sofi",
-      "color": "#22d3ee",
-      "role": "Equipo",
-      "team": "Juli y Sofi"
+      "role": "Equipo"
     },
     {
       "name": "Ruls",
@@ -224,11 +210,9 @@
     "Nia Freelo",
     "Tomy",
     "Vero Chile",
-    "Agus P.",
-    "Pau",
+    "Agus y Pau",
     "Marti",
-    "Juli",
-    "Sofi",
+    "Juli y Sofi",
     "Ruls",
     "Mel",
     "Jota",
@@ -237,24 +221,7 @@
     "Cesi",
     "Ubi"
   ],
-  "teamGroups": [
-    {
-      "name": "Agus y Pau",
-      "color": "#3b82f6",
-      "members": [
-        "Agus P.",
-        "Pau"
-      ]
-    },
-    {
-      "name": "Juli y Sofi",
-      "color": "#06b6d4",
-      "members": [
-        "Juli",
-        "Sofi"
-      ]
-    }
-  ],
+  "teamGroups": [],
   "hiddenAssignees": [
     "Mauro Freelo",
     "Sofi & Jose",

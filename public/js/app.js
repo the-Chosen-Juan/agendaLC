@@ -941,8 +941,7 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
   const teamInitials = getInitials(teamName);
   const memberNames = teamGroup.members || [];
 
-  // Collect ALL tasks for this team: individual members + legacy pair-assigned tasks
-  // Deduplicate in case team name matches a member name
+  // Collect ALL tasks for this team: individual members + pair-assigned tasks
   const allTeamAssignees = [...new Set([...memberNames, teamName])];
   let allTeamTasks = [];
   allTeamAssignees.forEach(name => {
@@ -950,13 +949,31 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
       allTeamTasks = allTeamTasks.concat(groups[name]);
     }
   });
-  // Filter out blank/dash tasks
   allTeamTasks = allTeamTasks.filter(t => {
     const proj = (t.project || '').trim();
     return proj && !/^[-–—]+$/.test(proj);
   });
 
-  // Team-level time offs and contracts (from legacy pair name)
+  // Merge pair-assigned tasks into member groups so they always show
+  const pairTasks = !memberNames.includes(teamName) ? (groups[teamName] || []).filter(t => {
+    const proj = (t.project || '').trim();
+    return proj && !/^[-–—]+$/.test(proj);
+  }) : [];
+  memberNames.forEach(mName => {
+    if (!groups[mName]) groups[mName] = [];
+  });
+  if (pairTasks.length > 0) {
+    // Add pair tasks to the first member so they always render visibly
+    const target = memberNames[0];
+    if (target && groups[target]) {
+      const existingIds = new Set(groups[target].map(t => t.id));
+      pairTasks.forEach(t => {
+        if (!existingIds.has(t.id)) groups[target].push(t);
+      });
+    }
+  }
+
+  // Team-level time offs and contracts
   const teamTimeOffs = timeOffs.filter(to => allTeamAssignees.includes(to.assignee));
   const teamContracts = allContracts.filter(c => allTeamAssignees.includes(c.assignee));
 
@@ -966,19 +983,13 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
     return new Date(t.deadline + 'T00:00:00') < now;
   }).length;
 
-  // Hide team if no tasks, time-offs, or contracts across all members
   if (totalTasks === 0 && teamTimeOffs.length === 0 && teamContracts.length === 0) return;
 
-  // When a filter/search is active, only show team if it has matching tasks
   const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client ||
     currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
   if (hasActiveFilter && totalTasks === 0) return;
 
-  // Count visible members: if only 1 member has content, skip the team wrapper and render flat
-  const legacyTasksForCheck = memberNames.includes(teamName) ? [] : (groups[teamName] || []).filter(t => {
-    const proj = (t.project || '').trim();
-    return proj && !/^[-–—]+$/.test(proj) && !t.isTimeOff && !isContractTask(t);
-  });
+  // Count visible members
   const visibleMembers = memberNames.filter(mName => {
     const mTasks = (groups[mName] || []).filter(t => {
       const proj = (t.project || '').trim();
@@ -993,10 +1004,16 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
     if (hasActiveFilter) return mTasks.length > 0;
     return mTasks.length > 0 || mTimeOffsCount > 0 || mContractsCount > 0;
   });
-  if (visibleMembers.length <= 1 && legacyTasksForCheck.length === 0) {
-    // Only 1 (or 0) member visible and no legacy tasks — render flat, no nesting
+  if (visibleMembers.length <= 1) {
+    // Render flat using team name so pair shows as "Agus y Pau" not "Agus P."
     const flatName = visibleMembers[0] || memberNames[0];
-    renderIndividualGroup(container, flatName, groups, timeOffs, now);
+    // Merge tasks into team name group for display
+    if (!groups[teamName]) groups[teamName] = [];
+    const teamIds = new Set(groups[teamName].map(t => t.id));
+    (groups[flatName] || []).forEach(t => {
+      if (!teamIds.has(t.id)) groups[teamName].push(t);
+    });
+    renderIndividualGroup(container, teamName, groups, timeOffs, now);
     return;
   }
 
@@ -1167,50 +1184,7 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
     bindTaskRows(mTableWrapper);
   });
 
-  // --- Legacy tasks (still assigned to old pair name) ---
-  // Skip if team name matches a member name (tasks already rendered under that member)
-  const legacyTasks = memberNames.includes(teamName) ? [] : sortTasksByNumber(groups[teamName] || []).filter(t => {
-    const proj = (t.project || '').trim();
-    return proj && !/^[-–—]+$/.test(proj) && !t.isTimeOff && !isContractTask(t);
-  });
-
-  if (legacyTasks.length > 0) {
-    const legacyHeader = document.createElement('div');
-    legacyHeader.className = 'group-header team-member-header team-legacy-header';
-    legacyHeader.dataset.assignee = teamName;
-    const legacyKey = `__legacy_${teamName}`;
-    const isLegacyCollapsed = collapsedGroups[legacyKey] === true;
-
-    legacyHeader.innerHTML = `
-      <div class="group-avatar" style="background:${teamColor};width:26px;height:26px;font-size:.7rem;opacity:.7">${teamInitials}</div>
-      <span class="group-name" style="font-size:.85rem;opacity:.7">Sin reasignar</span>
-      <span class="group-count">${legacyTasks.length} tarea${legacyTasks.length !== 1 ? 's' : ''}</span>
-      <span class="material-icons-round group-toggle ${isLegacyCollapsed ? 'collapsed' : ''}">expand_more</span>
-    `;
-
-    const legacyTable = document.createElement('div');
-    legacyTable.className = 'table-wrapper';
-    if (isLegacyCollapsed) legacyTable.classList.add('hidden');
-    legacyTable.innerHTML = buildTaskTable(legacyTasks, false, teamName);
-
-    const legacyCards = buildMobileCards(legacyTasks, teamName);
-    if (isLegacyCollapsed) legacyCards.classList.add('hidden');
-
-    legacyHeader.addEventListener('click', (e) => {
-      if (e.target.closest('.timeoff-badge') || e.target.closest('.contrato-badge')) return;
-      const toggle = legacyHeader.querySelector('.group-toggle');
-      toggle.classList.toggle('collapsed');
-      legacyTable.classList.toggle('hidden');
-      legacyCards.classList.toggle('hidden');
-      collapsedGroups[legacyKey] = legacyTable.classList.contains('hidden');
-      localStorage.setItem('agenda_collapsed', JSON.stringify(collapsedGroups));
-    });
-
-    teamContent.appendChild(legacyHeader);
-    teamContent.appendChild(legacyTable);
-    teamContent.appendChild(legacyCards);
-    bindTaskRows(legacyTable);
-  }
+  // Legacy pair-assigned tasks are now merged into member groups above
 
   // --- Team header collapse toggle ---
   teamHeader.addEventListener('click', (e) => {
