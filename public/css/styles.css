@@ -58,11 +58,11 @@
   --status-en-progreso: #9a6b00;
   --status-en-progreso-bg: #fef3c7;
   --status-on-going: #4a6b1f;
-  --status-on-going-bg: #ecfccb;
+  --status-on-going-bg: #e8eed6;
   --status-esperando: #7c3aed;
   --status-esperando-bg: #ede9fe;
   --status-completado: #0d9488;
-  --status-completado-bg: #ccfbf1;
+  --status-completado-bg: #d8ece6;
 
   /* Priority colors */
   --priority-alta: #9c2a13;
@@ -70,7 +70,7 @@
   --priority-media: #9a6b00;
   --priority-media-bg: #fef3c7;
   --priority-baja: #4a6b1f;
-  --priority-baja-bg: #f0fdf4;
+  --priority-baja-bg: #e8eed6;
   --priority-tbd: #988e72;
   --priority-tbd-bg: #efeadf;
 
@@ -83,11 +83,11 @@
 
   /* Heatmap */
   --heatmap-0: #efeadf;
-  --heatmap-1: #d9f99d;
-  --heatmap-2: #fde68a;
-  --heatmap-3: #fdba74;
-  --heatmap-4: #fca5a5;
-  --heatmap-off: #ddd6fe;
+  --heatmap-1: #d4dcc4;
+  --heatmap-2: #e3cfa0;
+  --heatmap-3: #d9b190;
+  --heatmap-4: #d4a0a0;
+  --heatmap-off: #d4cce0;
 
   /* Editorial radius overrides */
   --radius-sm: 4px;
@@ -111,8 +111,8 @@
   --border-strong: #2a3040;
   --text: #e7e9ef;
   --text-secondary: #8a93a6;
-  --text-muted: #5a6478;
-  --text-dim: #5a6478;
+  --text-muted: #7a8599;
+  --text-dim: #7a8599;
 
   --primary: #7dd3a3;
   --primary-light: #a7e8c5;
@@ -127,7 +127,7 @@
   --danger: #f87171;
 
   /* Status colors */
-  --status-sin-empezar: #5a6478;
+  --status-sin-empezar: #7a8599;
   --status-sin-empezar-bg: rgba(90,100,120,.15);
   --status-en-progreso: #fbbf24;
   --status-en-progreso-bg: rgba(251,191,36,.12);
@@ -256,7 +256,7 @@
    =========================== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { font-size: 14px; -webkit-font-smoothing: antialiased; line-height: 1.5; }
+html { font-size: 14px; -webkit-font-smoothing: antialiased; line-height: 1.5; overflow-x: hidden; }
 
 body {
   font-family: var(--font-body);
@@ -529,6 +529,8 @@ h1, h2, h3, .heading {
   flex: 1;
   margin-left: var(--sidebar-width);
   min-height: 100vh;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* ===========================
@@ -773,6 +775,8 @@ h1, h2, h3, .heading {
   user-select: none;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   transition: background .2s var(--ease);
+  flex-wrap: nowrap;
+  min-height: 0;
 }
 
 .group-header:hover {
@@ -922,7 +926,10 @@ h1, h2, h3, .heading {
 .group-timeoff {
   display: flex;
   gap: .35rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .timeoff-badge {
@@ -936,6 +943,12 @@ h1, h2, h3, .heading {
   background: #fef3c7;
   color: #92400e;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 .timeoff-badge:hover {
   filter: brightness(.95);
@@ -962,6 +975,12 @@ h1, h2, h3, .heading {
   color: #1e40af;
   cursor: pointer;
   transition: var(--transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 .contrato-badge:hover { filter: brightness(.92); }
 .contrato-badge .material-icons-round { font-size: .8rem; }
@@ -1415,14 +1434,14 @@ h1, h2, h3, .heading {
 .calendar-day {
   background: var(--surface);
   padding: .5rem;
-  min-height: 120px;
+  min-height: 100px;
   font-size: .8rem;
   position: relative;
   vertical-align: top;
 }
 .calendar-day .calendar-events {
-  max-height: none;
-  overflow: visible;
+  max-height: 80px;
+  overflow: hidden;
 }
 
 .calendar-day.today {
@@ -1992,10 +2011,13 @@ h1, h2, h3, .heading {
     -webkit-overflow-scrolling: touch;
   }
 
-  .calendar-grid { margin: 0 .75rem 2rem; }
-  .calendar-toolbar { padding: 1rem; }
-  .calendar-day { min-height: 60px; padding: .25rem; }
-  .calendar-day-number { font-size: .75rem; }
+  .calendar-grid { margin: 0 .5rem 2rem; }
+  .calendar-toolbar { padding: .75rem; }
+  .calendar-day { min-height: 55px; padding: .25rem; }
+  .calendar-day .calendar-events { max-height: 45px; }
+  .calendar-day-number { font-size: .7rem; margin-bottom: .15rem; }
+  .calendar-event { font-size: .5rem; padding: .1rem .2rem; }
+  .calendar-day-header { padding: .3rem; font-size: .6rem; }
   .calendar-event { font-size: .55rem; }
   .calendar-nav h2 { min-width: 140px; font-size: 1rem; }
 }
@@ -2010,7 +2032,8 @@ h1, h2, h3, .heading {
 
   .search-box { display: none; }
 
-  .calendar-day { min-height: 50px; }
+  .calendar-day { min-height: 45px; }
+  .calendar-day .calendar-events { max-height: 35px; }
 }
 
 /* ===========================
@@ -3487,11 +3510,11 @@ span.flatpickr-weekday {
 }
 .heatmap-cell.weekend { opacity: .6; }
 .heatmap-level-0 { background: var(--heatmap-0); color: var(--text-muted); }
-.heatmap-level-1 { background: var(--heatmap-1); color: #166534; }
-.heatmap-level-2 { background: var(--heatmap-2); color: #92400e; }
-.heatmap-level-3 { background: var(--heatmap-3); color: #9a3412; }
-.heatmap-level-4 { background: var(--heatmap-4); color: #991b1b; font-weight: 700; }
-.heatmap-level-off { background: var(--heatmap-off); color: #7c3aed; }
+.heatmap-level-1 { background: var(--heatmap-1); color: #3d5a28; }
+.heatmap-level-2 { background: var(--heatmap-2); color: #7a5a20; }
+.heatmap-level-3 { background: var(--heatmap-3); color: #7a4420; }
+.heatmap-level-4 { background: var(--heatmap-4); color: #7a2828; font-weight: 700; }
+.heatmap-level-off { background: var(--heatmap-off); color: #5a3d80; }
 .heatmap-total {
   border-left: 2px solid var(--border);
   margin-left: 4px;
@@ -3614,15 +3637,43 @@ span.flatpickr-weekday {
    =========================== */
 @media (max-width: 768px) {
   .toast-container {
-    bottom: auto;
-    top: .75rem;
+    bottom: .75rem;
+    top: auto;
     right: .75rem;
     left: .75rem;
   }
 
   .toast {
-    font-size: .8rem;
-    padding: .65rem 1rem;
+    font-size: .75rem;
+    padding: .5rem .85rem;
+  }
+
+  .group-header {
+    gap: .4rem;
+    padding: .6rem .35rem;
+  }
+
+  .group-name {
+    font-size: .9rem;
+  }
+
+  .group-count {
+    font-size: .65rem;
+    padding: .1rem .45rem;
+    white-space: nowrap;
+  }
+
+  .timeoff-badge,
+  .contrato-badge {
+    font-size: .6rem;
+    padding: .1rem .4rem;
+    max-width: 140px;
+  }
+
+  .group-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: .7rem;
   }
 }
 
