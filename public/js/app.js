@@ -4520,17 +4520,9 @@ function renderLeaderPool() {
 }
 
 document.getElementById('add-leader-btn').addEventListener('click', () => {
-  const pool = settings.leaderPool || [];
-  const allMembers = (settings.teamMembers || []).map(m => m.name);
-  const available = allMembers.filter(n => !pool.includes(n));
-
-  if (available.length === 0) {
-    toast('Todos los miembros ya están en el sorteo', 'error');
-    return;
-  }
-
   openPromptModal('Agregar líder', 'Nombre', false, false, async ({ name }) => {
     if (!name) return;
+    const pool = settings.leaderPool || [];
     if (pool.includes(name)) {
       toast('Ya está en el sorteo', 'error');
       return;
@@ -4543,7 +4535,7 @@ document.getElementById('add-leader-btn').addEventListener('click', () => {
     } catch (err) {
       toast('Error: ' + err.message, 'error');
     }
-  }, available);
+  });
 });
 
 document.getElementById('save-auto-delete').addEventListener('click', async () => {
