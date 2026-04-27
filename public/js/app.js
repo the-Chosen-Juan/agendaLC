@@ -3829,6 +3829,10 @@ function renderClientsDashboard() {
 
     const isCollapsed = collapsedGroups[`__client_${clientName}`] === true;
 
+    const seenProjects = new Set();
+    tasks.forEach(t => seenProjects.add((t.project || '—').trim().toLowerCase()));
+    const uniqueCount = seenProjects.size;
+
     html += `<div class="client-card">
       <div class="client-card-header" data-client="${escAttr(clientName)}">
         <div class="client-card-title">

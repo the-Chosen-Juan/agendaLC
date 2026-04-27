@@ -540,9 +540,7 @@ h1, h2, h3, .heading {
   position: sticky;
   top: 0;
   height: var(--topbar-height);
-  background: rgba(247,244,238,.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -1434,14 +1432,14 @@ h1, h2, h3, .heading {
 .calendar-day {
   background: var(--surface);
   padding: .5rem;
-  min-height: 100px;
+  min-height: 120px;
   font-size: .8rem;
   position: relative;
   vertical-align: top;
 }
 .calendar-day .calendar-events {
-  max-height: 80px;
-  overflow: hidden;
+  max-height: none;
+  overflow: visible;
 }
 
 .calendar-day.today {
@@ -1469,17 +1467,15 @@ h1, h2, h3, .heading {
 }
 
 .calendar-event {
-  display: flex;
-  align-items: center;
-  gap: .2rem;
-  padding: .15rem .35rem;
+  display: block;
+  padding: .2rem .4rem;
   border-radius: 4px;
-  font-size: .6rem;
+  font-size: .65rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 .calendar-event.deadline {
@@ -2014,11 +2010,10 @@ h1, h2, h3, .heading {
   .calendar-grid { margin: 0 .5rem 2rem; }
   .calendar-toolbar { padding: .75rem; }
   .calendar-day { min-height: 55px; padding: .25rem; }
-  .calendar-day .calendar-events { max-height: 45px; }
+  .calendar-day .calendar-events { max-height: 50px; overflow: hidden; }
   .calendar-day-number { font-size: .7rem; margin-bottom: .15rem; }
-  .calendar-event { font-size: .5rem; padding: .1rem .2rem; }
+  .calendar-event { font-size: .5rem; padding: .1rem .2rem; line-height: 1.2; }
   .calendar-day-header { padding: .3rem; font-size: .6rem; }
-  .calendar-event { font-size: .55rem; }
   .calendar-nav h2 { min-width: 140px; font-size: 1rem; }
 }
 
@@ -2032,8 +2027,8 @@ h1, h2, h3, .heading {
 
   .search-box { display: none; }
 
-  .calendar-day { min-height: 45px; }
-  .calendar-day .calendar-events { max-height: 35px; }
+  .calendar-day { min-height: 40px; }
+  .calendar-day .calendar-events { max-height: 30px; overflow: hidden; }
 }
 
 /* ===========================
@@ -3246,7 +3241,7 @@ span.flatpickr-weekday {
    CLIENTS DASHBOARD
    =========================== */
 .clients-toolbar {
-  padding: 0 1.75rem;
+  padding: 1rem 1.75rem 0;
 }
 .clients-stats-row {
   display: flex;
@@ -3396,7 +3391,7 @@ span.flatpickr-weekday {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.75rem 1rem;
+  padding: 1rem 1.75rem;
   flex-wrap: wrap;
   gap: .75rem;
 }
