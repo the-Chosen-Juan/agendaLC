@@ -4226,10 +4226,36 @@ function openEditMemberModal(member) {
 const promptModal = document.getElementById('prompt-modal');
 let promptCallback = null;
 
-function openPromptModal(title, label, showColor, showRole, callback) {
+function openPromptModal(title, label, showColor, showRole, callback, selectOptions) {
   document.getElementById('prompt-modal-title').textContent = title;
   document.getElementById('prompt-modal-label').textContent = label;
-  document.getElementById('prompt-modal-input').value = '';
+
+  const inputContainer = document.getElementById('prompt-modal-input').parentElement;
+  const oldEl = document.getElementById('prompt-modal-input');
+
+  if (selectOptions && selectOptions.length > 0) {
+    const selectEl = document.createElement('select');
+    selectEl.id = 'prompt-modal-input';
+    selectEl.className = 'filter-select';
+    selectEl.style.cssText = 'width:100%;padding:.65rem .85rem;font-size:.9rem';
+    selectOptions.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      selectEl.appendChild(opt);
+    });
+    oldEl.replaceWith(selectEl);
+  } else {
+    if (oldEl.tagName === 'SELECT') {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'prompt-modal-input';
+      input.required = true;
+      oldEl.replaceWith(input);
+    }
+    document.getElementById('prompt-modal-input').value = '';
+  }
+
   document.getElementById('prompt-modal-role').value = 'Equipo';
   document.getElementById('prompt-modal-color-group').classList.toggle('hidden', !showColor);
   document.getElementById('prompt-modal-role-group').classList.toggle('hidden', !showRole);
@@ -4263,14 +4289,6 @@ function openPromptModal(title, label, showColor, showRole, callback) {
 function closePromptModal() {
   promptModal.classList.add('hidden');
   promptCallback = null;
-  const el = document.getElementById('prompt-modal-input');
-  if (el && el.tagName === 'SELECT') {
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = 'prompt-modal-input';
-    input.required = true;
-    el.replaceWith(input);
-  }
 }
 
 document.getElementById('prompt-modal-close').addEventListener('click', closePromptModal);
@@ -4511,7 +4529,6 @@ document.getElementById('add-leader-btn').addEventListener('click', () => {
     return;
   }
 
-  // Show a simple select prompt
   openPromptModal('Agregar líder', 'Nombre', false, false, async ({ name }) => {
     if (!name) return;
     if (pool.includes(name)) {
@@ -4526,23 +4543,7 @@ document.getElementById('add-leader-btn').addEventListener('click', () => {
     } catch (err) {
       toast('Error: ' + err.message, 'error');
     }
-  });
-
-  // Replace the text input with a dropdown of available members
-  setTimeout(() => {
-    const inputEl = document.getElementById('prompt-modal-input');
-    const selectEl = document.createElement('select');
-    selectEl.id = 'prompt-modal-input';
-    selectEl.className = 'filter-select';
-    selectEl.style.cssText = 'width:100%;padding:.65rem .85rem;font-size:.9rem';
-    available.forEach(n => {
-      const opt = document.createElement('option');
-      opt.value = n;
-      opt.textContent = n;
-      selectEl.appendChild(opt);
-    });
-    inputEl.replaceWith(selectEl);
-  }, 50);
+  }, available);
 });
 
 document.getElementById('save-auto-delete').addEventListener('click', async () => {
