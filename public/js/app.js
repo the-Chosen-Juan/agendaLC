@@ -4263,6 +4263,14 @@ function openPromptModal(title, label, showColor, showRole, callback) {
 function closePromptModal() {
   promptModal.classList.add('hidden');
   promptCallback = null;
+  const el = document.getElementById('prompt-modal-input');
+  if (el && el.tagName === 'SELECT') {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'prompt-modal-input';
+    input.required = true;
+    el.replaceWith(input);
+  }
 }
 
 document.getElementById('prompt-modal-close').addEventListener('click', closePromptModal);
