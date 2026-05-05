@@ -362,21 +362,33 @@ function populateFilterDropdowns() {
   const clientSelect = document.getElementById('filter-client');
   const ownerSelect = document.getElementById('filter-owner');
 
-  assigneeSelect.innerHTML = '<option value="">Todos los asignados</option>';
-  clientSelect.innerHTML = '<option value="">Todos los clientes</option>';
-  ownerSelect.innerHTML = '<option value="">Todos los owners</option>';
+  const prevAssignee = assigneeSelect.value;
+  const prevClient = clientSelect.value;
+  const prevOwner = ownerSelect.value;
 
-  assignees.sort().forEach(a => {
-    assigneeSelect.innerHTML += `<option value="${escAttr(a)}">${escHtml(a)}</option>`;
-  });
+  assigneeSelect.innerHTML = '';
+  clientSelect.innerHTML = '';
+  ownerSelect.innerHTML = '';
 
-  clients.sort().forEach(c => {
-    clientSelect.innerHTML += `<option value="${escAttr(c)}">${escHtml(c)}</option>`;
-  });
+  const addOpt = (sel, val, text) => {
+    const o = document.createElement('option');
+    o.value = val;
+    o.textContent = text;
+    sel.appendChild(o);
+  };
 
-  owners.forEach(o => {
-    ownerSelect.innerHTML += `<option value="${escAttr(o)}">${escHtml(o)}</option>`;
-  });
+  addOpt(assigneeSelect, '', 'Todos los asignados');
+  assignees.sort().forEach(a => addOpt(assigneeSelect, a, a));
+
+  addOpt(clientSelect, '', 'Todos los clientes');
+  clients.sort().forEach(c => addOpt(clientSelect, c, c));
+
+  addOpt(ownerSelect, '', 'Todos los owners');
+  owners.forEach(o => addOpt(ownerSelect, o, o));
+
+  assigneeSelect.value = prevAssignee || '';
+  clientSelect.value = prevClient || '';
+  ownerSelect.value = prevOwner || '';
 
   populateFormDataLists(assignees, clients);
 }

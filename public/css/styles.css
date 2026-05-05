@@ -704,6 +704,10 @@ h1, h2, h3, .heading {
   cursor: pointer;
   outline: none;
   transition: var(--transition);
+  position: relative;
+  z-index: 2;
+  -webkit-appearance: menulist;
+  appearance: menulist;
 }
 .filter-select:focus { border-color: var(--primary); }
 
