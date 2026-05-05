@@ -233,5 +233,15 @@
     "Chiari"
   ],
   "supervisors": [],
-  "owners": []
+  "owners": [],
+  "leaderPool": [
+    "Delfi",
+    "Agus G",
+    "Pipi",
+    "Cata",
+    "Juan",
+    "Luli"
+  ],
+  "leaderRotationStart": "2026-04-27",
+  "weeklyLeader": "Delfi"
 }

@@ -6,7 +6,7 @@
 let token = localStorage.getItem('agenda_token') || null;
 let tasks = [];
 let settings = { teamMembers: [], clients: [], supervisors: [], owners: [], assigneeOrder: [], teamGroups: [], weeklyLeader: null, leaderPool: [], autoDeleteDays: 5, hiddenAssignees: [] };
-let currentFilter = JSON.parse(localStorage.getItem('agenda_filters') || 'null') || { priority: 'all', assignee: '', status: '', client: '', search: '' };
+let currentFilter = JSON.parse(localStorage.getItem('agenda_filters') || 'null') || { priority: 'all', assignee: '', status: '', client: '', owner: '', search: '' };
 function saveFilters() { localStorage.setItem('agenda_filters', JSON.stringify(currentFilter)); }
 
 // Set of known team member names (from settings) — used to filter out unknown assignees
@@ -31,10 +31,12 @@ function restoreFilters() {
   const assigneeEl = document.getElementById('filter-assignee');
   const statusEl = document.getElementById('filter-status');
   const clientEl = document.getElementById('filter-client');
+  const ownerEl = document.getElementById('filter-owner');
   const searchEl = document.getElementById('search-input');
   if (assigneeEl) assigneeEl.value = currentFilter.assignee || '';
   if (statusEl) statusEl.value = currentFilter.status || '';
   if (clientEl) clientEl.value = currentFilter.client || '';
+  if (ownerEl) ownerEl.value = currentFilter.owner || '';
   if (searchEl) searchEl.value = currentFilter.search || '';
 }
 let grouped = true;
@@ -352,11 +354,17 @@ function populateFilterDropdowns() {
     ...tasks.map(t => t.client).filter(Boolean)
   ])].filter(c => c.toLowerCase() !== 'contrato' && c.toLowerCase() !== 'time off');
 
+  const owners = [...new Set(
+    (settings.teamMembers || []).filter(m => m.role === 'Owner').map(m => m.name)
+  )].sort();
+
   const assigneeSelect = document.getElementById('filter-assignee');
   const clientSelect = document.getElementById('filter-client');
+  const ownerSelect = document.getElementById('filter-owner');
 
   assigneeSelect.innerHTML = '<option value="">Todos los asignados</option>';
   clientSelect.innerHTML = '<option value="">Todos los clientes</option>';
+  ownerSelect.innerHTML = '<option value="">Todos los owners</option>';
 
   assignees.sort().forEach(a => {
     assigneeSelect.innerHTML += `<option value="${escAttr(a)}">${escHtml(a)}</option>`;
@@ -364,6 +372,10 @@ function populateFilterDropdowns() {
 
   clients.sort().forEach(c => {
     clientSelect.innerHTML += `<option value="${escAttr(c)}">${escHtml(c)}</option>`;
+  });
+
+  owners.forEach(o => {
+    ownerSelect.innerHTML += `<option value="${escAttr(o)}">${escHtml(o)}</option>`;
   });
 
   populateFormDataLists(assignees, clients);
@@ -664,6 +676,7 @@ function renderTasks() {
   if (currentFilter.assignee) filterParts.push(`Asignado: ${currentFilter.assignee}`);
   if (currentFilter.status) filterParts.push(`Estado: ${currentFilter.status}`);
   if (currentFilter.client) filterParts.push(`Cliente: ${currentFilter.client}`);
+  if (currentFilter.owner) filterParts.push(`Owner: ${currentFilter.owner}`);
   if (currentFilter.search) filterParts.push(`Búsqueda: "${currentFilter.search}"`);
   if (currentFilter.priority && currentFilter.priority !== 'all') filterParts.push(`Prioridad: ${currentFilter.priority}`);
   if (filterParts.length > 0) {
@@ -681,6 +694,7 @@ function renderTasks() {
       currentFilter.status = '';
       currentFilter.priority = 'all';
       currentFilter.client = '';
+      currentFilter.owner = '';
       currentFilter.search = '';
       currentFilter._overdue = false;
       saveFilters();
@@ -858,7 +872,7 @@ function renderGroupedTasks(container, filtered) {
   });
 
   // Check if any filter/search is active — if so, don't show empty members
-  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client ||
+  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client || currentFilter.owner ||
     currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
 
   if (!hasActiveFilter) {
@@ -985,7 +999,7 @@ function renderTeamGroup(container, teamGroup, groups, timeOffs, allContracts, n
 
   if (totalTasks === 0 && teamTimeOffs.length === 0 && teamContracts.length === 0) return;
 
-  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client ||
+  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client || currentFilter.owner ||
     currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
   if (hasActiveFilter && totalTasks === 0) return;
 
@@ -1278,7 +1292,7 @@ function renderIndividualGroup(container, assignee, groups, timeOffs, now) {
   if (groupTasks.length === 0 && memberTimeOffs.length === 0 && memberContracts.length === 0) return;
 
   // When a filter/search is active, only show members that have matching tasks
-  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client ||
+  const hasActiveFilter = currentFilter.assignee || currentFilter.status || currentFilter.client || currentFilter.owner ||
     currentFilter.search || (currentFilter.priority && currentFilter.priority !== 'all') || currentFilter._overdue;
   if (hasActiveFilter && groupTasks.length === 0) return;
 
@@ -2231,6 +2245,13 @@ document.getElementById('filter-client').addEventListener('change', (e) => {
   updateStats();
 });
 
+document.getElementById('filter-owner').addEventListener('change', (e) => {
+  currentFilter.owner = e.target.value;
+  saveFilters();
+  renderTasks();
+  updateStats();
+});
+
 document.getElementById('search-input').addEventListener('input', (e) => {
   currentFilter.search = e.target.value.toLowerCase();
   saveFilters();
@@ -2269,6 +2290,7 @@ function getFilteredTasks() {
     if (assigneeMatchSet && !assigneeMatchSet.has(t.assignee)) return false;
     if (currentFilter.status && t.status !== currentFilter.status) return false;
     if (currentFilter.client && t.client !== currentFilter.client) return false;
+    if (currentFilter.owner && t.owner !== currentFilter.owner) return false;
     if (currentFilter._overdue) {
       if (!t.deadline || t.status === 'completado') return false;
       if (!(new Date(t.deadline + 'T00:00:00') < now)) return false;
@@ -2339,8 +2361,10 @@ document.querySelectorAll('.stat-card').forEach(card => {
       currentFilter.status = '';
       currentFilter.assignee = '';
       currentFilter.client = '';
+      currentFilter.owner = '';
       document.getElementById('filter-assignee').value = '';
       document.getElementById('filter-client').value = '';
+      document.getElementById('filter-owner').value = '';
     } else if (label === 'En progreso') {
       statusSelect.value = 'en progreso';
       currentFilter.status = 'en progreso';
@@ -2568,15 +2592,47 @@ function openTimeOffEditor(badgeEl, toTask) {
   setTimeout(() => document.addEventListener('click', closeOnOutside, true), 10);
 }
 
-// --- LEADER OF THE WEEK (uses leaderPool) ---
+// --- LEADER OF THE WEEK (fixed rotation with override support) ---
+function getCurrentWeekIndex() {
+  const start = settings.leaderRotationStart;
+  if (!start) return 0;
+  const startDate = new Date(start + 'T00:00:00');
+  const now = new Date();
+  const diffMs = now - startDate;
+  const diffWeeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+  return Math.max(0, diffWeeks);
+}
+
+function getWeekId() {
+  const now = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${weekNum}`;
+}
+
+function getScheduledLeader() {
+  const pool = settings.leaderPool || [];
+  if (pool.length === 0) return null;
+  const weekIdx = getCurrentWeekIndex();
+  return pool[weekIdx % pool.length];
+}
+
+function getCurrentLeader() {
+  const override = settings.leaderOverrideWeek;
+  const currentWeek = getWeekId();
+  if (override && override.week === currentWeek) {
+    return override.leader;
+  }
+  return getScheduledLeader();
+}
+
 function renderLeader() {
   const nameEl = document.getElementById('leader-name');
-  const leader = settings.weeklyLeader;
+  const leader = getCurrentLeader();
   nameEl.textContent = leader || '—';
 }
 
 document.getElementById('leader-randomize').addEventListener('click', async () => {
-  // Use leaderPool if set, otherwise all team members
   const pool = (settings.leaderPool || []).length > 0
     ? settings.leaderPool
     : (settings.teamMembers || []).map(m => m.name);
@@ -2586,33 +2642,28 @@ document.getElementById('leader-randomize').addEventListener('click', async () =
     return;
   }
 
-  // Round-robin: pick from people who haven't been leader recently
-  const history = settings.leaderHistory || [];
-  let eligible = pool.filter(p => !history.includes(p));
-  // If everyone has been leader, reset the cycle
+  const scheduled = getScheduledLeader();
+  const eligible = pool.filter(p => p !== scheduled);
   if (eligible.length === 0) {
-    eligible = [...pool];
-    history.length = 0;
+    toast('No hay otros miembros disponibles', 'error');
+    return;
   }
 
   const nameEl = document.getElementById('leader-name');
   let count = 0;
   const interval = setInterval(() => {
-    nameEl.textContent = pool[Math.floor(Math.random() * pool.length)];
+    nameEl.textContent = eligible[Math.floor(Math.random() * eligible.length)];
     count++;
     if (count >= 15) {
       clearInterval(interval);
       const winner = eligible[Math.floor(Math.random() * eligible.length)];
       nameEl.textContent = winner;
-      history.push(winner);
+      const currentWeek = getWeekId();
+      const overrideData = { week: currentWeek, leader: winner };
+      settings.leaderOverrideWeek = overrideData;
       settings.weeklyLeader = winner;
-      settings.leaderHistory = history;
-      api('PUT', '/settings', { weeklyLeader: winner, leaderHistory: history }).catch(() => {});
-      const remaining = pool.filter(p => !history.includes(p));
-      const msg = remaining.length > 0
-        ? `${winner} es el líder de la semana! (faltan ${remaining.length} para completar la ronda)`
-        : `${winner} es el líder de la semana! (ronda completa, se reinicia)`;
-      toast(msg);
+      api('PUT', '/settings', { weeklyLeader: winner, leaderOverrideWeek: overrideData }).catch(() => {});
+      toast(`${winner} reemplaza a ${scheduled} esta semana`);
     }
   }, 100);
 });
@@ -4483,20 +4534,23 @@ function renderTabVisibility() {
 function renderLeaderPool() {
   const container = document.getElementById('leader-pool-list');
   const pool = settings.leaderPool || [];
+  const scheduled = getScheduledLeader();
 
   container.innerHTML = '';
   if (pool.length === 0) {
     container.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">No hay líderes configurados. Agregá uno.</p>';
     return;
   }
-  pool.forEach(name => {
+  pool.forEach((name, i) => {
     const member = (settings.teamMembers || []).find(m => m.name === name);
     const color = member?.color || getColorForName(name);
+    const isCurrent = name === scheduled;
     const item = document.createElement('div');
-    item.className = 'settings-leader-item';
+    item.className = 'settings-leader-item' + (isCurrent ? ' leader-current' : '');
     item.innerHTML = `
+      <span style="color:var(--text-muted);font-size:.75rem;min-width:1.2rem">${i + 1}.</span>
       <div class="leader-avatar-mini" style="background:${color}">${getInitials(name)}</div>
-      <span>${escHtml(name)}</span>
+      <span>${escHtml(name)}${isCurrent ? ' <span style="font-size:.7rem;color:var(--accent);font-weight:600">← esta semana</span>' : ''}</span>
       <button class="leader-delete-btn" data-name="${escAttr(name)}" title="Quitar del sorteo" aria-label="Quitar ${escAttr(name)} del sorteo">
         <span class="material-icons-round">close</span>
       </button>
@@ -4802,6 +4856,7 @@ function navigateToTask(taskId) {
   document.getElementById('filter-assignee').value = '';
   document.getElementById('filter-status').value = '';
   document.getElementById('filter-client').value = '';
+  document.getElementById('filter-owner').value = '';
   document.getElementById('search-input').value = '';
 
   collapsedGroups = {};

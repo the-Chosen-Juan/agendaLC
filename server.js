@@ -256,6 +256,8 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       leaderHistory: settings.leaderHistory || [],
+      leaderRotationStart: settings.leaderRotationStart || null,
+      leaderOverrideWeek: settings.leaderOverrideWeek || null,
       autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 5,
       dataVersion: settings.dataVersion || 0,
       sheetSyncUrl: settings.sheetSyncUrl || '',
@@ -283,6 +285,8 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
     if (req.body.weeklyLeader !== undefined) settings.weeklyLeader = req.body.weeklyLeader;
     if (req.body.leaderPool !== undefined) settings.leaderPool = req.body.leaderPool;
     if (req.body.leaderHistory !== undefined) settings.leaderHistory = req.body.leaderHistory;
+    if (req.body.leaderRotationStart !== undefined) settings.leaderRotationStart = req.body.leaderRotationStart;
+    if (req.body.leaderOverrideWeek !== undefined) settings.leaderOverrideWeek = req.body.leaderOverrideWeek;
     if (req.body.autoDeleteDays !== undefined) settings.autoDeleteDays = req.body.autoDeleteDays;
     if (req.body.sheetSyncUrl !== undefined) settings.sheetSyncUrl = req.body.sheetSyncUrl;
     if (req.body.sheetSyncEnabled !== undefined) settings.sheetSyncEnabled = req.body.sheetSyncEnabled;
@@ -305,6 +309,8 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
       weeklyLeader: settings.weeklyLeader || null,
       leaderPool: settings.leaderPool || [],
       leaderHistory: settings.leaderHistory || [],
+      leaderRotationStart: settings.leaderRotationStart || null,
+      leaderOverrideWeek: settings.leaderOverrideWeek || null,
       autoDeleteDays: settings.autoDeleteDays !== undefined ? settings.autoDeleteDays : 5,
       dataVersion: settings.dataVersion || 0,
       sheetSyncUrl: settings.sheetSyncUrl || '',
