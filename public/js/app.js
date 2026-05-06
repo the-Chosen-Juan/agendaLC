@@ -354,9 +354,10 @@ function populateFilterDropdowns() {
     ...tasks.map(t => t.client).filter(Boolean)
   ])].filter(c => c.toLowerCase() !== 'contrato' && c.toLowerCase() !== 'time off');
 
-  const owners = [...new Set(
-    (settings.teamMembers || []).filter(m => m.role === 'Owner').map(m => m.name)
-  )].sort();
+  const owners = [...new Set([
+    ...(settings.teamMembers || []).filter(m => m.role === 'Owner').map(m => m.name),
+    ...tasks.map(t => t.owner).filter(Boolean)
+  ])].sort();
 
   const assigneeSelect = document.getElementById('filter-assignee');
   const clientSelect = document.getElementById('filter-client');
