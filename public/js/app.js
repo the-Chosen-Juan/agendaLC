@@ -2643,6 +2643,10 @@ function renderLeader() {
   const nameEl = document.getElementById('leader-name');
   const leader = getCurrentLeader();
   nameEl.textContent = leader || '—';
+  if (leader && leader !== settings.weeklyLeader) {
+    settings.weeklyLeader = leader;
+    api('PUT', '/settings', { weeklyLeader: leader }).catch(() => {});
+  }
 }
 
 document.getElementById('leader-randomize').addEventListener('click', async () => {
