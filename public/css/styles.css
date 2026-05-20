@@ -3694,6 +3694,117 @@ span.flatpickr-weekday {
 }
 
 /* ===========================
+   ANALYTICS VIEW
+   =========================== */
+.analytics-toolbar {
+  padding: 1.25rem 1.75rem .75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.analytics-period-selector {
+  display: flex;
+  gap: .4rem;
+}
+
+.analytics-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: .75rem;
+  padding: .75rem 1.75rem;
+}
+
+.analytics-kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.analytics-kpi .kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.analytics-kpi .kpi-label {
+  font-size: .72rem;
+  color: var(--text-muted);
+  margin-top: .25rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-weight: 600;
+}
+
+.analytics-kpi .kpi-delta {
+  font-size: .7rem;
+  font-weight: 600;
+  margin-top: .3rem;
+}
+
+.analytics-kpi .kpi-delta.positive { color: var(--success); }
+.analytics-kpi .kpi-delta.negative { color: var(--danger); }
+.analytics-kpi .kpi-delta.neutral { color: var(--text-muted); }
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  padding: .75rem 1.75rem 2rem;
+}
+
+.analytics-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-card h3 {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .75rem;
+  flex-shrink: 0;
+}
+
+.analytics-card canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+.analytics-card-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+    padding: .75rem 1rem 2rem;
+  }
+  .analytics-card-wide {
+    grid-column: auto;
+  }
+  .analytics-kpis {
+    grid-template-columns: repeat(2, 1fr);
+    padding: .75rem 1rem;
+  }
+  .analytics-toolbar {
+    padding: 1rem;
+  }
+}
+
+/* ===========================
    LIQUID GLASS DESIGN SYSTEM
    Dark mode only — editorial stays clean
    =========================== */
@@ -3702,6 +3813,8 @@ span.flatpickr-weekday {
 [data-theme="dark"] .client-card,
 [data-theme="dark"] .team-card,
 [data-theme="dark"] .stat-card,
+[data-theme="dark"] .analytics-card,
+[data-theme="dark"] .analytics-kpi,
 [data-theme="dark"] .heatmap-summary-card,
 [data-theme="dark"] .dropdown-menu {
   background: linear-gradient(135deg, rgba(125,211,163,.1) 0%, rgba(255,255,255,.03) 100%);

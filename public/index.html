@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     (function(){var t=localStorage.getItem('agenda_theme');if(t)document.documentElement.dataset.theme=t;else document.documentElement.dataset.theme='editorial';})();
@@ -54,6 +55,7 @@
         <a href="#" class="nav-item" data-view="clients"><span class="material-icons-round">business</span><span>Clientes</span></a>
         <a href="#" class="nav-item" data-view="timeline"><span class="material-icons-round">view_timeline</span><span>Timeline</span></a>
         <div class="nav-separator"></div>
+        <a href="#" class="nav-item" data-view="analytics"><span class="material-icons-round">insights</span><span>Analytics</span></a>
         <a href="#" class="nav-item" data-view="team"><span class="material-icons-round">group</span><span>Equipo</span></a>
         <a href="#" class="nav-item" data-view="activity"><span class="material-icons-round">history</span><span>Actividad</span></a>
         <a href="#" class="nav-item" data-view="settings"><span class="material-icons-round">settings</span><span>Configuración</span></a>
@@ -277,6 +279,83 @@
           </div>
         </div>
         <div id="activity-log-container" class="activity-log-container"></div>
+      </div>
+
+      <!-- ANALYTICS VIEW -->
+      <div id="view-analytics" class="view hidden">
+        <div class="analytics-toolbar">
+          <div class="analytics-period-selector">
+            <button class="chip active" data-analytics-period="7">7 días</button>
+            <button class="chip" data-analytics-period="14">14 días</button>
+            <button class="chip" data-analytics-period="30">30 días</button>
+            <button class="chip" data-analytics-period="90">90 días</button>
+            <button class="chip" data-analytics-period="all">Todo</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="analytics-refresh"><span class="material-icons-round">refresh</span><span>Actualizar</span></button>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div class="analytics-kpis" id="analytics-kpis"></div>
+
+        <!-- Charts Grid -->
+        <div class="analytics-grid">
+          <div class="analytics-card analytics-card-wide">
+            <h3>Tareas creadas vs completadas por semana</h3>
+            <canvas id="chart-created-vs-completed"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Distribución por estado</h3>
+            <canvas id="chart-status-distribution"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Distribución por prioridad</h3>
+            <canvas id="chart-priority-distribution"></canvas>
+          </div>
+          <div class="analytics-card analytics-card-wide">
+            <h3>Carga por miembro del equipo</h3>
+            <canvas id="chart-workload-by-member"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Tareas por cliente</h3>
+            <canvas id="chart-tasks-by-client"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Tareas por owner</h3>
+            <canvas id="chart-tasks-by-owner"></canvas>
+          </div>
+          <div class="analytics-card analytics-card-wide">
+            <h3>Tasa de tareas vencidas por semana</h3>
+            <canvas id="chart-overdue-trend"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Tiempo promedio de resolución</h3>
+            <canvas id="chart-avg-turnaround"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Cumplimiento de deadlines</h3>
+            <canvas id="chart-deadline-adherence"></canvas>
+          </div>
+          <div class="analytics-card analytics-card-wide">
+            <h3>Flujo de estados (últimas semanas)</h3>
+            <canvas id="chart-status-flow"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Actividad por día de la semana</h3>
+            <canvas id="chart-activity-by-day"></canvas>
+          </div>
+          <div class="analytics-card">
+            <h3>Top clientes por volumen</h3>
+            <canvas id="chart-top-clients"></canvas>
+          </div>
+          <div class="analytics-card analytics-card-wide">
+            <h3>Productividad por miembro (completadas)</h3>
+            <canvas id="chart-member-productivity"></canvas>
+          </div>
+          <div class="analytics-card analytics-card-wide">
+            <h3>Tendencia de carga total</h3>
+            <canvas id="chart-total-trend"></canvas>
+          </div>
+        </div>
       </div>
     </main>
   </div>

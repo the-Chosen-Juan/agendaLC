@@ -154,6 +154,7 @@ darkModeToggle.addEventListener('click', () => {
     localStorage.setItem('agenda_theme', 'dark');
     darkModeToggle.querySelector('.material-icons-round').textContent = 'light_mode';
   }
+  if (!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
 });
 
 // --- LOGIN REMOVED - App loads directly ---
@@ -174,7 +175,7 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${view}`).classList.remove('hidden');
 
-  const titles = { agenda: 'Agenda', timeline: 'Timeline', heatmap: 'Carga', calendar: 'Calendario', clients: 'Clientes', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
+  const titles = { agenda: 'Agenda', timeline: 'Timeline', heatmap: 'Carga', calendar: 'Calendario', clients: 'Clientes', analytics: 'Analytics', team: 'Equipo', activity: 'Actividad', settings: 'Configuración' };
   document.getElementById('page-title').textContent = titles[view] || 'Agenda';
 
   const searchBox = document.getElementById('search-box');
@@ -191,6 +192,7 @@ function switchView(view) {
   if (view === 'heatmap') renderHeatmap();
   if (view === 'calendar') renderCalendar();
   if (view === 'clients') renderClientsDashboard();
+  if (view === 'analytics') renderAnalytics();
   if (view === 'activity') loadActivityLog();
   if (view === 'settings') renderSettingsPage();
 }
@@ -282,6 +284,8 @@ async function loadData() {
 
     // Auto-delete completed tasks older than configured days (non-blocking)
     autoDeleteCompletedTasks().catch(() => {});
+    // Daily snapshot for analytics (max once per day)
+    takeDailySnapshot();
   } catch (err) {
     console.error('Failed to load data:', err);
   }
@@ -4492,6 +4496,7 @@ const TAB_DEFINITIONS = [
   { view: 'clients', label: 'Clientes', icon: 'business' },
   { view: 'timeline', label: 'Timeline', icon: 'view_timeline' },
   { view: 'team', label: 'Equipo', icon: 'group' },
+  { view: 'analytics', label: 'Analytics', icon: 'insights' },
   { view: 'activity', label: 'Actividad', icon: 'history' },
   { view: 'settings', label: 'Configuración', icon: 'settings', locked: true },
 ];
@@ -5647,6 +5652,436 @@ initDatePicker('#cal-event-date');
     observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
   });
 })();
+
+// --- ANALYTICS ---
+let analyticsHistory = [];
+let analyticsCharts = {};
+let analyticsPeriod = 30;
+
+function takeDailySnapshot() {
+  const lastSnap = localStorage.getItem('agenda_last_snapshot');
+  const today = new Date().toISOString().split('T')[0];
+  if (lastSnap === today) return;
+  api('POST', '/history/snapshot').then(() => {
+    localStorage.setItem('agenda_last_snapshot', today);
+  }).catch(() => {});
+}
+
+// Period selector
+document.querySelectorAll('[data-analytics-period]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-analytics-period]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const val = btn.dataset.analyticsPeriod;
+    analyticsPeriod = val === 'all' ? 9999 : parseInt(val);
+    renderAnalytics();
+  });
+});
+
+document.getElementById('analytics-refresh')?.addEventListener('click', () => renderAnalytics());
+
+function getChartColors() {
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  return {
+    text: isDark ? '#e7e9ef' : '#17150f',
+    textMuted: isDark ? '#7a8599' : '#7a7060',
+    grid: isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)',
+    primary: isDark ? '#7dd3a3' : '#a74a1f',
+    success: isDark ? '#7dd3a3' : '#3d6318',
+    warning: isDark ? '#fbbf24' : '#8a5c00',
+    danger: isDark ? '#f87171' : '#9c2a13',
+    purple: isDark ? '#a78bfa' : '#6d28d9',
+    cyan: isDark ? '#67e8f9' : '#0c7f75',
+    orange: isDark ? '#fb923c' : '#c2410c',
+    pink: isDark ? '#f472b6' : '#be185d',
+    blue: isDark ? '#60a5fa' : '#2563eb',
+    palette: isDark
+      ? ['#7dd3a3','#fbbf24','#f87171','#a78bfa','#67e8f9','#fb923c','#f472b6','#60a5fa','#34d399','#facc15','#fb7185','#c084fc']
+      : ['#a74a1f','#8a5c00','#9c2a13','#6d28d9','#0c7f75','#c2410c','#be185d','#2563eb','#3d6318','#b45309','#e11d48','#7c3aed']
+  };
+}
+
+function chartDefaults() {
+  const c = getChartColors();
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: c.text, font: { size: 11, family: "'Inter', sans-serif" }, boxWidth: 12, padding: 12 } },
+      tooltip: { backgroundColor: 'rgba(0,0,0,.8)', titleFont: { size: 12 }, bodyFont: { size: 11 }, padding: 10, cornerRadius: 6 }
+    },
+    scales: {
+      x: { ticks: { color: c.textMuted, font: { size: 10 } }, grid: { color: c.grid } },
+      y: { ticks: { color: c.textMuted, font: { size: 10 } }, grid: { color: c.grid }, beginAtZero: true }
+    }
+  };
+}
+
+function destroyCharts() {
+  Object.values(analyticsCharts).forEach(ch => { if (ch) ch.destroy(); });
+  analyticsCharts = {};
+}
+
+function getWeekLabel(date) {
+  const d = new Date(date);
+  const day = d.getDate();
+  const month = d.toLocaleDateString('es', { month: 'short' });
+  return `${day} ${month}`;
+}
+
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff)).toISOString().split('T')[0];
+}
+
+async function renderAnalytics() {
+  destroyCharts();
+  const c = getChartColors();
+  const now = new Date();
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() - analyticsPeriod);
+
+  try {
+    analyticsHistory = await api('GET', '/history');
+    if (analyticsHistory.length === 0) {
+      await api('POST', '/history/backfill');
+      analyticsHistory = await api('GET', '/history');
+    }
+  } catch { analyticsHistory = []; }
+
+  const allTasks = tasks.filter(t => !t.isTimeOff);
+  const historyInRange = analyticsHistory.filter(h => new Date(h.timestamp) >= cutoff);
+
+  // --- KPIs ---
+  const totalActive = allTasks.length;
+  const completed = historyInRange.filter(h => h.type === 'status_change' && h.newStatus === 'completado').length;
+  const created = historyInRange.filter(h => h.type === 'task_created').length;
+  const overdueNow = allTasks.filter(t => t.deadline && t.status !== 'completado' && new Date(t.deadline + 'T00:00:00') < now).length;
+
+  const completedTasks = historyInRange.filter(h => h.type === 'status_change' && h.newStatus === 'completado' && h.task);
+  let avgTurnaround = 0;
+  const turnarounds = [];
+  completedTasks.forEach(h => {
+    const created = h.task.createdAt || h.task.deadline;
+    if (created && h.completedAt) {
+      const days = (new Date(h.completedAt) - new Date(created)) / 86400000;
+      if (days >= 0 && days < 365) turnarounds.push(days);
+    }
+  });
+  if (turnarounds.length > 0) avgTurnaround = turnarounds.reduce((a, b) => a + b, 0) / turnarounds.length;
+
+  const deadlineTasks = allTasks.filter(t => t.deadline);
+  const onTime = deadlineTasks.filter(t => t.status === 'completado' || new Date(t.deadline + 'T00:00:00') >= now).length;
+  const adherenceRate = deadlineTasks.length > 0 ? Math.round((onTime / deadlineTasks.length) * 100) : 100;
+
+  const kpiContainer = document.getElementById('analytics-kpis');
+  kpiContainer.innerHTML = `
+    <div class="analytics-kpi"><div class="kpi-value">${totalActive}</div><div class="kpi-label">Tareas activas</div></div>
+    <div class="analytics-kpi"><div class="kpi-value">${completed}</div><div class="kpi-label">Completadas (período)</div></div>
+    <div class="analytics-kpi"><div class="kpi-value">${created}</div><div class="kpi-label">Creadas (período)</div></div>
+    <div class="analytics-kpi"><div class="kpi-value">${overdueNow}</div><div class="kpi-label">Vencidas ahora</div><div class="kpi-delta ${overdueNow > 0 ? 'negative' : 'positive'}">${overdueNow > 0 ? '⚠ Requieren atención' : '✓ Al día'}</div></div>
+    <div class="analytics-kpi"><div class="kpi-value">${avgTurnaround > 0 ? avgTurnaround.toFixed(1) + 'd' : '—'}</div><div class="kpi-label">Tiempo promedio resolución</div></div>
+    <div class="analytics-kpi"><div class="kpi-value">${adherenceRate}%</div><div class="kpi-label">Cumplimiento deadlines</div><div class="kpi-delta ${adherenceRate >= 80 ? 'positive' : adherenceRate >= 60 ? 'neutral' : 'negative'}">${adherenceRate >= 80 ? '✓ Buen ritmo' : 'Mejorar'}</div></div>
+  `;
+
+  // --- CHART: Created vs Completed per week ---
+  const weekBuckets = {};
+  for (let d = new Date(cutoff); d <= now; d.setDate(d.getDate() + 1)) {
+    const ws = getWeekStart(d);
+    if (!weekBuckets[ws]) weekBuckets[ws] = { created: 0, completed: 0 };
+  }
+  historyInRange.forEach(h => {
+    const ws = getWeekStart(h.timestamp);
+    if (!weekBuckets[ws]) weekBuckets[ws] = { created: 0, completed: 0 };
+    if (h.type === 'task_created') weekBuckets[ws].created++;
+    if (h.type === 'status_change' && h.newStatus === 'completado') weekBuckets[ws].completed++;
+  });
+  const weekKeys = Object.keys(weekBuckets).sort();
+  analyticsCharts.createdVsCompleted = new Chart(document.getElementById('chart-created-vs-completed'), {
+    type: 'bar',
+    data: {
+      labels: weekKeys.map(getWeekLabel),
+      datasets: [
+        { label: 'Creadas', data: weekKeys.map(k => weekBuckets[k].created), backgroundColor: c.blue + '99', borderColor: c.blue, borderWidth: 1, borderRadius: 4 },
+        { label: 'Completadas', data: weekKeys.map(k => weekBuckets[k].completed), backgroundColor: c.success + '99', borderColor: c.success, borderWidth: 1, borderRadius: 4 }
+      ]
+    },
+    options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { ...chartDefaults().plugins.legend, display: true } } }
+  });
+
+  // --- CHART: Status distribution (doughnut) ---
+  const statusCounts = {};
+  allTasks.forEach(t => { const s = t.status || 'sin empezar'; statusCounts[s] = (statusCounts[s] || 0) + 1; });
+  const statusLabels = Object.keys(statusCounts);
+  const statusColors = statusLabels.map(s => {
+    const map = { 'sin empezar': c.textMuted, 'en progreso': c.warning, 'on going': c.success, 'esperando respuesta': c.purple, 'completado': c.cyan };
+    return map[s] || c.orange;
+  });
+  analyticsCharts.statusDist = new Chart(document.getElementById('chart-status-distribution'), {
+    type: 'doughnut',
+    data: { labels: statusLabels.map(s => s.charAt(0).toUpperCase() + s.slice(1)), datasets: [{ data: statusLabels.map(s => statusCounts[s]), backgroundColor: statusColors, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: c.text, font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
+  });
+
+  // --- CHART: Priority distribution (doughnut) ---
+  const prioCounts = {};
+  allTasks.forEach(t => { const p = t.priority || 'tbd'; prioCounts[p] = (prioCounts[p] || 0) + 1; });
+  const prioLabels = Object.keys(prioCounts);
+  const prioColors = prioLabels.map(p => {
+    const map = { 'alta': c.danger, 'media': c.warning, 'baja': c.success, 'tbd': c.textMuted };
+    return map[p] || c.orange;
+  });
+  analyticsCharts.prioDist = new Chart(document.getElementById('chart-priority-distribution'), {
+    type: 'doughnut',
+    data: { labels: prioLabels.map(p => p.charAt(0).toUpperCase() + p.slice(1)), datasets: [{ data: prioLabels.map(p => prioCounts[p]), backgroundColor: prioColors, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: c.text, font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
+  });
+
+  // --- CHART: Workload by team member (horizontal bar) ---
+  const memberCounts = {};
+  allTasks.forEach(t => { if (t.assignee) memberCounts[t.assignee] = (memberCounts[t.assignee] || 0) + 1; });
+  const membersSorted = Object.entries(memberCounts).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  analyticsCharts.workload = new Chart(document.getElementById('chart-workload-by-member'), {
+    type: 'bar',
+    data: {
+      labels: membersSorted.map(m => m[0]),
+      datasets: [{
+        label: 'Tareas',
+        data: membersSorted.map(m => m[1]),
+        backgroundColor: membersSorted.map((m, i) => {
+          const member = (settings.teamMembers || []).find(tm => tm.name === m[0]);
+          return member?.color || c.palette[i % c.palette.length];
+        }),
+        borderWidth: 0,
+        borderRadius: 4
+      }]
+    },
+    options: { ...chartDefaults(), indexAxis: 'y', plugins: { ...chartDefaults().plugins, legend: { display: false } } }
+  });
+
+  // --- CHART: Tasks by client ---
+  const clientCounts = {};
+  allTasks.forEach(t => { if (t.client) clientCounts[t.client] = (clientCounts[t.client] || 0) + 1; });
+  const clientsSorted = Object.entries(clientCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  analyticsCharts.byClient = new Chart(document.getElementById('chart-tasks-by-client'), {
+    type: 'doughnut',
+    data: {
+      labels: clientsSorted.map(cl => cl[0]),
+      datasets: [{ data: clientsSorted.map(cl => cl[1]), backgroundColor: clientsSorted.map((_, i) => c.palette[i % c.palette.length]), borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: c.text, font: { size: 10 }, boxWidth: 10, padding: 6 } } } }
+  });
+
+  // --- CHART: Tasks by owner ---
+  const ownerCounts = {};
+  allTasks.forEach(t => { if (t.owner) ownerCounts[t.owner] = (ownerCounts[t.owner] || 0) + 1; });
+  const ownersSorted = Object.entries(ownerCounts).sort((a, b) => b[1] - a[1]);
+  analyticsCharts.byOwner = new Chart(document.getElementById('chart-tasks-by-owner'), {
+    type: 'doughnut',
+    data: {
+      labels: ownersSorted.map(o => o[0]),
+      datasets: [{ data: ownersSorted.map(o => o[1]), backgroundColor: ownersSorted.map((_, i) => c.palette[i % c.palette.length]), borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: c.text, font: { size: 10 }, boxWidth: 10, padding: 6 } } } }
+  });
+
+  // --- CHART: Overdue trend per week ---
+  const overdueByWeek = {};
+  weekKeys.forEach(ws => { overdueByWeek[ws] = 0; });
+  allTasks.forEach(t => {
+    if (t.deadline && t.status !== 'completado') {
+      const dl = new Date(t.deadline + 'T00:00:00');
+      if (dl < now) {
+        const ws = getWeekStart(t.deadline);
+        if (overdueByWeek[ws] !== undefined) overdueByWeek[ws]++;
+      }
+    }
+  });
+  historyInRange.filter(h => h.type === 'task_deleted' && h.task && h.task.deadline && h.task.status !== 'completado').forEach(h => {
+    const dl = new Date(h.task.deadline + 'T00:00:00');
+    if (dl < new Date(h.timestamp)) {
+      const ws = getWeekStart(h.task.deadline);
+      if (overdueByWeek[ws] !== undefined) overdueByWeek[ws]++;
+    }
+  });
+  analyticsCharts.overdueTrend = new Chart(document.getElementById('chart-overdue-trend'), {
+    type: 'line',
+    data: {
+      labels: weekKeys.map(getWeekLabel),
+      datasets: [{ label: 'Tareas vencidas', data: weekKeys.map(k => overdueByWeek[k] || 0), borderColor: c.danger, backgroundColor: c.danger + '18', fill: true, tension: .3, pointRadius: 4, pointBackgroundColor: c.danger }]
+    },
+    options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { display: false } } }
+  });
+
+  // --- CHART: Avg turnaround by owner ---
+  const turnaroundByOwner = {};
+  completedTasks.forEach(h => {
+    const owner = h.task?.owner;
+    if (!owner) return;
+    const created = h.task.createdAt || h.task.deadline;
+    if (created && h.completedAt) {
+      const days = (new Date(h.completedAt) - new Date(created)) / 86400000;
+      if (days >= 0 && days < 365) {
+        if (!turnaroundByOwner[owner]) turnaroundByOwner[owner] = [];
+        turnaroundByOwner[owner].push(days);
+      }
+    }
+  });
+  const turnaroundOwners = Object.entries(turnaroundByOwner).map(([name, vals]) => ({ name, avg: vals.reduce((a, b) => a + b, 0) / vals.length })).sort((a, b) => a.avg - b.avg);
+  if (turnaroundOwners.length > 0) {
+    analyticsCharts.avgTurnaround = new Chart(document.getElementById('chart-avg-turnaround'), {
+      type: 'bar',
+      data: {
+        labels: turnaroundOwners.map(o => o.name),
+        datasets: [{ label: 'Días promedio', data: turnaroundOwners.map(o => Math.round(o.avg * 10) / 10), backgroundColor: c.palette.slice(0, turnaroundOwners.length), borderWidth: 0, borderRadius: 4 }]
+      },
+      options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { display: false } } }
+    });
+  } else {
+    const ctx = document.getElementById('chart-avg-turnaround').getContext('2d');
+    ctx.fillStyle = c.textMuted;
+    ctx.font = '13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Se necesitan más datos históricos', ctx.canvas.width / 2, ctx.canvas.height / 2);
+  }
+
+  // --- CHART: Deadline adherence (gauge-like doughnut) ---
+  const metDeadline = deadlineTasks.filter(t => {
+    if (t.status === 'completado') return true;
+    return new Date(t.deadline + 'T00:00:00') >= now;
+  }).length;
+  const missedDeadline = deadlineTasks.length - metDeadline;
+  analyticsCharts.deadlineAdherence = new Chart(document.getElementById('chart-deadline-adherence'), {
+    type: 'doughnut',
+    data: {
+      labels: ['A tiempo', 'Vencidas'],
+      datasets: [{ data: [metDeadline, missedDeadline], backgroundColor: [c.success, c.danger], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: c.text, font: { size: 11 }, boxWidth: 10 } } },
+      cutout: '65%'
+    }
+  });
+
+  // --- CHART: Status flow (stacked bar per week) ---
+  const statusFlowByWeek = {};
+  const allStatuses = ['sin empezar', 'en progreso', 'on going', 'esperando respuesta', 'completado'];
+  weekKeys.forEach(ws => { statusFlowByWeek[ws] = {}; allStatuses.forEach(s => statusFlowByWeek[ws][s] = 0); });
+  historyInRange.filter(h => h.type === 'status_change').forEach(h => {
+    const ws = getWeekStart(h.timestamp);
+    if (statusFlowByWeek[ws] && h.newStatus) statusFlowByWeek[ws][h.newStatus] = (statusFlowByWeek[ws][h.newStatus] || 0) + 1;
+  });
+  const statusFlowColors = { 'sin empezar': c.textMuted, 'en progreso': c.warning, 'on going': c.success, 'esperando respuesta': c.purple, 'completado': c.cyan };
+  analyticsCharts.statusFlow = new Chart(document.getElementById('chart-status-flow'), {
+    type: 'bar',
+    data: {
+      labels: weekKeys.map(getWeekLabel),
+      datasets: allStatuses.map(s => ({
+        label: s.charAt(0).toUpperCase() + s.slice(1),
+        data: weekKeys.map(ws => statusFlowByWeek[ws][s] || 0),
+        backgroundColor: statusFlowColors[s] + '99',
+        borderColor: statusFlowColors[s],
+        borderWidth: 1,
+        borderRadius: 2
+      }))
+    },
+    options: { ...chartDefaults(), scales: { ...chartDefaults().scales, x: { ...chartDefaults().scales.x, stacked: true }, y: { ...chartDefaults().scales.y, stacked: true } } }
+  });
+
+  // --- CHART: Activity by day of week ---
+  const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  const dayActivity = [0, 0, 0, 0, 0, 0, 0];
+  historyInRange.filter(h => h.type === 'task_created' || h.type === 'status_change').forEach(h => {
+    const d = new Date(h.timestamp).getDay();
+    const idx = d === 0 ? 6 : d - 1;
+    dayActivity[idx]++;
+  });
+  analyticsCharts.activityByDay = new Chart(document.getElementById('chart-activity-by-day'), {
+    type: 'bar',
+    data: {
+      labels: dayNames,
+      datasets: [{ label: 'Actividad', data: dayActivity, backgroundColor: dayActivity.map((v, i) => { const max = Math.max(...dayActivity); return v === max ? c.primary : c.primary + '66'; }), borderWidth: 0, borderRadius: 6 }]
+    },
+    options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { display: false } } }
+  });
+
+  // --- CHART: Top clients trend (line) ---
+  const topClients = clientsSorted.slice(0, 5).map(cl => cl[0]);
+  const clientWeekData = {};
+  topClients.forEach(cl => { clientWeekData[cl] = {}; weekKeys.forEach(ws => clientWeekData[cl][ws] = 0); });
+  historyInRange.filter(h => h.type === 'task_created' && h.task?.client).forEach(h => {
+    if (topClients.includes(h.task.client)) {
+      const ws = getWeekStart(h.timestamp);
+      if (clientWeekData[h.task.client][ws] !== undefined) clientWeekData[h.task.client][ws]++;
+    }
+  });
+  analyticsCharts.topClients = new Chart(document.getElementById('chart-top-clients'), {
+    type: 'line',
+    data: {
+      labels: weekKeys.map(getWeekLabel),
+      datasets: topClients.map((cl, i) => ({
+        label: cl,
+        data: weekKeys.map(ws => clientWeekData[cl][ws] || 0),
+        borderColor: c.palette[i],
+        backgroundColor: 'transparent',
+        tension: .3,
+        pointRadius: 3,
+        pointBackgroundColor: c.palette[i],
+        borderWidth: 2
+      }))
+    },
+    options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { ...chartDefaults().plugins.legend, display: true } } }
+  });
+
+  // --- CHART: Member productivity (completed tasks per member) ---
+  const memberCompleted = {};
+  completedTasks.forEach(h => {
+    const assignee = h.task?.assignee;
+    if (assignee) memberCompleted[assignee] = (memberCompleted[assignee] || 0) + 1;
+  });
+  const memberProdSorted = Object.entries(memberCompleted).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  if (memberProdSorted.length > 0) {
+    analyticsCharts.memberProductivity = new Chart(document.getElementById('chart-member-productivity'), {
+      type: 'bar',
+      data: {
+        labels: memberProdSorted.map(m => m[0]),
+        datasets: [{ label: 'Completadas', data: memberProdSorted.map(m => m[1]), backgroundColor: memberProdSorted.map((m, i) => { const member = (settings.teamMembers || []).find(tm => tm.name === m[0]); return member?.color || c.palette[i % c.palette.length]; }), borderWidth: 0, borderRadius: 4 }]
+      },
+      options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { display: false } } }
+    });
+  } else {
+    const ctx = document.getElementById('chart-member-productivity').getContext('2d');
+    ctx.fillStyle = c.textMuted;
+    ctx.font = '13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Se necesitan más datos históricos', ctx.canvas.width / 2, ctx.canvas.height / 2);
+  }
+
+  // --- CHART: Total task trend (line from snapshots) ---
+  const snapshots = analyticsHistory.filter(h => h.type === 'daily_snapshot').sort((a, b) => a.date?.localeCompare(b.date));
+  if (snapshots.length > 1) {
+    analyticsCharts.totalTrend = new Chart(document.getElementById('chart-total-trend'), {
+      type: 'line',
+      data: {
+        labels: snapshots.map(s => { const d = new Date(s.date + 'T00:00:00'); return d.toLocaleDateString('es', { day: 'numeric', month: 'short' }); }),
+        datasets: [
+          { label: 'Total tareas', data: snapshots.map(s => s.totalTasks || 0), borderColor: c.primary, backgroundColor: c.primary + '18', fill: true, tension: .3, pointRadius: 3, borderWidth: 2 },
+          { label: 'Vencidas', data: snapshots.map(s => s.overdue || 0), borderColor: c.danger, backgroundColor: c.danger + '18', fill: true, tension: .3, pointRadius: 3, borderWidth: 2 }
+        ]
+      },
+      options: { ...chartDefaults() }
+    });
+  } else {
+    const ctx = document.getElementById('chart-total-trend').getContext('2d');
+    ctx.fillStyle = c.textMuted;
+    ctx.font = '13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Los datos de tendencia se acumulan con el uso diario', ctx.canvas.width / 2, ctx.canvas.height / 2);
+  }
+}
 
 // --- INIT ---
 loadData();

@@ -89,6 +89,43 @@ async function saveTasks(tasks) {
   }
 }
 
+// --- History storage ---
+async function getHistory() {
+  if (USE_REDIS) {
+    const data = await redis.get('agenda:history');
+    if (data) return typeof data === 'string' ? JSON.parse(data) : data;
+    return [];
+  } else {
+    const filePath = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'history.json');
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, JSON.stringify([], null, 2));
+      return [];
+    }
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  }
+}
+
+async function saveHistory(history) {
+  if (USE_REDIS) {
+    await redis.set('agenda:history', JSON.stringify(history));
+  } else {
+    const filePath = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'history.json');
+    fs.writeFileSync(filePath, JSON.stringify(history, null, 2));
+  }
+}
+
+async function logHistory(event) {
+  try {
+    const history = await getHistory();
+    history.push({ ...event, timestamp: new Date().toISOString() });
+    // Keep max 10000 entries
+    if (history.length > 10000) history.splice(0, history.length - 10000);
+    await saveHistory(history);
+  } catch (err) {
+    console.error('History log error:', err);
+  }
+}
+
 // ============================================================
 // AUTH - Stateless HMAC tokens (works on serverless)
 // ============================================================
@@ -194,6 +231,7 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
     };
     tasks.push(task);
     await saveTasks(tasks);
+    logHistory({ type: 'task_created', task: { id: task.id, client: task.client, project: task.project, assignee: task.assignee, owner: task.owner, priority: task.priority, deadline: task.deadline, status: task.status } });
     res.json(task);
   } catch (err) {
     console.error('Create task error:', err);
@@ -206,8 +244,16 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
     const tasks = await getTasks();
     const idx = tasks.findIndex(t => t.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'Task not found' });
+    const oldTask = { ...tasks[idx] };
     tasks[idx] = { ...tasks[idx], ...req.body, updatedAt: new Date().toISOString() };
     await saveTasks(tasks);
+    const newTask = tasks[idx];
+    if (oldTask.status !== newTask.status) {
+      logHistory({ type: 'status_change', task: { id: newTask.id, client: newTask.client, project: newTask.project, assignee: newTask.assignee, owner: newTask.owner, priority: newTask.priority, deadline: newTask.deadline }, oldStatus: oldTask.status, newStatus: newTask.status, completedAt: newTask.status === 'completado' ? new Date().toISOString() : undefined });
+    }
+    if (oldTask.assignee !== newTask.assignee) {
+      logHistory({ type: 'reassigned', task: { id: newTask.id, client: newTask.client, project: newTask.project, owner: newTask.owner }, oldAssignee: oldTask.assignee, newAssignee: newTask.assignee });
+    }
     res.json(tasks[idx]);
   } catch (err) {
     console.error('Update task error:', err);
@@ -218,11 +264,96 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
 app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
   try {
     let tasks = await getTasks();
+    const deleted = tasks.find(t => t.id === req.params.id);
+    if (deleted) {
+      logHistory({ type: 'task_deleted', task: { id: deleted.id, client: deleted.client, project: deleted.project, assignee: deleted.assignee, owner: deleted.owner, priority: deleted.priority, deadline: deleted.deadline, status: deleted.status, createdAt: deleted.createdAt } });
+    }
     tasks = tasks.filter(t => t.id !== req.params.id);
     await saveTasks(tasks);
     res.json({ success: true });
   } catch (err) {
     console.error('Delete task error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
+// HISTORY / ANALYTICS
+// ============================================================
+app.get('/api/history', authMiddleware, async (req, res) => {
+  try {
+    const history = await getHistory();
+    res.json(history);
+  } catch (err) {
+    console.error('Get history error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Snapshot current tasks for historical tracking (called by frontend periodically)
+app.post('/api/history/snapshot', authMiddleware, async (req, res) => {
+  try {
+    const tasks = await getTasks();
+    const regular = tasks.filter(t => !t.isTimeOff);
+    const snapshot = {
+      type: 'daily_snapshot',
+      date: new Date().toISOString().split('T')[0],
+      totalTasks: regular.length,
+      byStatus: {},
+      byPriority: {},
+      byOwner: {},
+      byAssignee: {},
+      byClient: {},
+      overdue: 0
+    };
+    const now = new Date();
+    regular.forEach(t => {
+      snapshot.byStatus[t.status || 'sin empezar'] = (snapshot.byStatus[t.status || 'sin empezar'] || 0) + 1;
+      snapshot.byPriority[t.priority || 'tbd'] = (snapshot.byPriority[t.priority || 'tbd'] || 0) + 1;
+      if (t.owner) snapshot.byOwner[t.owner] = (snapshot.byOwner[t.owner] || 0) + 1;
+      if (t.assignee) snapshot.byAssignee[t.assignee] = (snapshot.byAssignee[t.assignee] || 0) + 1;
+      if (t.client) snapshot.byClient[t.client] = (snapshot.byClient[t.client] || 0) + 1;
+      if (t.deadline && t.status !== 'completado' && new Date(t.deadline + 'T00:00:00') < now) snapshot.overdue++;
+    });
+    await logHistory(snapshot);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Snapshot error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Backfill history from existing tasks (one-time seed)
+app.post('/api/history/backfill', authMiddleware, async (req, res) => {
+  try {
+    const history = await getHistory();
+    const existingIds = new Set(history.filter(h => h.task?.id).map(h => h.task.id));
+    const tasks = await getTasks();
+    let added = 0;
+    tasks.filter(t => !t.isTimeOff).forEach(t => {
+      if (existingIds.has(t.id)) return;
+      history.push({
+        type: 'task_created',
+        timestamp: t.createdAt || new Date().toISOString(),
+        task: { id: t.id, client: t.client, project: t.project, assignee: t.assignee, owner: t.owner, priority: t.priority, deadline: t.deadline, status: t.status, createdAt: t.createdAt }
+      });
+      if (t.status === 'completado') {
+        history.push({
+          type: 'status_change',
+          timestamp: t.completedAt || t.updatedAt || new Date().toISOString(),
+          task: { id: t.id, client: t.client, project: t.project, assignee: t.assignee, owner: t.owner, priority: t.priority, deadline: t.deadline, createdAt: t.createdAt },
+          oldStatus: 'en progreso',
+          newStatus: 'completado',
+          completedAt: t.completedAt || t.updatedAt || new Date().toISOString()
+        });
+      }
+      added++;
+    });
+    if (history.length > 10000) history.splice(0, history.length - 10000);
+    await saveHistory(history);
+    res.json({ success: true, added });
+  } catch (err) {
+    console.error('Backfill error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1343,6 +1474,9 @@ app.post('/api/sheet-sync', authMiddleware, async (req, res) => {
 
     const result = await performSheetSync();
     console.log(`Sheet sync: +${result.created} ~${result.updated} -${result.deleted} =${result.unchanged}`);
+    if (result.created > 0 || result.updated > 0 || result.deleted > 0) {
+      logHistory({ type: 'sheet_sync', created: result.created, updated: result.updated, deleted: result.deleted, unchanged: result.unchanged });
+    }
     res.json(result);
   } catch (err) {
     console.error('Sheet sync error:', err.message);
