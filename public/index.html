@@ -285,75 +285,41 @@
       <div id="view-analytics" class="view hidden">
         <div class="analytics-toolbar">
           <div class="analytics-period-selector">
-            <button class="chip active" data-analytics-period="7">7 días</button>
-            <button class="chip" data-analytics-period="14">14 días</button>
-            <button class="chip" data-analytics-period="30">30 días</button>
-            <button class="chip" data-analytics-period="90">90 días</button>
+            <button class="chip active" data-analytics-period="7">7d</button>
+            <button class="chip" data-analytics-period="14">14d</button>
+            <button class="chip" data-analytics-period="30">30d</button>
+            <button class="chip" data-analytics-period="90">90d</button>
             <button class="chip" data-analytics-period="all">Todo</button>
           </div>
-          <button class="btn btn-ghost btn-sm" id="analytics-refresh"><span class="material-icons-round">refresh</span><span>Actualizar</span></button>
+          <div class="analytics-tabs">
+            <button class="analytics-tab active" data-atab="overview">Resumen</button>
+            <button class="analytics-tab" data-atab="team">Equipo</button>
+            <button class="analytics-tab" data-atab="clients">Clientes</button>
+          </div>
         </div>
 
-        <!-- KPI Summary Cards -->
         <div class="analytics-kpis" id="analytics-kpis"></div>
 
-        <!-- Charts Grid -->
-        <div class="analytics-grid">
-          <div class="analytics-card analytics-card-wide">
-            <h3>Tareas creadas vs completadas por semana</h3>
-            <canvas id="chart-created-vs-completed"></canvas>
+        <div class="analytics-section" id="atab-overview">
+          <div class="analytics-grid">
+            <div class="analytics-card analytics-card-wide"><h3>Creadas vs completadas</h3><canvas id="chart-created-vs-completed"></canvas></div>
+            <div class="analytics-card"><h3>Estado actual</h3><canvas id="chart-status-distribution"></canvas></div>
+            <div class="analytics-card"><h3>Prioridad</h3><canvas id="chart-priority-distribution"></canvas></div>
           </div>
-          <div class="analytics-card">
-            <h3>Distribución por estado</h3>
-            <canvas id="chart-status-distribution"></canvas>
+        </div>
+
+        <div class="analytics-section hidden" id="atab-team">
+          <div class="analytics-grid">
+            <div class="analytics-card analytics-card-wide"><h3>Carga por miembro</h3><canvas id="chart-workload-by-member"></canvas></div>
+            <div class="analytics-card"><h3>Deadlines</h3><canvas id="chart-deadline-adherence"></canvas></div>
+            <div class="analytics-card"><h3>Actividad por día</h3><canvas id="chart-activity-by-day"></canvas></div>
           </div>
-          <div class="analytics-card">
-            <h3>Distribución por prioridad</h3>
-            <canvas id="chart-priority-distribution"></canvas>
-          </div>
-          <div class="analytics-card analytics-card-wide">
-            <h3>Carga por miembro del equipo</h3>
-            <canvas id="chart-workload-by-member"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Tareas por cliente</h3>
-            <canvas id="chart-tasks-by-client"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Tareas por owner</h3>
-            <canvas id="chart-tasks-by-owner"></canvas>
-          </div>
-          <div class="analytics-card analytics-card-wide">
-            <h3>Tasa de tareas vencidas por semana</h3>
-            <canvas id="chart-overdue-trend"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Tiempo promedio de resolución</h3>
-            <canvas id="chart-avg-turnaround"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Cumplimiento de deadlines</h3>
-            <canvas id="chart-deadline-adherence"></canvas>
-          </div>
-          <div class="analytics-card analytics-card-wide">
-            <h3>Flujo de estados (últimas semanas)</h3>
-            <canvas id="chart-status-flow"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Actividad por día de la semana</h3>
-            <canvas id="chart-activity-by-day"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Top clientes por volumen</h3>
-            <canvas id="chart-top-clients"></canvas>
-          </div>
-          <div class="analytics-card analytics-card-wide">
-            <h3>Productividad por miembro (completadas)</h3>
-            <canvas id="chart-member-productivity"></canvas>
-          </div>
-          <div class="analytics-card analytics-card-wide">
-            <h3>Tendencia de carga total</h3>
-            <canvas id="chart-total-trend"></canvas>
+        </div>
+
+        <div class="analytics-section hidden" id="atab-clients">
+          <div class="analytics-grid">
+            <div class="analytics-card"><h3>Tareas por cliente</h3><canvas id="chart-tasks-by-client"></canvas></div>
+            <div class="analytics-card"><h3>Tareas por owner</h3><canvas id="chart-tasks-by-owner"></canvas></div>
           </div>
         </div>
       </div>

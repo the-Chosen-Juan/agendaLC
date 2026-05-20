@@ -3697,53 +3697,82 @@ span.flatpickr-weekday {
    ANALYTICS VIEW
    =========================== */
 .analytics-toolbar {
-  padding: 1.25rem 1.75rem .75rem;
+  padding: 1rem 1.75rem .5rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: .75rem;
   flex-wrap: wrap;
 }
 
 .analytics-period-selector {
   display: flex;
-  gap: .4rem;
+  gap: .3rem;
 }
+
+.analytics-tabs {
+  display: flex;
+  gap: .25rem;
+  margin-left: auto;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+  padding: .2rem;
+}
+
+.analytics-tab {
+  padding: .35rem .9rem;
+  border: none;
+  background: transparent;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: var(--transition);
+}
+
+.analytics-tab.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.analytics-section.hidden { display: none; }
 
 .analytics-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: .75rem;
-  padding: .75rem 1.75rem;
+  grid-template-columns: repeat(6, 1fr);
+  gap: .6rem;
+  padding: .5rem 1.75rem;
 }
 
 .analytics-kpi {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem 1.15rem;
+  padding: .75rem .9rem;
   box-shadow: var(--shadow-sm);
 }
 
 .analytics-kpi .kpi-value {
-  font-size: 1.75rem;
+  font-size: 1.4rem;
   font-weight: 700;
   line-height: 1.1;
   color: var(--text);
 }
 
 .analytics-kpi .kpi-label {
-  font-size: .72rem;
+  font-size: .65rem;
   color: var(--text-muted);
-  margin-top: .25rem;
+  margin-top: .15rem;
   text-transform: uppercase;
   letter-spacing: .04em;
   font-weight: 600;
 }
 
 .analytics-kpi .kpi-delta {
-  font-size: .7rem;
+  font-size: .65rem;
   font-weight: 600;
-  margin-top: .3rem;
+  margin-top: .2rem;
 }
 
 .analytics-kpi .kpi-delta.positive { color: var(--success); }
@@ -3753,28 +3782,28 @@ span.flatpickr-weekday {
 .analytics-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  padding: .75rem 1.75rem 2rem;
+  gap: .75rem;
+  padding: .5rem 1.75rem 1.5rem;
 }
 
 .analytics-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem;
+  padding: 1rem;
   box-shadow: var(--shadow-sm);
-  min-height: 280px;
+  height: 260px;
   display: flex;
   flex-direction: column;
 }
 
 .analytics-card h3 {
-  font-size: .8rem;
+  font-size: .7rem;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: .04em;
-  margin-bottom: .75rem;
+  margin-bottom: .5rem;
   flex-shrink: 0;
 }
 
@@ -3785,23 +3814,31 @@ span.flatpickr-weekday {
 
 .analytics-card-wide {
   grid-column: 1 / -1;
+  height: 220px;
+}
+
+@media (max-width: 900px) {
+  .analytics-kpis { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 768px) {
   .analytics-grid {
     grid-template-columns: 1fr;
-    padding: .75rem 1rem 2rem;
+    padding: .5rem 1rem 1.5rem;
   }
-  .analytics-card-wide {
-    grid-column: auto;
-  }
+  .analytics-card-wide { grid-column: auto; }
+  .analytics-card { height: 220px; }
+  .analytics-card-wide { height: 200px; }
   .analytics-kpis {
-    grid-template-columns: repeat(2, 1fr);
-    padding: .75rem 1rem;
+    grid-template-columns: repeat(3, 1fr);
+    padding: .5rem 1rem;
   }
   .analytics-toolbar {
-    padding: 1rem;
+    padding: .75rem 1rem .5rem;
+    flex-direction: column;
+    align-items: stretch;
   }
+  .analytics-tabs { margin-left: 0; }
 }
 
 /* ===========================
