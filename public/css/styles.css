@@ -167,15 +167,15 @@
   --radius-lg: 14px;
   --radius-xs: 4px;
 
-  /* Glass tokens */
-  --glass-bg: linear-gradient(135deg, rgba(110,231,168,.06) 0%, rgba(255,255,255,.02) 100%);
-  --glass-bg-strong: linear-gradient(155deg, rgba(110,231,168,.09) 0%, rgba(255,255,255,.03) 100%);
-  --glass-border: rgba(110,231,168,.16);
-  --glass-border-subtle: rgba(110,231,168,.06);
-  --glass-highlight: rgba(255,255,255,.08);
+  /* Glass tokens (unused — kept for reference) */
+  --glass-bg: none;
+  --glass-bg-strong: none;
+  --glass-border: var(--border);
+  --glass-border-subtle: var(--border);
+  --glass-highlight: transparent;
   --glass-shadow: rgba(0,0,0,.5);
-  --glass-blur: 20px;
-  --glass-saturate: 180%;
+  --glass-blur: 0;
+  --glass-saturate: 100%;
 }
 
 /* Dark mode text contrast for heatmap cells */
@@ -197,13 +197,11 @@
 
 [data-theme="dark"] .modal-content {
   background: var(--surface);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.05);
+  box-shadow: var(--shadow-lg);
 }
 
 [data-theme="dark"] .topbar {
-  background: rgba(10,12,16,.8);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: #0e1016;
 }
 
 [data-theme="dark"] .btn-danger {
@@ -3845,7 +3843,7 @@ span.flatpickr-weekday {
    Dark mode only — editorial stays clean
    =========================== */
 
-/* --- Glass surfaces: DARK MODE ONLY --- */
+/* --- Card surfaces: DARK MODE ONLY --- */
 [data-theme="dark"] .client-card,
 [data-theme="dark"] .team-card,
 [data-theme="dark"] .stat-card,
@@ -3853,108 +3851,77 @@ span.flatpickr-weekday {
 [data-theme="dark"] .analytics-kpi,
 [data-theme="dark"] .heatmap-summary-card,
 [data-theme="dark"] .dropdown-menu {
-  background: rgba(24,27,36,.85);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255,255,255,.06);
-  box-shadow: 0 4px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
   position: relative;
 }
 
-/* Glass card hover: dark mode only */
+/* Card hover: dark mode only */
 [data-theme="dark"] .client-card:hover,
 [data-theme="dark"] .team-card:hover,
 [data-theme="dark"] .stat-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(110,231,168,.14);
-  box-shadow: 0 8px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(110,231,168,.08);
-  transition: all .25s var(--ease);
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  transition: all .2s var(--ease);
 }
 
-/* --- Frosted sidebar: dark mode only --- */
+/* --- Sidebar: dark mode only --- */
 [data-theme="dark"] .sidebar {
-  background: rgba(14,16,22,.92) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border-right: 1px solid rgba(255,255,255,.05) !important;
-  box-shadow: 4px 0 32px rgba(0,0,0,.4);
+  background: #0e1016 !important;
+  border-right: 1px solid var(--border) !important;
+  box-shadow: 2px 0 8px rgba(0,0,0,.3);
 }
 
-/* --- Frosted topbar: dark mode only --- */
+/* --- Topbar: dark mode only --- */
 [data-theme="dark"] .topbar {
-  background: rgba(12,14,20,.80) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border-bottom: 1px solid rgba(255,255,255,.05) !important;
-  box-shadow: 0 1px 16px rgba(0,0,0,.35);
+  background: #0e1016 !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
 }
 
-/* --- Glass nav active pill: dark mode only --- */
+/* --- Nav active pill: dark mode only --- */
 [data-theme="dark"] .nav-item.active {
-  background: rgba(110,231,168,.10) !important;
-  border: 1px solid rgba(110,231,168,.18);
-  box-shadow: 0 0 12px rgba(110,231,168,.06);
+  background: rgba(110,231,168,.08) !important;
+  border: 1px solid rgba(110,231,168,.14);
   border-left: 3px solid var(--accent) !important;
 }
 
-/* --- Glass modal: dark mode only --- */
+/* --- Modal: dark mode only --- */
 [data-theme="dark"] .modal-content {
-  background: rgba(20,23,31,.96) !important;
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255,255,255,.06);
-  box-shadow: 0 24px 64px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
 }
 
 [data-theme="dark"] .modal-backdrop {
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(0,0,0,.6);
 }
 
-/* --- Glass dropdown: dark mode only --- */
+/* --- Dropdown: dark mode only --- */
 [data-theme="dark"] .dropdown-menu {
-  background: rgba(20,23,31,.95) !important;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-color: rgba(255,255,255,.06);
+  background: var(--surface) !important;
+  border-color: var(--border);
 }
 
-/* --- Glass buttons --- */
+/* --- Buttons --- */
 .btn-primary {
   position: relative;
   overflow: hidden;
 }
 
-[data-theme="dark"] .btn-primary::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
-  transition: left .5s var(--ease);
-}
-
-[data-theme="dark"] .btn-primary:hover::before {
-  left: 100%;
-}
-
-/* --- Glass toast: dark mode only --- */
+/* --- Toast: dark mode only --- */
 [data-theme="dark"] .toast {
-  background: rgba(24,27,36,.92) !important;
-  border: 1px solid rgba(255,255,255,.06);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
 }
 
-/* --- Glass search box: dark mode only --- */
+/* --- Search box: dark mode only --- */
 [data-theme="dark"] .search-box {
-  background: rgba(24,27,36,.6) !important;
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border-color: rgba(255,255,255,.08) !important;
+  background: var(--bg-elev) !important;
+  border-color: var(--border) !important;
 }
 
 [data-theme="dark"] .search-box:focus-within {
@@ -3998,7 +3965,7 @@ span.flatpickr-weekday {
 }
 
 [data-theme="editorial"] .orb { opacity: 0; }
-[data-theme="dark"] .orb { opacity: .22; }
+[data-theme="dark"] .orb { opacity: 0; }
 
 [data-theme="dark"] .orb.o1 {
   background: #7dd3a3;
@@ -4050,22 +4017,14 @@ span.flatpickr-weekday {
   50% { border-radius: 45% 55% 55% 45% / 55% 45% 50% 50%; transform: translate(25px, -25px) scale(1.12); }
 }
 
-/* --- Dark mode ambient glow on body --- */
+/* --- Dark mode body --- */
 [data-theme="dark"] body {
-  background: var(--bg) radial-gradient(ellipse 120% 70% at 50% 0%, rgba(125,211,163,.06), transparent 55%) no-repeat !important;
+  background: var(--bg) !important;
 }
 
-/* --- Dark mode glass glow on scrollable areas --- */
+/* --- Dark mode scrollable areas (no glow) --- */
 [data-theme="dark"] .main-content::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 300px;
-  background: radial-gradient(ellipse 80% 100% at 60% -20%, rgba(125,211,163,.04), transparent);
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 
 /* --- Page title editorial style --- */
