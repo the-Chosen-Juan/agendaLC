@@ -3252,9 +3252,9 @@ function renderCalendar() {
         const prefix = to.assignee + ' - ';
         if (calTitle.startsWith(prefix)) calTitle = calTitle.slice(prefix.length);
       }
-      const displayLabel = calTitle || `${to.assignee} (${typeLabel})`;
-      eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="background:${color}" title="${escAttr(displayLabel)}" data-task-id="${to.id}" data-event-type="timeoff">
-        ${showLabel ? `<span class="material-icons-round">beach_access</span>${escHtml(displayLabel)}` : '&nbsp;'}
+      const displayLabel = calTitle ? `${to.assignee} — ${calTitle}` : `${to.assignee} (${typeLabel})`;
+      eventsHtml += `<div class="calendar-event timeoff timeoff-${pos}" style="--to-color:${color}" title="${escAttr(displayLabel)}" data-task-id="${to.id}" data-event-type="timeoff">
+        ${showLabel ? `<span class="material-icons-round">${typeLabel === 'OOO' ? 'laptop_mac' : 'beach_access'}</span><strong>${escHtml(to.assignee)}</strong> <span class="to-detail">${escHtml(calTitle || typeLabel)}</span>` : '&nbsp;'}
       </div>`;
       nextLane = (to._lane || 0) + 1;
     });
