@@ -673,6 +673,10 @@ h1, h2, h3, .heading {
   color: #fff;
   border-color: var(--primary);
 }
+[data-theme="dark"] .chip.active {
+  color: #0c0e14;
+  font-weight: 600;
+}
 
 .priority-dot {
   width: 8px;
@@ -1488,76 +1492,104 @@ h1, h2, h3, .heading {
 
 .calendar-event.timeoff {
   --to-color: #888;
-  background: transparent !important;
-  color: var(--to-color);
-  border: 1.5px solid var(--to-color);
-  border-radius: 4px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 3px,
+      rgba(0,0,0,.07) 3px,
+      rgba(0,0,0,.07) 6px
+    ),
+    #fef3c7 !important;
+  color: #92400e;
+  border: none;
+  border-left: 3px solid #f59e0b;
+  border-radius: 3px;
   font-weight: 600;
+  font-size: .7rem;
   opacity: 1;
   display: flex;
   align-items: center;
   gap: 3px;
+  padding: .25rem .4rem;
+  min-height: 20px;
+}
+.calendar-event.timeoff .material-icons-round {
+  color: #d97706;
+  font-size: .75rem;
 }
 .calendar-event.timeoff strong {
-  color: var(--to-color);
-  font-weight: 700;
+  color: #78350f;
+  font-weight: 800;
   flex-shrink: 0;
 }
 .calendar-event.timeoff .to-detail {
-  opacity: .7;
+  opacity: .65;
   font-weight: 500;
 }
 [data-theme="dark"] .calendar-event.timeoff {
-  background: color-mix(in srgb, var(--to-color) 12%, transparent) !important;
-  color: color-mix(in srgb, var(--to-color) 80%, #fff);
-  border-color: color-mix(in srgb, var(--to-color) 40%, transparent);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 3px,
+      rgba(251,191,36,.08) 3px,
+      rgba(251,191,36,.08) 6px
+    ),
+    rgba(251,191,36,.12) !important;
+  color: #fbbf24;
+  border-left: 3px solid #f59e0b;
+}
+[data-theme="dark"] .calendar-event.timeoff .material-icons-round {
+  color: #f59e0b;
 }
 [data-theme="dark"] .calendar-event.timeoff strong {
-  color: color-mix(in srgb, var(--to-color) 70%, #fff);
+  color: #fcd34d;
+}
+[data-theme="dark"] .calendar-event.timeoff .to-detail {
+  color: #fbbf24;
+  opacity: .7;
 }
 
 /* Multi-day time off connected bars */
 .calendar-event.timeoff.timeoff-start {
-  border-radius: 4px 0 0 4px;
-  border-right: none;
+  border-radius: 3px 0 0 3px;
   margin-right: -6px;
   padding-right: 8px;
 }
 .calendar-event.timeoff.timeoff-middle {
   border-radius: 0;
   border-left: none;
-  border-right: none;
   margin-left: -6px;
   margin-right: -6px;
   padding-left: 4px;
-  min-height: 18px;
+  min-height: 20px;
 }
 .calendar-event.timeoff.timeoff-end {
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 3px 3px 0;
   border-left: none;
   margin-left: -6px;
   padding-left: 4px;
-  min-height: 18px;
+  min-height: 20px;
 }
 .calendar-event.timeoff.timeoff-single {
-  border-radius: 4px;
+  border-radius: 3px;
 }
 /* Week boundary: bar resumes at start of a new week row */
 .calendar-event.timeoff.timeoff-week-start {
-  border-radius: 4px 0 0 4px;
-  border-right: none;
+  border-radius: 3px 0 0 3px;
   margin-right: -6px;
   padding-right: 8px;
 }
 .calendar-event.timeoff.timeoff-week-end {
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 3px 3px 0;
   border-left: none;
   margin-left: -6px;
   padding-left: 4px;
-  min-height: 18px;
+  min-height: 20px;
 }
 .calendar-event.timeoff.timeoff-week-start-end {
-  border-radius: 4px;
+  border-radius: 3px;
 }
 /* Invisible spacer to hold lanes in consistent vertical position */
 .calendar-event.timeoff-spacer {
